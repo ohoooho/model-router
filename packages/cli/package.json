@@ -1,11 +1,11 @@
 {
-  "name": "@musistudio/claude-code-router",
-  "version": "3.0.18",
+  "name": "@ohoooho/model-router",
+  "version": "0.1.0",
   "license": "MIT",
-  "description": "Local Claude Code Router gateway with CLI and web management UI.",
+  "description": "桃仙模型路由网关 OMR — local model router gateway (fork of claude-code-router)",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/musistudio/claude-code-router.git"
+    "url": "https://git.dbhys.com/ohoooho/ohoooho-model-router.git"
   },
   "bugs": {
     "url": "https://github.com/musistudio/claude-code-router/issues"
@@ -20,6 +20,7 @@
   ],
   "main": "dist/main/cli.js",
   "bin": {
+    "model-router": "dist/main/cli.js",
     "ccr": "dist/main/cli.js"
   },
   "files": [

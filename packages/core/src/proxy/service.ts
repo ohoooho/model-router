@@ -1548,14 +1548,14 @@ function normalizeFingerprint(value: string): string {
 function macosSystemCertificateInstallScript(): string {
   return [
     "set -e",
-    "/usr/bin/security delete-certificate -c 'Claude Code Router CA' /Library/Keychains/System.keychain >/dev/null 2>&1 || true",
+    "/usr/bin/security delete-certificate -c 'OMR CA' /Library/Keychains/System.keychain >/dev/null 2>&1 || true",
     `/usr/bin/security add-trusted-cert -d -r trustRoot -p ssl -k /Library/Keychains/System.keychain ${quoteShellArg(PROXY_CA_CERT_FILE)}`
   ].join("; ");
 }
 
 function macosManualCertificateInstallCommand(): string {
   return [
-    "sudo /usr/bin/security delete-certificate -c 'Claude Code Router CA' /Library/Keychains/System.keychain || true",
+    "sudo /usr/bin/security delete-certificate -c 'OMR CA' /Library/Keychains/System.keychain || true",
     `sudo /usr/bin/security add-trusted-cert -d -r trustRoot -p ssl -k /Library/Keychains/System.keychain ${quoteShellArg(PROXY_CA_CERT_FILE)}`
   ].join("\n");
 }
@@ -1606,7 +1606,7 @@ function macosTerminalCertificateInstallScript(): string {
     "echo 'Installing CCR Proxy CA into the macOS System keychain.'",
     "echo 'Terminal will ask for your macOS password if sudo is required.'",
     "echo ''",
-    "sudo /usr/bin/security delete-certificate -c 'Claude Code Router CA' /Library/Keychains/System.keychain >/dev/null 2>&1 || true",
+    "sudo /usr/bin/security delete-certificate -c 'OMR CA' /Library/Keychains/System.keychain >/dev/null 2>&1 || true",
     `sudo /usr/bin/security add-trusted-cert -d -r trustRoot -p ssl -k /Library/Keychains/System.keychain ${quoteShellArg(PROXY_CA_CERT_FILE)}`,
     "echo ''",
     "echo 'Done. Return to CCR, click Check Trust, then restart proxy mode and Chrome.'",

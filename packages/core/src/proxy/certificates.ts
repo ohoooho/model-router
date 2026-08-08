@@ -45,11 +45,11 @@ export function ensureProxyCertificateAuthority(): void {
   cert.validity.notAfter.setFullYear(cert.validity.notAfter.getFullYear() + 20);
 
   const attrs = [
-    { name: "commonName", value: `Claude Code Router CA (${os.hostname()})` },
+    { name: "commonName", value: `OMR CA (${os.hostname()})` },
     { name: "countryName", value: "US" },
     { shortName: "ST", value: "California" },
     { name: "localityName", value: "San Francisco" },
-    { name: "organizationName", value: "Claude Code Router" },
+    { name: "organizationName", value: "OMR" },
     { shortName: "OU", value: "CCR MITM Proxy" }
   ];
   cert.setSubject(attrs);

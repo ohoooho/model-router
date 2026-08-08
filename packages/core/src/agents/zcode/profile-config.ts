@@ -63,7 +63,7 @@ export function writeZcodeGatewayConfig(
     ])),
     models: modelCatalog.models.map((item) => item.slug),
     providerId,
-    providerName: profile.providerName?.trim() || "Claude Code Router",
+    providerName: profile.providerName?.trim() || "OMR",
     token
   };
   const cliResult = writeJsonFile(file, buildZcodeGatewayConfig(readJsonObject(file), values), options);

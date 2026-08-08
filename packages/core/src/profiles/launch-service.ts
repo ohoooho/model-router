@@ -1955,7 +1955,7 @@ function shellRcPathBlock(): string {
   const binDir = "$HOME/.claude-code-router/bin";
   return [
     ccrPathBlockStart,
-    "# Added by Claude Code Router. Enables the ccr-app command in new shells.",
+    "# Added by OMR. Enables the ccr-app command in new shells.",
     'case ":$PATH:" in',
     `  *":${binDir}:"*) ;;`,
     `  *) export PATH="${binDir}:$PATH" ;;`,
@@ -1988,7 +1988,7 @@ function ensureFishPathBlock(file: string, binDir: string): void {
 function fishPathBlock(): string {
   return [
     ccrPathBlockStart,
-    "# Added by Claude Code Router. Enables the ccr-app command in new shells.",
+    "# Added by OMR. Enables the ccr-app command in new shells.",
     'set -l ccr_bin "$HOME/.claude-code-router/bin"',
     "if not contains $ccr_bin $PATH",
     "    set -gx PATH $ccr_bin $PATH",

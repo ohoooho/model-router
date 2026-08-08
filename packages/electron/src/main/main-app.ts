@@ -84,7 +84,7 @@ function startPrimaryInstance(): void {
     const detail = formatErrorDetail(error);
     console.error(`Failed to initialize ${app.name || "application"}: ${detail}`);
     try {
-      dialog.showErrorBox("Claude Code Router failed to start", detail);
+      dialog.showErrorBox("OMR failed to start", detail);
     } catch {
       // Keep the console log as the fallback diagnostic channel.
     }

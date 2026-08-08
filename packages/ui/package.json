@@ -1,8 +1,8 @@
 {
-  "name": "@claude-code-router/ui",
-  "version": "3.0.18",
+  "name": "@ohoooho/model-router-ui",
+  "version": "0.1.0",
   "private": true,
-  "description": "Claude Code Router web management UI.",
+  "description": "OMR web management UI.",
   "scripts": {
     "test": "node ../../build/test.mjs ui && node ../../build/run-tests.mjs ui",
     "test:unit": "node ../../build/test.mjs ui --scope unit && node ../../build/run-tests.mjs ui",

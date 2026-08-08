@@ -32,7 +32,7 @@
 
 <div align="center">
 
-# Claude Code Router
+# OMR — 桃仙模型路由网关
 
 ### 在一个地方，管理你所有的 Agent 与 Provider
 

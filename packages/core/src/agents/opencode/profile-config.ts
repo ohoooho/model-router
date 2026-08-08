@@ -94,7 +94,7 @@ export function openCodeProviderId(profile: Pick<ProfileConfig, "providerId">): 
 
 function openCodeGatewayOverrides(config: AppConfig, profile: ProfileConfig, token: string): Record<string, unknown> {
   const providerId = openCodeProviderId(profile);
-  const providerName = profile.providerName?.trim() || "Claude Code Router";
+  const providerName = profile.providerName?.trim() || "OMR";
   const model = normalizeClientModel(profile.model) || defaultClientModel(config);
   const modelRef = `${providerId}/${model}`;
   const models = openCodeModelConfigs(config, model);

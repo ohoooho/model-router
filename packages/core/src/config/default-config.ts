@@ -31,7 +31,63 @@ export function createDefaultAppConfig(options: DefaultAppConfigOptions = {}): A
     CUSTOM_ROUTER_PATH: "",
     HOST: "127.0.0.1",
     PORT: 3456,
-    Providers: [],
+    Providers: [
+      {
+        name: "baozi",
+        baseUrl: "https://llm.ohoooho.com/v1",
+        apiKey: "",
+        models: [
+          "MiniMax-M3",
+          "claude-sonnet-4-5",
+          "kimi-k2.6",
+          "kimi-k2.7-code",
+          "deepseek-v3",
+          "qwen3-max",
+          "glm-4.6"
+        ]
+      },
+      {
+        name: "ds",
+        baseUrl: "https://api.deepseek.com/v1",
+        apiKey: "",
+        apiFormat: "OpenAI Chat",
+        models: ["deepseek-v4-pro", "deepseek-v4-flash"]
+      },
+      {
+        name: "ark",
+        baseUrl: "https://ark.cn-beijing.volces.com/api/coding/v3/v1",
+        apiKey: "",
+        apiFormat: "OpenAI Chat",
+        models: [
+          "doubao-seed-2.0-code",
+          "doubao-seed-2.0-pro",
+          "glm-5.2",
+          "kimi-k2.7-code",
+          "deepseek-v4-pro",
+          "deepseek-v4-flash",
+          "minimax-m3"
+        ]
+      },
+      {
+        name: "ali-agent-plan",
+        baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        apiKey: "",
+        apiFormat: "OpenAI Chat",
+        models: ["qwen3.8-max", "qwen-max", "qwen-plus"]
+      },
+      {
+        name: "minimaxi",
+        baseUrl: "https://api.minimaxi.com/anthropic",
+        apiKey: "",
+        models: ["MiniMax-M3"]
+      },
+      {
+        name: "anthropic",
+        baseUrl: "https://api.anthropic.com",
+        apiKey: "",
+        models: ["claude-sonnet-4-5", "claude-opus-4-5", "claude-haiku-4-5"]
+      }
+    ],
     Router: {
       builtInRules: {
         "claude-code": {
@@ -42,8 +98,16 @@ export function createDefaultAppConfig(options: DefaultAppConfigOptions = {}): A
         }
       },
       fallback: {
-        mode: "off",
-        models: [],
+        mode: "sequential",
+        models: [
+          "baozi,MiniMax-M3",
+          "ds,deepseek-v4-pro",
+          "ds,deepseek-v4-flash",
+          "ark,deepseek-v4-flash",
+          "minimaxi,MiniMax-M3",
+          "ali-agent-plan,qwen3.8-max",
+          "anthropic,claude-sonnet-4-5"
+        ],
         retryCount: 1
       },
       rules: []
@@ -124,7 +188,7 @@ export function createDefaultAppConfig(options: DefaultAppConfigOptions = {}): A
       requestLogSuccessSampleRate: 1,
       requestLogs: false
     },
-    preferredProvider: "",
+    preferredProvider: "baozi",
     plugins: [],
     profile: {
       claudeCode: {
@@ -148,7 +212,7 @@ export function createDefaultAppConfig(options: DefaultAppConfigOptions = {}): A
         managedCompact: false,
         model: "",
         providerId: "claude-code-router",
-        providerName: "Claude Code Router",
+        providerName: "OMR",
         showAllSessions: false
       },
       enabled: true,
@@ -184,7 +248,7 @@ export function createDefaultAppConfig(options: DefaultAppConfigOptions = {}): A
           model: "",
           name: "Codex",
           providerId: "claude-code-router",
-          providerName: "Claude Code Router",
+          providerName: "OMR",
           showAllSessions: false,
           scope: "global",
           surface: "auto"

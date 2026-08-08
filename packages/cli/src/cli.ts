@@ -122,7 +122,7 @@ async function main(): Promise<void> {
     throw new Error("ZCode profiles can only open the app; agent arguments are not supported.");
   }
   if (profile.agent === "claude-design") {
-    throw new Error("Claude Design profiles can only be opened from CCR Desktop.");
+    throw new Error("Claude Design profiles can only be opened from OMR Desktop.");
   }
   if (profile.agent === "claude-code" && resolvedSurface === "app" && profileOptions.agentArgs.length > 0) {
     throw new Error("Claude App profiles do not support agent arguments.");
@@ -208,7 +208,7 @@ async function main(): Promise<void> {
     const plan = buildProfileLaunchPlan(configDir, profile, resolvedSurface, profileOptions.agentArgs);
 
     if (path.isAbsolute(plan.command) && !existsSync(plan.command)) {
-      throw new Error(`Profile launcher was not found: ${plan.command}. Open CCR once or re-save the profile.`);
+      throw new Error(`Profile launcher was not found: ${plan.command}. Open OMR once or re-save the profile.`);
     }
 
     const childEnv = {
@@ -404,15 +404,15 @@ async function startService(options: WebCliOptions): Promise<ServiceState> {
     });
     const spawnError = await waitForImmediateSpawnError(child, 1000);
     if (spawnError) {
-      throw new Error(`Failed to start CCR service: ${spawnError}`);
+      throw new Error(`Failed to start OMR service: ${spawnError}`);
     }
     child.unref();
 
     const state = await waitForServiceState(child.pid, serviceStartTimeoutMs);
     if (!state) {
-      throw new Error(`CCR service did not report ready within ${serviceStartTimeoutMs}ms.`);
+      throw new Error(`OMR service did not report ready within ${serviceStartTimeoutMs}ms.`);
     }
-    process.stdout.write(`CCR service started at ${state.url} (pid ${state.pid}).\n`);
+    process.stdout.write(`OMR service started at ${state.url} (pid ${state.pid}).\n`);
     if (options.open) {
       await openManagementUrl(state.url);
     }
@@ -427,7 +427,7 @@ async function reuseRunningService(current: ServiceState, options: WebCliOptions
   if (options.startGateway && (!state.startGateway || options.ensureGatewayRunning)) {
     const gatewayStatus = await callServiceRpc<GatewayStatus>(state, "startGateway");
     if (gatewayStatus.state !== "running") {
-      throw new Error(gatewayStatus.lastError || "CCR service did not start the gateway.");
+      throw new Error(gatewayStatus.lastError || "OMR service did not start the gateway.");
     }
     state = { ...state, startGateway: true };
   }
@@ -437,7 +437,7 @@ async function reuseRunningService(current: ServiceState, options: WebCliOptions
   if (state !== current) {
     writeServiceState(state);
   }
-  process.stdout.write(`CCR service is already running at ${state.url} (pid ${state.pid}).\n`);
+  process.stdout.write(`OMR service is already running at ${state.url} (pid ${state.pid}).\n`);
   if (options.open) {
     await openManagementUrl(state.url);
   }
@@ -454,10 +454,10 @@ async function openManagementUi(options: WebCliOptions): Promise<void> {
 async function openManagementUrl(url: string): Promise<void> {
   try {
     await openSystemExternal(url);
-    process.stdout.write(`Opened CCR management UI at ${url}\n`);
+    process.stdout.write(`Opened OMR management UI at ${url}\n`);
   } catch (error) {
     process.stderr.write(`Failed to open browser: ${formatError(error)}\n`);
-    process.stdout.write(`CCR management UI is available at ${url}\n`);
+    process.stdout.write(`OMR management UI is available at ${url}\n`);
   }
 }
 
@@ -495,7 +495,7 @@ async function runWebServer(options: WebCliOptions): Promise<void> {
       url: runtime.url
     });
   }
-  process.stdout.write(`CCR web management is running at ${runtime.url}\n`);
+  process.stdout.write(`OMR web management is running at ${runtime.url}\n`);
 
   let closing = false;
   let profileLeaseMonitor: NodeJS.Timeout | undefined;
@@ -544,13 +544,13 @@ async function runWebServer(options: WebCliOptions): Promise<void> {
 async function stopService(): Promise<void> {
   const state = readServiceState();
   if (!state) {
-    process.stdout.write("CCR service is not running.\n");
+    process.stdout.write("OMR service is not running.\n");
     return;
   }
   const verification = await verifyServiceState(state);
   if (!verification.ok) {
     clearServiceState(state.pid);
-    process.stdout.write("CCR service is not running.\n");
+    process.stdout.write("OMR service is not running.\n");
     return;
   }
 
@@ -559,10 +559,10 @@ async function stopService(): Promise<void> {
     ? await waitForProcessExit(state.pid, serviceStopTimeoutMs)
     : await waitForServiceUnavailable(state, serviceStopTimeoutMs);
   if (!stopped) {
-    throw new Error(`CCR service did not stop within ${serviceStopTimeoutMs}ms.`);
+    throw new Error(`OMR service did not stop within ${serviceStopTimeoutMs}ms.`);
   }
   clearServiceState(state.pid);
-  process.stdout.write("CCR service stopped.\n");
+  process.stdout.write("OMR service stopped.\n");
 }
 
 function printHelp(exitCode: number): void {
@@ -624,7 +624,7 @@ function printUiHelp(exitCode: number): void {
     "Usage:",
     `  ${command} ui [--host <host>] [--port <port>] [--open|--no-open] [--gateway|--no-gateway]`,
     "",
-    "Starts the background CCR service if needed and opens the management UI in the default browser.",
+    "Starts the background OMR service if needed and opens the management UI in the default browser.",
     "",
     "Options:",
     "  --host <host>    Management server host. Defaults to CCR_WEB_HOST or 127.0.0.1.",
@@ -650,7 +650,7 @@ function printStopHelp(exitCode: number): void {
     "Usage:",
     `  ${command} stop`,
     "",
-    `Stops the background CCR service started by \`${command} start\`.`
+    `Stops the background OMR service started by \`${command} start\`.`
   ].join("\n");
   const stream = exitCode === 0 ? process.stdout : process.stderr;
   stream.write(`${output}\n`);
@@ -928,7 +928,7 @@ async function verifyServiceState(state: ServiceState): Promise<ServiceStateVeri
   }
 
   const appInfo = await callServiceRpc<{ name?: unknown }>(state, "getAppInfo").catch(() => undefined);
-  return appInfo?.name === "Claude Code Router"
+  return appInfo?.name === "OMR"
     ? { ok: true, trustedPid: false }
     : { ok: false };
 }
@@ -937,13 +937,13 @@ async function waitForServiceUnavailable(state: ServiceState, timeoutMs: number)
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
     const appInfo = await callServiceRpc<{ name?: unknown }>(state, "getAppInfo").catch(() => undefined);
-    if (appInfo?.name !== "Claude Code Router") {
+    if (appInfo?.name !== "OMR") {
       return true;
     }
     await delay(150);
   }
   const appInfo = await callServiceRpc<{ name?: unknown }>(state, "getAppInfo").catch(() => undefined);
-  return appInfo?.name !== "Claude Code Router";
+  return appInfo?.name !== "OMR";
 }
 
 async function callServiceRpc<T>(state: ServiceState, method: string, args: unknown[] = [], timeoutMs = serviceRpcTimeoutMs): Promise<T> {

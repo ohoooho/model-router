@@ -1,8 +1,8 @@
 {
-  "name": "@claude-code-router/electron",
-  "version": "3.0.18",
+  "name": "@ohoooho/model-router-electron",
+  "version": "0.1.0",
   "private": true,
-  "description": "Claude Code Router Electron desktop shell.",
+  "description": "OMR desktop app (fork of claude-code-router electron).",
   "author": "musistudio",
   "main": "dist/main/main.js",
   "scripts": {
