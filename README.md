@@ -1,10 +1,10 @@
 <div align="center">
 
-# OMR — 桃仙模型路由网关
+# OMR — Model Router
 
 ### One local gateway for all your coding agents and models.
 
-OMR gives Claude Code, Codex, and compatible API clients **one stable local endpoint**, while you manage providers, models, accounts, routing rules, and failover from a single place. Built for teams and developers in China: domestic models first, no VPN required.
+OMR is a local model gateway and control plane for AI coding agents. It gives Claude Code, Codex, and compatible API clients **one stable local endpoint**, while you manage providers, models, accounts, routing rules, and failover from a single place.
 
 <p>
   <a href="#quick-start"><img alt="Quick Start" src="https://img.shields.io/badge/Get_Started-Quick_Start-16A34A?style=for-the-badge&logo=rocket&logoColor=white" /></a>
@@ -15,13 +15,13 @@ OMR gives Claude Code, Codex, and compatible API clients **one stable local endp
 
 ## What is OMR?
 
-OMR (桃仙模型路由网关, Model Router) is a local model gateway and control plane for AI coding agents. It is part of the 桃仙 (Peach) AI 分身 platform.
+OMR is a local model gateway and control plane for AI coding agents.
 
 Instead of configuring a separate model endpoint for every AI tool, you configure OMR **once**, then point all your agents at it:
 
 - **Claude Code / Codex / Cursor / Aider** and other compatible clients → `http://127.0.0.1:3456`
 - One place to manage providers, models, API keys, routing rules, and failover chains
-- Pre-configured for domestic providers: **baozi (llm.ohoooho.com) / DeepSeek / Ark / MiniMax / Qwen / Anthropic**
+- Pre-configured presets for common providers: **DeepSeek / Ark (Volcano) / MiniMax / Qwen (Alibaba) / Anthropic / OpenAI-compatible endpoints**
 - Smart fallback: if one provider fails, requests automatically roll to the next in the chain
 
 ## Core capabilities
@@ -94,4 +94,4 @@ OMR is a fork of [claude-code-router](https://github.com/musistudio/claude-code-
 
 ## License
 
-[MIT License](LICENSE) — © 2025 musistudio, © 2026 ohoooho (桃仙 / Peach).
+[MIT License](LICENSE) — © 2025 musistudio, © 2026 ohoooho.

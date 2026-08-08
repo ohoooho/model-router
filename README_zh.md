@@ -1,10 +1,10 @@
 <div align="center">
 
-# OMR — 桃仙模型路由网关
+# OMR — Model Router
 
 ### 所有 AI 编程工具，共用一个本地模型入口。
 
-OMR 让 Claude Code、Codex 和所有兼容 API 客户端共用一个**稳定的本地网关**，供应商、模型、账号、路由规则、故障降级全在一个地方管。面向国内开发者：国产模型优先，不用翻墙。
+OMR 是面向 AI 编程工具的本地模型网关与控制平面。它让 Claude Code、Codex 和所有兼容 API 客户端共用一个**稳定的本地网关**，供应商、模型、账号、路由规则、故障降级全在一个地方管。
 
 <p>
   <a href="#快速开始"><img alt="快速开始" src="https://img.shields.io/badge/快速开始-Quick_Start-16A34A?style=for-the-badge&logo=rocket&logoColor=white" /></a>
@@ -15,13 +15,13 @@ OMR 让 Claude Code、Codex 和所有兼容 API 客户端共用一个**稳定的
 
 ## OMR 是什么？
 
-OMR（桃仙模型路由网关，Model Router）是面向 AI 编程工具的本地模型网关与控制平面，是**桃仙（Peach）AI 分身平台**的一部分。
+OMR 是面向 AI 编程工具的本地模型网关与控制平面。
 
 不用给每个 AI 工具单独配模型，配一次 OMR，所有工具都指过来：
 
 - **Claude Code / Codex / Cursor / Aider** 等兼容客户端 → `http://127.0.0.1:3456`
 - 供应商、模型、API Key、路由规则、降级链，一个地方全管
-- 预置国产供应商：**baozi（llm.ohoooho.com）/ DeepSeek / 火山方舟 / MiniMax / 通义千问 / Anthropic**
+- 预置常用供应商预设：**DeepSeek / 火山方舟 / MiniMax / 通义千问 / Anthropic / 任意 OpenAI 兼容端点**
 - 智能降级：一个供应商挂了，请求自动切到链上下一个
 
 ## 核心能力
@@ -94,4 +94,4 @@ OMR fork 自 [claude-code-router](https://github.com/musistudio/claude-code-rout
 
 ## License
 
-[MIT License](LICENSE) — © 2025 musistudio，© 2026 ohoooho（桃仙 / Peach）。
+[MIT License](LICENSE) — © 2025 musistudio，© 2026 ohoooho。
