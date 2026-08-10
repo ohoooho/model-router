@@ -99,7 +99,7 @@ export function profileApiKeyName(profile: ProfileApiKeySource): string {
 }
 
 export function generateProfileApiKey(): string {
-  return `ccr-profile-${randomBase64Url(24)}`;
+  return `omr-profile-${randomBase64Url(24)}`;
 }
 
 function randomBase64Url(byteLength: number): string {

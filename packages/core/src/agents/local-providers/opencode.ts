@@ -214,7 +214,7 @@ function openCodeAuthPlugin(
         removeHeaders: ["authorization", "x-api-key"],
         strict: true
       },
-      key: `ccr-local-agent-${providerNameSlugPlaceholder}-${suffix}`,
+      key: `omr-local-agent-${providerNameSlugPlaceholder}-${suffix}`,
       providerName
     };
   }

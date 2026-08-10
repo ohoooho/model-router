@@ -229,7 +229,7 @@ function withMissingCodexOauthProviderPlugins(
       continue;
     }
 
-    const keyPrefix = `ccr-local-agent-${providerNameSlug(runtimeName)}`;
+    const keyPrefix = `omr-local-agent-${providerNameSlug(runtimeName)}`;
     additions.push({
       codexOauth: {
         accessToken: codexAuth.accessToken,
@@ -646,7 +646,7 @@ function isLocalCodexOauthProviderPlugin(value: unknown): value is Record<string
     return false;
   }
   const key = stringValue(value.key)?.toLowerCase() ?? "";
-  return key.startsWith("ccr-local-agent-") && key.includes("codex-oauth");
+  return key.startsWith("omr-local-agent-") && key.includes("codex-oauth");
 }
 
 
@@ -752,7 +752,7 @@ function isLocalGrokOauthProviderPlugin(value: unknown): value is Record<string,
     return false;
   }
   const key = stringValue(value.key)?.toLowerCase() ?? "";
-  return key.startsWith("ccr-local-agent-") && key.includes("grok-cli-oauth");
+  return key.startsWith("omr-local-agent-") && key.includes("grok-cli-oauth");
 }
 
 
@@ -761,7 +761,7 @@ function isLocalKimiOauthProviderPlugin(value: unknown): value is Record<string,
     return false;
   }
   const key = stringValue(value.key)?.toLowerCase() ?? "";
-  return key.startsWith("ccr-local-agent-") && key.includes("kimi-cli-oauth");
+  return key.startsWith("omr-local-agent-") && key.includes("kimi-cli-oauth");
 }
 
 

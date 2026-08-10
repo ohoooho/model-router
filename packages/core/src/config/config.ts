@@ -3947,7 +3947,7 @@ function createGeneratedGatewayApiKey(): ApiKeyConfig {
   return {
     createdAt: new Date().toISOString(),
     id: GENERATED_GATEWAY_API_KEY_ID,
-    key: `sk-ccr-${randomBytes(32).toString("base64url")}`,
+    key: `sk-omr-${randomBytes(32).toString("base64url")}`,
     name: "Local Gateway"
   };
 }

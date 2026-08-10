@@ -24,7 +24,7 @@ export type ApiTokenSet = {
 export const providerNamePlaceholder = "__CCR_PROVIDER_NAME__";
 export const providerNameSlugPlaceholder = "__CCR_PROVIDER_NAME_SLUG__";
 export const providerInternalNamePlaceholder = "__CCR_PROVIDER_INTERNAL_NAME__";
-export const localAgentProviderApiKey = "ccr-local-agent-login";
+export const localAgentProviderApiKey = "omr-local-agent-login";
 
 export function missingCandidate(
   kind: LocalAgentProviderKind,
@@ -103,7 +103,7 @@ export function bearerAuthPlugin(
       removeHeaders: ["x-api-key"],
       strict: true
     },
-    key: `ccr-local-agent-${providerNameSlugPlaceholder}-${suffix}`,
+    key: `omr-local-agent-${providerNameSlugPlaceholder}-${suffix}`,
     providerName
   };
 }
@@ -121,7 +121,7 @@ export function apiKeyAuthPlugin(
       removeHeaders: ["authorization"],
       strict: true
     },
-    key: `ccr-local-agent-${providerNameSlugPlaceholder}-${suffix}`,
+    key: `omr-local-agent-${providerNameSlugPlaceholder}-${suffix}`,
     providerName
   };
 }

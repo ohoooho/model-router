@@ -1406,7 +1406,7 @@ async function localAgentProviderAccountCredential(
   if (isLocalCodexProvider(provider)) {
     return await localCodexAccountCredential({
       codexOauth: { refreshIfMissingAccessToken: true },
-      key: "ccr-local-agent-codex-fallback-codex-oauth",
+      key: "omr-local-agent-codex-fallback-codex-oauth",
       providerName: provider.name
     });
   }
@@ -1424,7 +1424,7 @@ function localAgentProviderPluginMatches(plugin: unknown, provider: GatewayProvi
     return false;
   }
   const key = readString(plugin.key)?.toLowerCase() ?? "";
-  if (!key.startsWith("ccr-local-agent-")) {
+  if (!key.startsWith("omr-local-agent-")) {
     return false;
   }
 

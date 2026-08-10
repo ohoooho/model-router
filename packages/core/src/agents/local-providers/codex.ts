@@ -606,7 +606,7 @@ function providerApiKey(provider: GatewayProviderConfig): string {
 
 function codexOauthPlugin(suffix: string, providerName = providerNamePlaceholder): Record<string, unknown> {
   return {
-    key: `ccr-local-agent-${providerNameSlugPlaceholder}-${suffix}`,
+    key: `omr-local-agent-${providerNameSlugPlaceholder}-${suffix}`,
     providerName,
     request: codexBackendRequestTransform()
   };
