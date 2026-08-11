@@ -164,6 +164,26 @@ test("sortProviderCredentialCandidates with auto-balance prefers low-utilization
   assert.equal(sorted[2].credential.label, "carol", "highest utilization should be last");
 });
 
+test("auto-balance uses effective_weight = weight × (1 - utilization), not utilization alone", () => {
+  // 用户拍板方案 B（2026-08-11 16:47）：按剩余容量加权，重 credential 优先
+  // 关键场景: heavy credential 即使 utilization 高，剩余容量也更多 → 应该优先
+  const heavyUsed = makeCredential("heavy-used", { weight: 5 });
+  const lightFresh = makeCredential("light-fresh", { weight: 1 });
+
+  const candidates: Candidate[] = [
+    // lightFresh: weight=1, util=0 → effective = 1.0
+    makeCandidate(lightFresh, 0, 1, 0, 1),
+    // heavyUsed: weight=5, util=0.5 → effective = 5 × 0.5 = 2.5
+    makeCandidate(heavyUsed, 0.5, 1, 1, 5)
+  ];
+
+  const sorted = sortProviderCredentialCandidates(candidates, "auto-balance");
+  // heavyUsed (effective=2.5) 应该赢，即使 utilization 更高
+  assert.equal(sorted[0].credential.label, "heavy-used",
+    `weight×(1-utilization) should favor heavy credential even when its utilization is higher (heavy: 5×0.5=2.5 vs light: 1×1.0=1.0)`);
+  assert.equal(sorted[1].credential.label, "light-fresh");
+});
+
 // ── Case 2: waterfall ────────────────────────────────────────────────────────
 
 test("waterfall sends all 100 requests to priority=1 credential", () => {

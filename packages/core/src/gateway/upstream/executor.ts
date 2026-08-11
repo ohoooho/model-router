@@ -23,8 +23,6 @@ import { claudeCodeOauthBetaHeader, claudeCodeOauthRequiredBeta, UpstreamRequest
 import type { ApiKeyLimitUsage, ProviderCredentialRoutingTarget, UpstreamAttempt, UpstreamFailedAttempt, UpstreamFetchResult } from "@ccr/core/gateway/internal/shared";
 import type { RouteTraceObserver } from "@ccr/core/observability/route-trace";
 
-const providerCredentialSpilloverThreshold = 0.8;
-
 
 export function applyProviderCapabilityRouting(input: {
   body?: Buffer;
@@ -893,37 +891,21 @@ export function sortProviderCredentialCandidates<T extends {
 }
 
 
-// auto-balance (默认): 保留原有"按 priority + spillover"行为作为向后兼容基线
-//   第一轮: priority asc, utilization asc, weight desc → 低优先级 + 低利用率先吃
-//   spillover: 当 primary-priority 所有 candidate 都 >= 80% utilization 时改用 utilization asc
-//   本质是"先用满便宜的 key，满了再切下一个"
+// auto-balance (默认): 按 effective_weight = weight × (1 - utilization) DESC 排序
+//   剩余容量越多（weight 大 × utilization 低）→ 越优先被尝试
+//   这是用户拍板方案 B（2026-08-11 16:47）：比之前的 "priority + spillover" 更直觉
+//   tie-break: index asc（稳定排序，配置顺序优先）
 function sortAutoBalance<T extends {
   index: number;
   limitState: { utilization: number };
   priority: number;
   weight: number;
 }>(candidates: T[]): T[] {
-  const prioritySorted = [...candidates].sort((left, right) =>
-    left.priority - right.priority ||
-    left.limitState.utilization - right.limitState.utilization ||
-    right.weight - left.weight ||
-    left.index - right.index
-  );
-  const primaryPriority = prioritySorted[0]?.priority;
-  const primaryCandidates = prioritySorted.filter((candidate) => candidate.priority === primaryPriority);
-  const shouldSpillOver = primaryCandidates.length > 0 &&
-    primaryCandidates.every((candidate) => candidate.limitState.utilization >= providerCredentialSpilloverThreshold);
-
-  if (shouldSpillOver) {
-    return prioritySorted.sort((left, right) =>
-      left.limitState.utilization - right.limitState.utilization ||
-      left.priority - right.priority ||
-      right.weight - left.weight ||
-      left.index - right.index
-    );
-  }
-
-  return prioritySorted;
+  return [...candidates].sort((left, right) => {
+    const leftEffective = left.weight * (1 - left.limitState.utilization);
+    const rightEffective = right.weight * (1 - right.limitState.utilization);
+    return rightEffective - leftEffective || left.index - right.index;
+  });
 }
 
 
