@@ -108,8 +108,8 @@ type RawTraceStorageLimits = {
   inboxMaxBytes: number;
 };
 
-const rawTraceInboxDirectoryName = ".ccr-inbox";
-const rawTraceDeadLetterDirectoryName = ".ccr-dead-letter";
+const rawTraceInboxDirectoryName = ".omr-inbox";
+const rawTraceDeadLetterDirectoryName = ".omr-dead-letter";
 const rawTraceStagingDirectoryName = ".ccr-staging";
 const rawTraceDeliveryFileName = ".ccr-delivery.json";
 const rawTraceReadyFileName = ".ccr-ready.json";

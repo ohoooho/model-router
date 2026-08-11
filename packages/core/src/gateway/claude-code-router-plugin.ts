@@ -740,7 +740,7 @@ const ccrSubagentPromptFieldInstruction =
 type ClaudeCodeSubagentToolKind = "subagent" | "workflow";
 const claudeCodeAgentToolNames = new Set(["agent", "task"]);
 const claudeCodeWorkflowToolNames = new Set(["workflow"]);
-const ccrToolHubSystemInstructionMarker = "CCR ToolHub tool resolution is enabled.";
+const omrToolHubSystemInstructionMarker = "OMR ToolHub tool resolution is enabled.";
 
 function claudeCodeToolName(tool: Record<string, unknown>): string | undefined {
   const functionSpec = isRecord(tool.function) ? tool.function : undefined;
@@ -761,7 +761,7 @@ function injectClaudeCodeToolHubInstructions(body: Record<string, unknown>, conf
   }
   const invokeName = toolNames.invoke ?? "tool_hub.invoke";
   appendSystemInstruction(body, [
-    ccrToolHubSystemInstructionMarker,
+    omrToolHubSystemInstructionMarker,
     `The ToolHub search/resolution tool is ${toolNames.resolve}; call this actual tool, do not merely mention its name in text.`,
     `You MUST call the ToolHub search/resolution tool ${toolNames.resolve} before answering any request that asks about external services, installed MCP capabilities, business APIs, orders, coupons, stores, accounts, available tools, or capabilities that are not already obvious from the eager tools.`,
     `Do this even if the user did not mention ToolHub or ${toolNames.resolve}. Only skip the ToolHub search/resolution tool when the request is clearly local code/file/shell work or simple conversation that does not need an external or MCP capability.`,
@@ -801,7 +801,7 @@ function shouldUseClaudeCodeToolHubName(current: string | undefined, candidate: 
 
 function claudeCodeToolHubNameScore(name: string): number {
   const normalized = name.toLowerCase();
-  if (normalized.startsWith("mcp__ccr-toolhub__") || normalized.startsWith("mcp__ccr_toolhub__")) {
+  if (normalized.startsWith("mcp__omr-toolhub__") || normalized.startsWith("mcp__omr_toolhub__")) {
     return 3;
   }
   if (normalized.startsWith("mcp__") && normalized.includes("toolhub")) {
@@ -814,7 +814,7 @@ function claudeCodeToolHubNameScore(name: string): number {
 }
 
 function appendSystemInstruction(body: Record<string, unknown>, instruction: string): void {
-  if (systemContainsInstruction(body.system, ccrToolHubSystemInstructionMarker)) {
+  if (systemContainsInstruction(body.system, omrToolHubSystemInstructionMarker)) {
     return;
   }
   if (typeof body.system === "string") {

@@ -399,7 +399,7 @@ function createEphemeralCodexApiKeyBootstrap(runtimeAgent) {
     fs.mkdirSync(path.dirname(authFile), { recursive: true, mode: 0o700 });
     fs.writeFileSync(temporary, JSON.stringify({
       auth_mode: "apikey",
-      OPENAI_API_KEY: "ccr-local-profile"
+      OPENAI_API_KEY: "omr-local-profile"
     }, null, 2) + "\n", { mode: 0o600 });
     fs.renameSync(temporary, authFile);
     active = true;
@@ -426,7 +426,7 @@ function createEphemeralCodexApiKeyBootstrap(runtimeAgent) {
         keys[0] === "OPENAI_API_KEY" &&
         keys[1] === "auth_mode" &&
         value.auth_mode === "apikey" &&
-        value.OPENAI_API_KEY === "ccr-local-profile"
+        value.OPENAI_API_KEY === "omr-local-profile"
       ) {
         fs.unlinkSync(authFile);
         active = false;
@@ -4685,7 +4685,7 @@ function mockAccountRead() {
 
 function mockAuthStatus(includeToken) {
   const result = { authMethod: "amazonBedrock", authToken: null, requiresOpenaiAuth: false };
-  if (includeToken) result.authToken = "ccr-local-profile";
+  if (includeToken) result.authToken = "omr-local-profile";
   return result;
 }
 

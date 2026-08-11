@@ -181,7 +181,7 @@ type ResolveOutput = {
 };
 
 const protocolVersion = "2024-11-05";
-const toolHubServerName = "ccr-toolhub";
+const toolHubServerName = "omr-toolhub";
 const resolveToolName = "tool_hub.resolve";
 const invokeToolName = "tool_hub.invoke";
 const defaultRequestTimeoutMs = 60_000;

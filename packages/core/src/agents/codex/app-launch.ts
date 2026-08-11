@@ -334,7 +334,7 @@ export function removeLegacyCodexVirtualAuthMarker(codexHome: string): boolean {
       keys[0] !== "OPENAI_API_KEY" ||
       keys[1] !== "auth_mode" ||
       value.auth_mode !== "apikey" ||
-      value.OPENAI_API_KEY !== "ccr-local-profile"
+      value.OPENAI_API_KEY !== "omr-local-profile"
     ) {
       return false;
     }

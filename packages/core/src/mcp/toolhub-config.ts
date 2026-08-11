@@ -2,7 +2,7 @@ import { join as pathJoin } from "node:path";
 import { CONFIGDIR } from "@ccr/core/config/constants";
 import type { AppConfig, GatewayMcpServerConfig } from "@ccr/core/contracts/app";
 
-export const TOOL_HUB_MCP_SERVER_NAME = "ccr-toolhub";
+export const TOOL_HUB_MCP_SERVER_NAME = "omr-toolhub";
 export const TOOL_HUB_MCP_RUNTIME_FILE_NAME = "toolhub-mcp.js";
 export const BROWSER_AUTOMATION_MCP_SERVER_NAME = "ccr-browser-automation";
 export const BROWSER_AUTOMATION_MCP_PATH = "/__ccr/browser-automation/mcp";

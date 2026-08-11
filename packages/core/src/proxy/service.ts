@@ -1580,7 +1580,7 @@ async function windowsCurrentUserRootContainsCertificateThumbprint(thumbprint: s
 }
 
 async function openMacosTerminalCertificateInstaller(): Promise<string> {
-  const installerFile = path.join(os.tmpdir(), `ccr-install-proxy-ca-${randomUUID()}.command`);
+  const installerFile = path.join(os.tmpdir(), `omr-install-proxy-ca-${randomUUID()}.command`);
   writeFileSync(installerFile, `${macosTerminalCertificateInstallScript()}\n`, "utf8");
   chmodSync(installerFile, 0o700);
   await execFilePromise("/usr/bin/open", [installerFile]);

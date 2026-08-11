@@ -105,7 +105,7 @@ export type AppUpdateStatus = {
   supported: boolean;
 };
 
-export const BUILTIN_FUSION_TOOL_SERVER_NAME = "ccr-fusion-builtins";
+export const BUILTIN_FUSION_TOOL_SERVER_NAME = "omr-fusion-builtins";
 export const BUILTIN_FUSION_VISION_TOOL_NAME = "vision_understand";
 export const BUILTIN_FUSION_WEB_SEARCH_TOOL_NAME = "web_search";
 export const BUILTIN_FUSION_IMAGE_GENERATION_TOOL_NAME = "image_generation";
