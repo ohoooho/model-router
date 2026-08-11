@@ -1060,9 +1060,16 @@ export function hasAvailableGatewayModels(config: Pick<AppConfig, "Providers" | 
   return availableGatewayModelIds(config).length > 0;
 }
 
+// OMR-FORK-CHANGE-001（@omr/fork/hide-provider, 2026-08-11）
+// 桃仙 OMR 核心商业哲学：隐藏 Provider（dopple/PRINCIPLE-HIDE-PROVIDER.md）
+// 上游 CCR 强制暴露 `${providerName}/${modelName}` 格式 + `Fusion/` 场景前缀
+// 桃仙改造：/v1/models 返回纯模型名 + 场景 ID（无前缀），让客户不知道底层 provider
+// 改动 4 处：(1) baseEntries 不带 provider 前缀 (2) prefix 不带 provider 前缀
+//          (3) suffix 不带 provider 前缀 (4) 场景 ID 不带 Fusion 前缀
 export function availableGatewayModelIds(config: Pick<AppConfig, "Providers" | "virtualModelProfiles">): string[] {
   const baseEntries = availableGatewayBaseModelEntries(config.Providers);
-  const ids = baseEntries.map((entry) => `${entry.providerName}/${entry.modelName}`);
+  // OMR-FORK-CHANGE-001 (1): 原 `${entry.providerName}/${entry.modelName}` → 纯 modelName
+  const ids = baseEntries.map((entry) => entry.modelName);
 
   for (const profile of config.virtualModelProfiles ?? []) {
     if (!isGatewayModelVisibleVirtualProfile(profile)) {
@@ -1073,13 +1080,15 @@ export function availableGatewayModelIds(config: Pick<AppConfig, "Providers" | "
       for (const prefix of profile.match?.prefixes ?? []) {
         const normalizedPrefix = prefix.trim();
         if (normalizedPrefix) {
-          ids.push(`${entry.providerName}/${normalizedPrefix}${entry.modelName}`);
+          // OMR-FORK-CHANGE-001 (2): 原 `${entry.providerName}/${normalizedPrefix}${entry.modelName}` → 纯 prefix + modelName
+          ids.push(`${normalizedPrefix}${entry.modelName}`);
         }
       }
       for (const suffix of profile.match?.suffixes ?? []) {
         const normalizedSuffix = suffix.trim();
         if (normalizedSuffix) {
-          ids.push(`${entry.providerName}/${entry.modelName}${normalizedSuffix}`);
+          // OMR-FORK-CHANGE-001 (3): 原 `${entry.providerName}/${entry.modelName}${normalizedSuffix}` → 纯 modelName + suffix
+          ids.push(`${entry.modelName}${normalizedSuffix}`);
         }
       }
     }
@@ -1087,7 +1096,8 @@ export function availableGatewayModelIds(config: Pick<AppConfig, "Providers" | "
     for (const alias of profile.match?.exactAliases ?? []) {
       const normalizedAlias = alias.trim();
       if (normalizedAlias && baseEntries.length > 0) {
-        ids.push(normalizedAlias.toLowerCase().startsWith("fusion/") ? normalizedAlias : `Fusion/${normalizedAlias}`);
+        // OMR-FORK-CHANGE-001 (4): 原 `Fusion/${normalizedAlias}` 逻辑去掉 → 直接 push normalizedAlias
+        ids.push(normalizedAlias);
       }
     }
   }

@@ -276,7 +276,17 @@ function buildGatewayDiscoverableModelIds(config: AppConfig): string[] {
     }
   }
 
-  const ids = baseEntries.map((entry) => `${entry.providerName}/${entry.modelName}`);
+  // OMR-FORK-CHANGE-003（@omr/fork/hide-provider, 2026-08-11）
+  // 桃仙 OMR 核心商业哲学：隐藏 Provider（dopple/PRINCIPLE-HIDE-PROVIDER.md）
+  // OMR-FORK-CHANGE-001 改了 contracts/app.ts 的 availableGatewayModelIds（仅用于校验 .length），
+  //   真正服务 /v1/models 的是本函数（被 createGatewayModelsResponse / buildClaudeAppGatewayModelsResponse 调用）。
+  // 上游 CCR 强制暴露 `${providerName}/${modelName}` 格式 + `Fusion/` 场景前缀
+  // 桃仙改造：/v1/models 返回纯模型名 + 场景 ID（无前缀），让客户不知道底层 provider
+  // 改动 4 处：(1) baseEntries 不带 provider 前缀 (2) prefix 不带 provider 前缀
+  //          (3) suffix 不带 provider 前缀 (4) exactAliases 不带 Fusion 前缀
+  // 内部 routing 仍按 providerName 走（baseEntries 仍含 providerName，仅不暴露给 /v1/models）
+  // gatewayModelOwner() 检测不到 `/` 时回退到 "ccr"，所以 owned_by 也自动变成 "ccr"
+  const ids = baseEntries.map((entry) => entry.modelName);
   for (const profile of config.virtualModelProfiles ?? []) {
     if (!isVisibleVirtualModelProfile(profile)) {
       continue;
@@ -286,13 +296,13 @@ function buildGatewayDiscoverableModelIds(config: AppConfig): string[] {
       for (const prefix of profile.match?.prefixes ?? []) {
         const normalizedPrefix = prefix.trim();
         if (normalizedPrefix) {
-          ids.push(`${entry.providerName}/${normalizedPrefix}${entry.modelName}`);
+          ids.push(`${normalizedPrefix}${entry.modelName}`);
         }
       }
       for (const suffix of profile.match?.suffixes ?? []) {
         const normalizedSuffix = suffix.trim();
         if (normalizedSuffix) {
-          ids.push(`${entry.providerName}/${entry.modelName}${normalizedSuffix}`);
+          ids.push(`${entry.modelName}${normalizedSuffix}`);
         }
       }
     }
@@ -302,7 +312,7 @@ function buildGatewayDiscoverableModelIds(config: AppConfig): string[] {
       if (!normalizedAlias) {
         continue;
       }
-      ids.push(fusionModelSelector(normalizedAlias));
+      ids.push(normalizedAlias);
     }
   }
 
