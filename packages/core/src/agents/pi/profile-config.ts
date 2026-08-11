@@ -34,8 +34,8 @@ export function resolvePiSessionDir(configDir: string, profile: ProfileConfig): 
 export function piWrapperFilename(profile: ProfileConfig): string {
   const slug = sanitizePathSegment(profile.id || profile.name || profile.agent) || "pi";
   return process.platform === "win32"
-    ? `ccr-pi-wrapper-${slug}.cmd`
-    : `ccr-pi-wrapper-${slug}`;
+    ? `omr-pi-wrapper-${slug}.cmd`
+    : `omr-pi-wrapper-${slug}`;
 }
 
 export function writePiGatewayConfig(
@@ -48,7 +48,7 @@ export function writePiGatewayConfig(
   const profileHome = resolvePiAgentDir(configDir, profile);
   const sessionDir = resolvePiSessionDir(configDir, profile);
   const file = path.join(profileHome, "models.json");
-  const providerId = sanitizeProviderId(profile.providerId || "") || "claude-code-router";
+  const providerId = sanitizeProviderId(profile.providerId || "") || "omr";
   const models = piProfileModels(config, defaultModel);
   const model = models.includes(defaultModel) ? defaultModel : models[0] || defaultModel || "default";
   const content = `${JSON.stringify(piModelsJson(config, profile, providerId, token, models), null, 2)}\n`;
@@ -81,8 +81,8 @@ function piModelsJson(
         authHeader: true,
         baseUrl: `${gatewayEndpoint(config).replace(/\/+$/g, "")}/v1`,
         headers: {
-          "x-ccr-client": "pi",
-          "x-ccr-profile": profile.id || profile.name || "pi"
+          "x-omr-client": "pi",
+          "x-omr-profile": profile.id || profile.name || "pi"
         },
         models: models.map(piModelConfig)
       }

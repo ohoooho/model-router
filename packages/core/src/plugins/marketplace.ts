@@ -354,7 +354,7 @@ function normalizeMarketplacePluginAppUrl(value: string | undefined): string {
     throw new Error("Marketplace plugin app URL cannot be protocol-relative.");
   }
   if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)) {
-    throw new Error("Marketplace plugin app URL must be an http(s) URL or a CCR gateway path.");
+    throw new Error("Marketplace plugin app URL must be an http(s) URL or an OMR gateway path.");
   }
   return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
 }

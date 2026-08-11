@@ -775,7 +775,7 @@ function resolveLocalModulePath(value: string, label: string): string {
 
   const resolved = path.resolve(CONFIGDIR, expanded);
   if (!isPathInside(resolved, CONFIGDIR)) {
-    throw new Error(`${label} relative paths must stay inside the CCR config directory.`);
+    throw new Error(`${label} relative paths must stay inside the OMR config directory.`);
   }
   return resolved;
 }
@@ -893,7 +893,7 @@ function normalizePluginAppUrl(value: string | undefined): string {
     throw new Error("Plugin app URL cannot be protocol-relative.");
   }
   if (isProtocolSpecifier(trimmed)) {
-    throw new Error("Plugin app URL must be an http(s) URL or a CCR gateway path.");
+    throw new Error("Plugin app URL must be an http(s) URL or an OMR gateway path.");
   }
   return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
 }

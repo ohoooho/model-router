@@ -273,9 +273,9 @@ function isCodexAppPageTarget(target: DevToolsTarget): boolean {
 function validateCodexMediaArtifactUrl(value: string, endpoint: string): ValidatedArtifactUrl {
   const expected = new URL(endpoint);
   const url = new URL(value);
-  if (url.protocol !== "http:" || url.origin !== expected.origin) throw new Error("Artifact origin is not the configured CCR gateway.");
+  if (url.protocol !== "http:" || url.origin !== expected.origin) throw new Error("Artifact origin is not the configured OMR gateway.");
   if (url.username || url.password || url.hash) throw new Error("Artifact URL contains unsupported credentials or fragments.");
-  if (!url.pathname.startsWith(MEDIA_ARTIFACT_PATH_PREFIX)) throw new Error("Artifact URL does not use the CCR media artifact path.");
+  if (!url.pathname.startsWith(MEDIA_ARTIFACT_PATH_PREFIX)) throw new Error("Artifact URL does not use the OMR media artifact path.");
   const encodedId = url.pathname.slice(MEDIA_ARTIFACT_PATH_PREFIX.length);
   if (!encodedId || encodedId.includes("/")) throw new Error("Artifact URL contains an invalid identifier.");
   const artifactId = decodeURIComponent(encodedId);
@@ -299,22 +299,22 @@ async function loadCodexMediaArtifact(validated: ValidatedArtifactUrl, signal: A
       signal
     });
   } catch {
-    throw new Error("The CCR artifact request failed.");
+    throw new Error("The OMR artifact request failed.");
   }
-  if (!response.ok) throw new Error(`The CCR artifact endpoint returned HTTP ${response.status}.`);
-  if (response.redirected) throw new Error("The CCR artifact endpoint attempted a redirect.");
+  if (!response.ok) throw new Error(`The OMR artifact endpoint returned HTTP ${response.status}.`);
+  if (response.redirected) throw new Error("The OMR artifact endpoint attempted a redirect.");
   const declaredMimeType = (response.headers.get("content-type") || "").split(";", 1)[0].trim().toLowerCase();
   const declaredKind = mediaKind(declaredMimeType);
-  if (!declaredKind) throw new Error("The CCR artifact endpoint returned a non-media content type.");
+  if (!declaredKind) throw new Error("The OMR artifact endpoint returned a non-media content type.");
   const maxBytes = declaredKind === "video" ? codexMediaPreviewMaxVideoBytes : codexMediaPreviewMaxImageBytes;
   const declaredLength = Number(response.headers.get("content-length") || "0");
   if (declaredLength && (!Number.isSafeInteger(declaredLength) || declaredLength < 1 || declaredLength > maxBytes)) {
-    throw new Error("The CCR media artifact exceeds the inline preview size limit.");
+    throw new Error("The OMR media artifact exceeds the inline preview size limit.");
   }
   if (response.headers.get("content-encoding") && response.headers.get("content-encoding") !== "identity") {
-    throw new Error("Compressed CCR media artifacts are not accepted for inline preview.");
+    throw new Error("Compressed OMR media artifacts are not accepted for inline preview.");
   }
-  if (!response.body) throw new Error("The CCR artifact response had no body.");
+  if (!response.body) throw new Error("The OMR artifact response had no body.");
   const reader = response.body.getReader();
   const chunks: Buffer[] = [];
   let total = 0;
@@ -325,16 +325,16 @@ async function loadCodexMediaArtifact(validated: ValidatedArtifactUrl, signal: A
     total += part.value.byteLength;
     if (total > maxBytes) {
       await reader.cancel();
-      throw new Error("The CCR media artifact exceeds the inline preview size limit.");
+      throw new Error("The OMR media artifact exceeds the inline preview size limit.");
     }
     chunks.push(Buffer.from(part.value));
   }
-  if (!total) throw new Error("The CCR artifact response was empty.");
-  if (declaredLength && total !== declaredLength) throw new Error("The CCR artifact response length did not match its headers.");
+  if (!total) throw new Error("The OMR artifact response was empty.");
+  if (declaredLength && total !== declaredLength) throw new Error("The OMR artifact response length did not match its headers.");
   const bytes = Buffer.concat(chunks, total);
   const detectedMimeType = detectMediaMimeType(bytes);
   if (!detectedMimeType || mediaKind(detectedMimeType) !== declaredKind) {
-    throw new Error("The CCR artifact content did not match its declared media type.");
+    throw new Error("The OMR artifact content did not match its declared media type.");
   }
   return { bytes, mimeType: detectedMimeType };
 }
@@ -572,7 +572,7 @@ function codexMediaPreviewPageBootstrap(config: {
       media.preload = "metadata";
       media.src = asset.blobUrl;
     } else {
-      media.alt = "CCR generated image";
+      media.alt = "OMR generated image";
       media.decoding = "async";
       media.src = asset.blobUrl;
     }

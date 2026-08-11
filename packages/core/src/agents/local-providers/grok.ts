@@ -821,7 +821,7 @@ function persistRefreshedGrokAuth(auth: GrokTokenSet): void {
     }
     writeFileSync(auth.sourceFile, `${JSON.stringify(parsed, null, 2)}\n`, "utf8");
   } catch {
-    // Best effort. The refreshed token is still used for this CCR run.
+    // Best effort. The refreshed token is still used for this OMR run.
   }
 }
 

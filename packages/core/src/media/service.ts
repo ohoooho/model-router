@@ -101,7 +101,7 @@ export class MediaService {
         this.completions.get(job.id)?.resolve(next);
         this.completions.delete(job.id);
       } else if (job.status === "queued") {
-        this.finishCanceled(job, "CCR stopped before the media job started.");
+        this.finishCanceled(job, "OMR stopped before the media job started.");
       }
     }
     this.queue = [];
@@ -311,7 +311,7 @@ export class MediaService {
         job = this.jobStore.update(job.id, { status: "running" });
       } else if (this.stopping) {
         job = this.jobStore.update(job.id, {
-          error: { code: "interrupted", message: "CCR stopped before the media request completed. The request was not automatically resubmitted.", retryable: true },
+          error: { code: "interrupted", message: "OMR stopped before the media request completed. The request was not automatically resubmitted.", retryable: true },
           finishedAt: new Date().toISOString(),
           status: "failed"
         });
@@ -360,7 +360,7 @@ export class MediaService {
         if (!this.queue.some((item) => item.jobId === job.id)) this.queue.push({ jobId: job.id, resumeRemoteRequestId: job.remoteRequestId });
       } else {
         this.jobStore.update(job.id, {
-          error: { code: "interrupted", message: "CCR restarted before the media request completed. The request was not automatically resubmitted.", retryable: true },
+          error: { code: "interrupted", message: "OMR restarted before the media request completed. The request was not automatically resubmitted.", retryable: true },
           finishedAt: new Date().toISOString(),
           status: "failed"
         });

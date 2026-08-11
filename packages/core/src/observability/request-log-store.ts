@@ -548,7 +548,7 @@ export class RequestLogStore {
       inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens;
     const model = normalizeLabel(usage.model ?? route.model ?? requestModel ?? input.fallbackModel, "unknown");
     const providerName = normalizeLabel(provider, "unknown");
-    // CCR credential IDs are structured metadata, but their header names also
+    // OMR credential IDs are structured metadata, but their header names also
     // match the fail-closed secret classifier. Extract them before sanitizing;
     // the persisted header JSON remains redacted.
     const credentialInfo = readCredentialLogInfo(rawResponseHeaders, rawRequestHeaders);
@@ -1498,8 +1498,8 @@ function agentAnalysisCacheKey(filter: AgentAnalysisFilter): string {
 function extractAgentLogDetails(entry: StoredRequestLogEntry): AgentLogDetails {
   const requestPayloads = parseLogBodyPayloads(entry.requestBody);
   const responsePayloads = parseLogBodyPayloads(entry.responseBody);
-  const routeReason = readHeaderValue(entry.requestHeaders, "x-ccr-route-reason");
-  const routedModel = readHeaderValue(entry.requestHeaders, "x-ccr-routed-model");
+  const routeReason = readCompatHeaderValue(entry.requestHeaders, "route-reason");
+  const routedModel = readCompatHeaderValue(entry.requestHeaders, "routed-model");
   const subagentModel = extractSubagentModel(entry, requestPayloads, routeReason, routedModel);
   const agent = inferAgentKind(entry, requestPayloads, responsePayloads);
   const toolCalls = extractToolCalls(responsePayloads);
@@ -1563,6 +1563,7 @@ function readAgentHeaderSignals(headers: Record<string, string | string[]>): str
       normalizedKey === "user-agent" ||
       normalizedKey === "x-user-agent" ||
       normalizedKey === "x-client-user-agent" ||
+      normalizedKey === "x-omr-client" ||
       normalizedKey === "x-ccr-client" ||
       normalizedKey === "x-client-name" ||
       normalizedKey.includes("user-agent") ||
@@ -1938,7 +1939,7 @@ function extractSubagentModelFromContent(content: unknown): string | undefined {
 }
 
 function extractSubagentModelFromText(text: string): string | undefined {
-  const match = text.match(/<CCR-SUBAGENT-MODEL>(.*?)<\/CCR-SUBAGENT-MODEL>/s);
+  const match = text.match(/<OMR-SUBAGENT-MODEL>(.*?)<\/OMR-SUBAGENT-MODEL>/s);
   const model = match?.[1]?.trim();
   return model && model.toLowerCase() !== "provider/model" ? model : undefined;
 }
@@ -3221,11 +3222,15 @@ function readHeaderValue(headers: HeaderRecord, name: string): string | undefine
   return normalizeFilterValue(value);
 }
 
+function readCompatHeaderValue(headers: HeaderRecord, name: string): string | undefined {
+  return readHeaderValue(headers, `x-omr-${name}`) ?? readHeaderValue(headers, `x-ccr-${name}`);
+}
+
 function hasCredentialLogHeaders(headers: HeaderRecord): boolean {
   return Boolean(
-    readHeaderValue(headers, "x-ccr-provider-credential-id") ||
-    readHeaderValue(headers, "x-ccr-provider-credential-chain") ||
-    readHeaderValue(headers, "x-ccr-provider-credential-saturated")
+    readCompatHeaderValue(headers, "provider-credential-id") ||
+    readCompatHeaderValue(headers, "provider-credential-chain") ||
+    readCompatHeaderValue(headers, "provider-credential-saturated")
   );
 }
 
@@ -3233,11 +3238,11 @@ function readCredentialLogInfo(
   responseHeaders: HeaderRecord,
   requestHeaders: HeaderRecord
 ): { chain: string[]; id: string; saturated: boolean } {
-  const responseChain = parseCredentialChain(readHeaderValue(responseHeaders, "x-ccr-provider-credential-chain"));
-  const requestChain = parseCredentialChain(readHeaderValue(requestHeaders, "x-ccr-provider-credential-chain"));
+  const responseChain = parseCredentialChain(readCompatHeaderValue(responseHeaders, "provider-credential-chain"));
+  const requestChain = parseCredentialChain(readCompatHeaderValue(requestHeaders, "provider-credential-chain"));
   const id = normalizeLabel(
-    readHeaderValue(responseHeaders, "x-ccr-provider-credential-id") ??
-      readHeaderValue(requestHeaders, "x-ccr-provider-credential-id") ??
+    readCompatHeaderValue(responseHeaders, "provider-credential-id") ??
+      readCompatHeaderValue(requestHeaders, "provider-credential-id") ??
       responseChain[0] ??
       requestChain[0],
     ""
@@ -3250,8 +3255,8 @@ function readCredentialLogInfo(
         ? [id]
         : [];
   const saturated = readHeaderFlag(
-    readHeaderValue(responseHeaders, "x-ccr-provider-credential-saturated") ??
-      readHeaderValue(requestHeaders, "x-ccr-provider-credential-saturated")
+    readCompatHeaderValue(responseHeaders, "provider-credential-saturated") ??
+      readCompatHeaderValue(requestHeaders, "provider-credential-saturated")
   );
   return { chain, id, saturated };
 }
@@ -3260,13 +3265,13 @@ function parseRequestLogRetryAttempts(
   responseHeaders: Record<string, string | string[]>,
   finalStatusCode: number
 ): RequestLogRetryAttempt[] {
-  const attemptCount = asNumber(readHeaderValue(responseHeaders, "x-ccr-fallback-attempts")) ?? 0;
+  const attemptCount = asNumber(readCompatHeaderValue(responseHeaders, "fallback-attempts")) ?? 0;
   if (attemptCount <= 1) {
     return [];
   }
 
-  const failures = splitHeaderCsv(readHeaderValue(responseHeaders, "x-ccr-fallback-failures"));
-  const delays = splitHeaderCsv(readHeaderValue(responseHeaders, "x-ccr-fallback-delays-ms"))
+  const failures = splitHeaderCsv(readCompatHeaderValue(responseHeaders, "fallback-failures"));
+  const delays = splitHeaderCsv(readCompatHeaderValue(responseHeaders, "fallback-delays-ms"))
     .map((value) => asNumber(value) ?? 0);
   const attempts: RequestLogRetryAttempt[] = [];
 
@@ -4412,7 +4417,7 @@ function finalAttemptFromHeaders(
   headers: Record<string, string | string[]>,
   routeAttemptCount?: number
 ): number {
-  const value = Number(headerValue(headers, "x-ccr-fallback-attempts"));
+  const value = Number(compatHeaderValue(headers, "fallback-attempts"));
   if (Number.isFinite(value) && value >= 1) return Math.floor(value);
   return Number.isFinite(routeAttemptCount) && Number(routeAttemptCount) >= 1
     ? Math.floor(Number(routeAttemptCount))
@@ -4506,6 +4511,10 @@ function headersToRecord(headers: Headers | HeaderRecord | undefined): HeaderRec
 function headerValue(headers: Record<string, string | string[]>, name: string): string | undefined {
   const value = headers[name.toLowerCase()];
   return Array.isArray(value) ? value[0] : value;
+}
+
+function compatHeaderValue(headers: Record<string, string | string[]>, name: string): string | undefined {
+  return headerValue(headers, `x-omr-${name}`) ?? headerValue(headers, `x-ccr-${name}`);
 }
 
 function batchNeedsUsagePricing(

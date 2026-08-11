@@ -16,8 +16,8 @@ import {
 import type { AppConfig, GatewayNetworkEndpoint } from "@ccr/core/contracts/app";
 import { fetchWithSystemProxy } from "@ccr/core/proxy/system-proxy-fetch";
 import { isRecord, numberValue, stringValue } from "@ccr/core/gateway/internal/value";
-import { formatError, readHeader } from "@ccr/core/gateway/http/io";
-import { coreGatewayAuthHeader, coreGatewayAuthTokenEnv, gatewayEntryOverrideEnv, gatewayPackageCandidates, gatewayRuntimeMarkerFile, requireFromHere } from "@ccr/core/gateway/internal/shared";
+import { formatError, readCompatHeader, readHeader } from "@ccr/core/gateway/http/io";
+import { coreGatewayAuthHeader, coreGatewayAuthTokenEnv, gatewayEntryOverrideEnv, gatewayPackageCandidates, gatewayRuntimeMarkerFile, omrCoreGatewayAuthHeader, requireFromHere } from "@ccr/core/gateway/internal/shared";
 import type { CoreGatewayHealth, ManagedGatewayRuntimeMarker } from "@ccr/core/gateway/internal/shared";
 import { delay } from "@ccr/core/gateway/internal/clock";
 
@@ -165,7 +165,7 @@ function resolveGatewayBootstrapEntry(): string {
       : [])
   ].find((candidate) => existsSync(candidate));
   if (!entry) {
-    throw new Error("CCR gateway IPC bootstrap was not found. Run npm run build:assets.");
+    throw new Error("OMR gateway IPC bootstrap was not found. Run npm run build:assets.");
   }
   return entry;
 }
@@ -262,7 +262,7 @@ function createGatewayProcessEnv(
     AUTH_REQUIRED: "true",
     AUTH_STATIC_API_KEY_BEARER_ONLY: "false",
     AUTH_STATIC_API_KEY_ENV: coreGatewayAuthTokenEnv,
-    AUTH_STATIC_API_KEY_HEADER: coreGatewayAuthHeader,
+    AUTH_STATIC_API_KEY_HEADER: omrCoreGatewayAuthHeader,
     CCR_GATEWAY_RUNTIME_ID: runtimeId,
     [coreGatewayAuthTokenEnv]: coreAuthToken,
     HOST: config.gateway.coreHost,
@@ -789,7 +789,7 @@ export function shouldServeGatewayRequest(config: AppConfig, request: IncomingMe
   if (config.gateway.enabled) {
     return true;
   }
-  return config.proxy.enabled && config.proxy.mode === "gateway" && readHeader(request.headers["x-ccr-proxy-mode"]) === "gateway";
+  return config.proxy.enabled && config.proxy.mode === "gateway" && readCompatHeader(request.headers, "proxy-mode") === "gateway";
 }
 
 export function applyCors(response: ServerResponse, config?: AppConfig): void {

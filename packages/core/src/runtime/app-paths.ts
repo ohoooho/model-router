@@ -1,8 +1,9 @@
+import { existsSync, renameSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
 export const APP_NAME = "OMR";
-export const APP_STORAGE_NAME = "claude-code-router";
+export const APP_STORAGE_NAME = "omr";
 
 const homeDirEnv = "CCR_INTERNAL_HOME_DIR";
 const appDataDirEnv = "CCR_INTERNAL_APP_DATA_DIR";
@@ -34,11 +35,48 @@ export function resolveRuntimeAppPath(name: RuntimePathName): string {
 
 export const LEGACY_CONFIGDIR = path.join(resolveRuntimeAppPath("home"), ".claude-code-router");
 
+let configDir: string | undefined;
+
 export function resolveRuntimeConfigDir(): string {
-  if (process.platform === "win32") {
-    return path.join(resolveRuntimeAppPath("appData"), APP_STORAGE_NAME);
+  if (configDir) {
+    return configDir;
   }
-  return path.join(resolveRuntimeAppPath("home"), `.${APP_STORAGE_NAME}`);
+  if (process.platform === "win32") {
+    configDir = path.join(resolveRuntimeAppPath("appData"), APP_STORAGE_NAME);
+  } else {
+    configDir = path.join(resolveRuntimeAppPath("home"), `.${APP_STORAGE_NAME}`);
+  }
+  return configDir;
+}
+
+/**
+ * Migrate legacy ~/.claude-code-router → ~/.omr if the legacy directory exists
+ * and the new directory does not. Idempotent — safe to call on every startup.
+ * Returns true if a migration was performed.
+ */
+export function migrateLegacyConfigDir(): boolean {
+  const newDir = resolveRuntimeConfigDir();
+  const legacyDir = LEGACY_CONFIGDIR;
+
+  // Normalize to avoid false positives from path differences
+  if (path.resolve(newDir) === path.resolve(legacyDir)) {
+    return false;
+  }
+
+  if (existsSync(newDir)) {
+    return false; // new directory already exists, nothing to migrate
+  }
+
+  if (!existsSync(legacyDir)) {
+    return false; // no legacy directory to migrate
+  }
+
+  try {
+    renameSync(legacyDir, newDir);
+    return true;
+  } catch {
+    return false; // rename failed — new dir may have been created concurrently, or permissions issue
+  }
 }
 
 export function resolveRuntimeDataDir(): string {

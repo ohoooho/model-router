@@ -200,7 +200,7 @@ async function handleJsonRpcRequest(payload: unknown): Promise<JsonRpcResponse |
           protocolVersion,
           serverInfo: {
             name: "omr-fusion-builtins",
-            title: "CCR Fusion Builtins",
+            title: "OMR Fusion Builtins",
             version: "1.0.0"
           }
         });

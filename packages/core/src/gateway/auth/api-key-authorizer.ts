@@ -17,7 +17,7 @@ export async function authorize(
   if (apiKeys.length === 0) {
     sendJson(response, 403, {
       error: {
-        message: "CCR API key is not initialized. Save a gateway API key or restart CCR to generate one."
+        message: "CCR API key is not initialized. Save a gateway API key or restart OMR to generate one."
       }
     });
     return { ok: false };

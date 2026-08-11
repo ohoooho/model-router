@@ -407,7 +407,7 @@ function launchCodexCompatibleAppProfile(
 }
 
 function codexProfileEnv(profile: ProfileConfig, appExecutable: string, spec: CodexCompatibleAppSpec): Record<string, string> {
-  const providerId = sanitizeCodexProviderId(profile.providerId || "") || "claude-code-router";
+  const providerId = sanitizeCodexProviderId(profile.providerId || "") || "omr";
   const realCliPath = profile.codexCliPath?.trim() || bundledCodexCliPath(appExecutable, spec) || spec.defaultCliCommand;
   const remoteFrontendMode = normalizeCodexRemoteFrontendMode(profile.remoteFrontendMode);
   if (spec.kind === "zcode") {
@@ -572,7 +572,7 @@ function macAppBundleFromExecutable(executable: string): string | undefined {
 function codexElectronUserDataDir(codexHome: string, profile: ProfileConfig, spec: CodexCompatibleAppSpec): string {
   return path.join(
     codexHome,
-    ".claude-code-router",
+    ".omr",
     spec.userDataDirName,
     sanitizeProfilePathSegment(profile.id || profile.name || "default") || "default"
   );

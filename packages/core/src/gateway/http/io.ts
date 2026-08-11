@@ -4,12 +4,12 @@
 import type { IncomingHttpHeaders, IncomingMessage, Server, ServerResponse } from "node:http";
 import type { ApiKeyConfig } from "@ccr/core/contracts/app";
 import { ccrRemoteControlPathPrefix } from "@ccr/core/gateway/remote-control-service";
-import { coreGatewayAuthHeader, localObservabilityHeaderNames, proxyHeaderDenyList, responseHeaderDenyList } from "@ccr/core/gateway/internal/shared";
+import { coreGatewayAuthHeader, localObservabilityHeaderNames, omrCoreGatewayAuthHeader, proxyHeaderDenyList, responseHeaderDenyList } from "@ccr/core/gateway/internal/shared";
 
 
 export function inferGatewayClient(apiKey: ApiKeyConfig | undefined, headers: IncomingHttpHeaders): string | undefined {
   const explicit =
-    readHeader(headers["x-ccr-client"]) ??
+    readCompatHeader(headers, "client") ??
     readHeader(headers["x-client-name"]) ??
     readHeader(headers["x-forwarded-client-cert"]);
   if (explicit) {
@@ -18,7 +18,7 @@ export function inferGatewayClient(apiKey: ApiKeyConfig | undefined, headers: In
 
   const apiKeyClient = apiKey?.name?.trim() || apiKey?.id?.trim();
   const userAgentClient = inferClientFromUserAgent(headers);
-  if (readHeader(headers["x-ccr-proxy-mode"]) === "gateway") {
+  if (readCompatHeader(headers, "proxy-mode") === "gateway") {
     return userAgentClient ?? apiKeyClient;
   }
   return apiKeyClient ?? userAgentClient;
@@ -113,7 +113,7 @@ export function withCoreGatewayAuthHeader(headers: Record<string, string>, token
   }
   return {
     ...headers,
-    [coreGatewayAuthHeader]: token
+    [omrCoreGatewayAuthHeader]: token
   };
 }
 
@@ -304,6 +304,11 @@ export function readHeader(value: string | string[] | undefined): string | undef
     return value[0]?.trim();
   }
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+/** Read a header with OMR→CCR compat: tries `x-omr-{name}` first, then `x-ccr-{name}`. */
+export function readCompatHeader(headers: IncomingHttpHeaders | Record<string, string | string[] | undefined>, name: string): string | undefined {
+  return readHeader(headers[`x-omr-${name}`]) ?? readHeader(headers[`x-ccr-${name}`]);
 }
 
 

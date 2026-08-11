@@ -245,7 +245,7 @@ function resolveLocalModulePath(value: string, label: string): string {
 
   const resolved = path.resolve(CONFIGDIR, expanded);
   if (!isPathInside(resolved, CONFIGDIR)) {
-    throw new Error(`${label} relative paths must stay inside the CCR config directory.`);
+    throw new Error(`${label} relative paths must stay inside the OMR config directory.`);
   }
   return resolved;
 }
@@ -711,31 +711,31 @@ function builtInAgentUserAgentNeedle(agent: RouterBuiltInAgentRuleId): string {
   return agent === "claude-code" ? "claude" : "codex";
 }
 
-const ccrSubagentModelOpenTag = "<CCR-SUBAGENT-MODEL>";
-const ccrSubagentModelCloseTag = "</CCR-SUBAGENT-MODEL>";
-const ccrSubagentModelTagExample = `${ccrSubagentModelOpenTag}Provider/model${ccrSubagentModelCloseTag}`;
-const ccrSubagentModelPlaceholder = "provider/model";
+const omrSubagentModelOpenTag = "<OMR-SUBAGENT-MODEL>";
+const omrSubagentModelCloseTag = "</OMR-SUBAGENT-MODEL>";
+const omrSubagentModelTagExample = `${omrSubagentModelOpenTag}Provider/model${omrSubagentModelCloseTag}`;
+const omrSubagentModelPlaceholder = "provider/model";
 const claudeCodeBillingSystemHeaderPrefix = "x-anthropic-billing-header";
 const claudeCodeSubagentModelEnv = "CLAUDE_CODE_SUBAGENT_MODEL";
-const ccrSubagentToolModelInstruction =
-  `CCR subagent routing is enabled. When calling this tool, the prompt parameter MUST start with ` +
-  `${ccrSubagentModelTagExample} on its own first line, replacing Provider/model with the best client model ID from the list below. ` +
+const omrSubagentToolModelInstruction =
+  `OMR subagent routing is enabled. When calling this tool, the prompt parameter MUST start with ` +
+  `${omrSubagentModelTagExample} on its own first line, replacing Provider/model with the best client model ID from the list below. ` +
   `When the tool model field accepts exact strings, set it to the same client model ID so the client initializes the child with the correct model limits. ` +
-  `CCR consumes the tag, removes it from the prompt, and routes the spawned agent request to that model. ` +
+  `OMR consumes the tag, removes it from the prompt, and routes the spawned agent request to that model. ` +
   `If the model field only permits built-in aliases, leave it unset and use the tag as the routing fallback. ` +
   `Do not omit the tag or put it in description or subagent_type. ` +
-  `中文要求：调用该工具时，prompt 参数第一行必须写入 ${ccrSubagentModelTagExample}，并将 Provider/model 替换成列表中的客户端模型 ID；若 model 字段支持任意字符串，也必须使用同一个 ID。`;
-const ccrWorkflowSubagentModelInstruction =
-  `CCR workflow subagent routing is enabled. When this workflow creates Agent/Task subagents, each spawned agent prompt MUST start with ` +
-  `${ccrSubagentModelTagExample} on its own first line, replacing Provider/model with the best client model ID from the list below. ` +
+  `中文要求：调用该工具时，prompt 参数第一行必须写入 ${omrSubagentModelTagExample}，并将 Provider/model 替换成列表中的客户端模型 ID；若 model 字段支持任意字符串，也必须使用同一个 ID。`;
+const omrWorkflowSubagentModelInstruction =
+  `OMR workflow subagent routing is enabled. When this workflow creates Agent/Task subagents, each spawned agent prompt MUST start with ` +
+  `${omrSubagentModelTagExample} on its own first line, replacing Provider/model with the best client model ID from the list below. ` +
   `Set each spawned agent's model option to that same client model ID when the agent API accepts exact strings. ` +
   `Put the tag inside the Agent/Task prompt created by the workflow, not in the workflow description or subagent_type. ` +
-  `CCR consumes the tag from the spawned agent request, removes it, and routes that request to the selected model. ` +
-  `中文要求：Workflow 中创建 Agent/Task 时，每个被创建 agent 的 prompt 第一行必须写入 ${ccrSubagentModelTagExample}，并替换成列表中的客户端模型 ID；若 agent API 支持任意模型字符串，也必须将 model 设为同一个 ID。`;
-const ccrSubagentPromptFieldInstruction =
-  `CCR subagent routing is enabled. This prompt string MUST start with ${ccrSubagentModelTagExample} on its own first line, ` +
+  `OMR consumes the tag from the spawned agent request, removes it, and routes that request to the selected model. ` +
+  `中文要求：Workflow 中创建 Agent/Task 时，每个被创建 agent 的 prompt 第一行必须写入 ${omrSubagentModelTagExample}，并替换成列表中的客户端模型 ID；若 agent API 支持任意模型字符串，也必须将 model 设为同一个 ID。`;
+const omrSubagentPromptFieldInstruction =
+  `OMR subagent routing is enabled. This prompt string MUST start with ${omrSubagentModelTagExample} on its own first line, ` +
   `with Provider/model replaced by one client model ID from the list below. When the adjacent model field accepts exact strings, use the same client model ID there. ` +
-  `Put the subagent task after that line; CCR removes the tag before the subagent runs. ` +
+  `Put the subagent task after that line; OMR removes the tag before the subagent runs. ` +
   `中文要求：这个 prompt 字符串第一行必须是替换后的模型标签，后面再写 subagent 任务正文。`;
 type ClaudeCodeSubagentToolKind = "subagent" | "workflow";
 const claudeCodeAgentToolNames = new Set(["agent", "task"]);
@@ -908,7 +908,7 @@ function appendPromptSchemaDescriptionInstruction(tool: Record<string, unknown>,
 
 function appendDescriptionInstruction(description: string | undefined, instruction: string): string {
   const existing = description?.trim() ?? "";
-  if (existing.includes(ccrSubagentModelOpenTag)) {
+  if (existing.includes(omrSubagentModelOpenTag)) {
     return existing;
   }
   return existing ? `${existing}\n\n${instruction}` : instruction;
@@ -925,17 +925,17 @@ function claudeCodeAgentToolInstructions(config: AppConfig): { prompt: string; t
   ].join("\n");
   return {
     prompt: [
-      ccrSubagentPromptFieldInstruction,
+      omrSubagentPromptFieldInstruction,
       "",
       modelList
     ].join("\n"),
     tool: [
-      ccrSubagentToolModelInstruction,
+      omrSubagentToolModelInstruction,
       "",
       modelList
     ].join("\n"),
     workflow: [
-      ccrWorkflowSubagentModelInstruction,
+      omrWorkflowSubagentModelInstruction,
       "",
       modelList
     ].join("\n")
@@ -1153,12 +1153,12 @@ function extractAndRemoveSubagentModelTagFromText(
   text: string,
   replace: (text: string) => void
 ): string | undefined {
-  const openIndex = text.indexOf(ccrSubagentModelOpenTag);
+  const openIndex = text.indexOf(omrSubagentModelOpenTag);
   if (openIndex < 0) {
     return undefined;
   }
-  const modelStart = openIndex + ccrSubagentModelOpenTag.length;
-  const closeIndex = text.indexOf(ccrSubagentModelCloseTag, modelStart);
+  const modelStart = openIndex + omrSubagentModelOpenTag.length;
+  const closeIndex = text.indexOf(omrSubagentModelCloseTag, modelStart);
   if (closeIndex < 0) {
     return undefined;
   }
@@ -1166,7 +1166,7 @@ function extractAndRemoveSubagentModelTagFromText(
   if (!model) {
     return undefined;
   }
-  const nextText = `${text.slice(0, openIndex)}${text.slice(closeIndex + ccrSubagentModelCloseTag.length)}`;
+  const nextText = `${text.slice(0, openIndex)}${text.slice(closeIndex + omrSubagentModelCloseTag.length)}`;
   replace(nextText);
   return model;
 }
@@ -1582,7 +1582,7 @@ function routerRuleReason(
 }
 
 function isSubagentModelPlaceholder(model: string): boolean {
-  return model.trim().toLowerCase() === ccrSubagentModelPlaceholder;
+  return model.trim().toLowerCase() === omrSubagentModelPlaceholder;
 }
 
 function calculateTokenCount(messages: unknown, system: unknown, tools: unknown): number {

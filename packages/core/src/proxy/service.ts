@@ -428,7 +428,7 @@ class ProxyService {
         return {
           caCertFile: proxyCaCertFile(),
           manualCommand: macosManualCertificateInstallCommand(),
-          message: `macOS did not allow CCR to request administrator authorization: ${formatError(error)}.${terminalMessage}`,
+          message: `macOS did not allow OMR to request administrator authorization: ${formatError(error)}.${terminalMessage}`,
           ok: false,
           status
         };
@@ -632,7 +632,7 @@ class ProxyService {
     const mitmServer = await this.getMitmServer(target.hostname);
     const localSocket = net.connect(mitmServer.port, "127.0.0.1");
     localSocket.once("connect", () => {
-      clientSocket.write("HTTP/1.1 200 Connection Established\r\nProxy-agent: CCR-MITM\r\n\r\n");
+      clientSocket.write("HTTP/1.1 200 Connection Established\r\nProxy-agent: OMR-MITM\r\n\r\n");
       if (head.length > 0) {
         localSocket.write(head);
       }
@@ -1603,13 +1603,13 @@ function macosTerminalCertificateInstallScript(): string {
   return [
     "#!/bin/zsh",
     "set -e",
-    "echo 'Installing CCR Proxy CA into the macOS System keychain.'",
+    "echo 'Installing OMR Proxy CA into the macOS System keychain.'",
     "echo 'Terminal will ask for your macOS password if sudo is required.'",
     "echo ''",
     "sudo /usr/bin/security delete-certificate -c 'OMR CA' /Library/Keychains/System.keychain >/dev/null 2>&1 || true",
     `sudo /usr/bin/security add-trusted-cert -d -r trustRoot -p ssl -k /Library/Keychains/System.keychain ${quoteShellArg(PROXY_CA_CERT_FILE)}`,
     "echo ''",
-    "echo 'Done. Return to CCR, click Check Trust, then restart proxy mode and Chrome.'",
+    "echo 'Done. Return to OMR, click Check Trust, then restart proxy mode and Chrome.'",
     "printf 'Press Return to close this window...'",
     "read reply"
   ].join("\n");
@@ -1632,6 +1632,10 @@ function readHeader(value: string | string[] | undefined): string | undefined {
     return value[0]?.trim();
   }
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function readCompatHeader(headers: IncomingHttpHeaders, name: string): string | undefined {
+  return readHeader(headers[`x-omr-${name}`]) ?? readHeader(headers[`x-ccr-${name}`]);
 }
 
 class NetworkBodySampler {
@@ -1694,7 +1698,7 @@ function toProxyNetworkExchange(record: ProxyNetworkCaptureRecord): ProxyNetwork
 
 function inferProxyClient(headers: IncomingHttpHeaders): string {
   const explicitClient =
-    readHeader(headers["x-ccr-client"]) ??
+    readCompatHeader(headers, "client") ??
     readHeader(headers["x-client-name"]) ??
     readHeader(headers["x-forwarded-client-cert"]);
   if (explicitClient) {

@@ -50,7 +50,7 @@ export function ensureProxyCertificateAuthority(): void {
     { shortName: "ST", value: "California" },
     { name: "localityName", value: "San Francisco" },
     { name: "organizationName", value: "OMR" },
-    { shortName: "OU", value: "CCR MITM Proxy" }
+    { shortName: "OU", value: "OMR MITM Proxy" }
   ];
   cert.setSubject(attrs);
   cert.setIssuer(attrs);

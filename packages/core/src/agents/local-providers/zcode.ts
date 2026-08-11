@@ -288,7 +288,7 @@ function isZcodeModelProvider(providerId: string, provider: Record<string, unkno
     text.includes("zcode") ||
     text.includes("bigmodel") ||
     text.includes("open.bigmodel.cn");
-  if (!matchesZcodeProvider || text.includes("claude-code-router")) {
+  if (!matchesZcodeProvider || text.includes("omr")) {
     return false;
   }
 

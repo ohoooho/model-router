@@ -97,7 +97,7 @@ export function compactHandoffTask(input: {
 }): string {
   const footer = archiveHandoffFooter(input);
   return [
-    "CCR compact handoff task:",
+    "OMR compact handoff task:",
     "You are the previous-context agent. Produce a concise handoff for a successor agent that will start with a fresh context.",
     "Preserve the current goal, user constraints, decisions, changed files, completed verification, unresolved problems, and the exact next action.",
     "Do not continue the task and do not call tools. Do not invent details.",
@@ -127,7 +127,7 @@ export function archiveHandoffFooter(input: {
         `${input.toolName}(${argumentsJson})`
       ];
   return [
-    "CCR ARCHIVED HISTORY ACCESS",
+    "OMR ARCHIVED HISTORY ACCESS",
     `Archive id: ${input.archiveId}`,
     `Archive session id: ${input.sessionId}`,
     `Archive generation: ${input.generation}`,
@@ -140,7 +140,7 @@ export function archiveHandoffFooter(input: {
 
 export function historyReplayTask(task: string): string {
   return [
-    "CCR history task from the successor agent:",
+    "OMR history task from the successor agent:",
     "Use the complete conversation and request parameters already present in this request as your previous context.",
     "Answer only the task below from that context. If the context is insufficient, say so directly.",
     "Do not continue the previous task, modify files, or call external tools.",
@@ -154,6 +154,7 @@ export function hasExplicitCompactSignal(
   headers: Record<string, string | string[] | undefined>
 ): boolean {
   const explicitHeader = [
+    readHeader(headers, "x-omr-context-compact"),
     readHeader(headers, "x-ccr-context-compact"),
     readHeader(headers, "x-context-compact")
   ].find(Boolean);

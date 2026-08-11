@@ -190,7 +190,7 @@ function macOpenEnvArgs(env: Record<string, string>): string[] {
 function claudeElectronUserDataDir(settingsDir: string, profile: ProfileConfig): string {
   return path.join(
     settingsDir,
-    ".claude-code-router",
+    ".omr",
     "claude-app-user-data",
     sanitizeProfilePathSegment(profile.id || profile.name || "default") || "default"
   );

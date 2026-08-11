@@ -149,7 +149,7 @@ class CcrRemoteControlService {
       return;
     }
     const id = sanitizeSessionId(readString(body.id) || readString(body.sessionId)) || randomUUID();
-    const title = readString(body.title) || readString(body.name) || `CCR Remote ${id.slice(0, 8)}`;
+    const title = readString(body.title) || readString(body.name) || `OMR Remote ${id.slice(0, 8)}`;
     const metadata = readRecord(body.metadata) ?? {};
     const session = this.ensureSession(id, title, metadata);
     this.appendEvent(session, {

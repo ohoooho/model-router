@@ -1137,8 +1137,12 @@ function readHeader(headers: Headers, name: string): string | undefined {
   return value || undefined;
 }
 
+function readCompatHeader(headers: Headers, name: string): string | undefined {
+  return readHeader(headers, `x-omr-${name}`) ?? readHeader(headers, `x-ccr-${name}`);
+}
+
 function readCredentialId(headers: Headers): string | undefined {
-  return readHeader(headers, "x-ccr-provider-credential-id") ?? parseCredentialChain(readHeader(headers, "x-ccr-provider-credential-chain"))[0];
+  return readCompatHeader(headers, "provider-credential-id") ?? parseCredentialChain(readCompatHeader(headers, "provider-credential-chain"))[0];
 }
 
 function parseCredentialChain(value: string | undefined): string[] {

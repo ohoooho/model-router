@@ -65,9 +65,9 @@ const serviceStartTimeoutMs = 30_000;
 const serviceStopTimeoutMs = 10_000;
 const profileGatewayIdleGraceMs = 2_000;
 const profileGatewayLeasePollMs = 500;
-const webAuthHeader = "x-ccr-web-auth";
+const webAuthHeader = "x-omr-web-auth";
 const webAuthQueryParam = "ccr_web_token";
-const defaultCliCommandName = "ccr";
+const defaultCliCommandName = "omr";
 const prepareProfileOnlyEnv = "CCR_CLI_PREPARE_PROFILE_ONLY";
 
 async function main(): Promise<void> {

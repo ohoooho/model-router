@@ -116,7 +116,7 @@ export const GROK_API_DEFAULT_VIDEO_MODEL = "grok-imagine-video";
 // Legacy sentinel retained only to migrate configs created before media execution
 // moved from the Grok CLI subprocess to the Grok API.
 export const GROK_CLI_MEDIA_MODEL_SELECTOR = "grok-cli";
-export const MEDIA_TOOLS_MCP_SERVER_NAME = "ccr-media-tools";
+export const MEDIA_TOOLS_MCP_SERVER_NAME = "omr-media-tools";
 export const MEDIA_IMAGE_GENERATE_TOOL_PREFIX = "image_generate";
 export const MEDIA_IMAGE_EDIT_TOOL_PREFIX = "image_edit";
 export const MEDIA_VIDEO_START_TOOL_PREFIX = "video_generate";
@@ -782,14 +782,14 @@ export type GatewayPluginAppConfig = {
 export const CLAUDE_DESIGN_PLUGIN_ID = "claude-design";
 export const CLAUDE_SHIP_PLUGIN_ID = "claude-ship";
 export const DEFAULT_CLAUDE_DESIGN_APP: GatewayPluginAppConfig = {
-  description: "Open Claude Design in a dedicated CCR Electron window.",
+  description: "Open Claude Design in a dedicated OMR Electron window.",
   icon: "palette",
   id: "claude-design",
   name: "Claude Design",
   url: "https://claude-design.ccrdesk.top/design"
 };
 export const DEFAULT_CLAUDE_SHIP_APP: GatewayPluginAppConfig = {
-  description: "Open Claude Ship in a dedicated CCR Electron window.",
+  description: "Open Claude Ship in a dedicated OMR Electron window.",
   icon: "rocket",
   id: "claude-ship",
   name: "Claude Ship",
@@ -1048,7 +1048,7 @@ export type VirtualModelProfileConfig = {
 };
 
 export const NO_AVAILABLE_GATEWAY_MODELS_MESSAGE =
-  "No available models. Configure at least one provider with a model before starting CCR Gateway or opening an agent through CCR.";
+  "No available models. Configure at least one provider with a model before starting OMR Gateway or opening an agent through OMR.";
 
 export function assertAvailableGatewayModels(config: Pick<AppConfig, "Providers" | "virtualModelProfiles">): void {
   if (!hasAvailableGatewayModels(config)) {

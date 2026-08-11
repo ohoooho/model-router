@@ -771,7 +771,7 @@ async function resolveLocalEstimateConnector(
   return {
     errors: [],
     meters: meters.filter((meter): meter is ProviderAccountMeter => Boolean(meter)),
-    message: "Local estimate from CCR usage history.",
+    message: "Local estimate from OMR usage history.",
     source: "local-estimate"
   };
 }
@@ -1479,7 +1479,7 @@ function zcodeProviderTextMatches(values: Array<string | undefined>): boolean {
     text.includes("z.ai") ||
     text.includes("bigmodel") ||
     text.includes("open.bigmodel.cn")
-  ) && !text.includes("claude-code-router");
+  ) && !text.includes("omr");
 }
 
 async function localCodexAccountCredential(plugin: Record<string, unknown>): Promise<LocalAgentAccountCredential> {

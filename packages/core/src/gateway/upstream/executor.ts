@@ -951,7 +951,7 @@ export function destroyResponseStreams(streams: Readable[]): void {
 
 export function mergeFallbackResponseHeaders(headers: Headers, result: UpstreamFetchResult): Headers {
   const credentialIds = result.attempt.credentialIds ?? [];
-  const credentialSaturated = result.attempt.headers?.["x-ccr-provider-credential-saturated"] === "true";
+  const credentialSaturated = (result.attempt.headers?.["x-omr-provider-credential-saturated"] ?? result.attempt.headers?.["x-ccr-provider-credential-saturated"]) === "true";
   if (result.failedAttempts.length === 0 && credentialIds.length === 0 && !credentialSaturated) {
     return headers;
   }

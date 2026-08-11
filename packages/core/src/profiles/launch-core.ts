@@ -109,7 +109,7 @@ export function buildProfileLaunchPlan(
 ): ProfileLaunchPlan {
   const resolvedSurface = resolveProfileOpenSurface(profile, surface);
   if (profile.agent === "claude-design") {
-    throw new Error("Claude Design profiles can only be opened from CCR Desktop.");
+    throw new Error("Claude Design profiles can only be opened from OMR Desktop.");
   }
   if (profile.agent === "grok") {
     return buildGrokLaunchPlan(configDir, profile, resolvedSurface, extraArgs);
@@ -139,7 +139,7 @@ function buildOpenCodeLaunchPlan(
   extraArgs: string[]
 ): ProfileLaunchPlan {
   if (surface !== "cli") {
-    throw new Error("OpenCode App profiles must be opened through CCR Desktop.");
+    throw new Error("OpenCode App profiles must be opened through OMR Desktop.");
   }
   return {
     args: extraArgs,
@@ -295,7 +295,7 @@ function buildCodexLaunchPlan(
   surface: ProfileOpenSurface,
   extraArgs: string[]
 ): ProfileLaunchPlan {
-  const providerId = sanitizeCodexProviderId(profile.providerId || "") || "claude-code-router";
+  const providerId = sanitizeCodexProviderId(profile.providerId || "") || "omr";
   const launcher = path.join(configDir, "bin", codexMiddlewareFilename(profile, providerId));
   return {
     args: surface === "app" && extraArgs.length === 0 ? ["app"] : extraArgs,
@@ -315,7 +315,7 @@ function buildClaudeCodeLaunchPlan(
   extraArgs: string[]
 ): ProfileLaunchPlan {
   if (surface === "app") {
-    throw new Error("Claude App opening is available from the CCR desktop app.");
+    throw new Error("Claude App opening is available from the OMR desktop app.");
   }
   const settingsFile = resolveClaudeCodeSettingsFile(configDir, profile);
   const launcher = path.join(configDir, "bin", claudeCodeWrapperFilename(profile));
@@ -343,7 +343,7 @@ function defaultCodexConfigFile(agent: ProfileConfig["agent"]): string {
     : agent === "pi"
       ? "~/.pi/agent"
       : agent === "claude-design"
-        ? "~/.claude-code-router/claude-design"
+        ? "~/.omr/claude-design"
         : "~/.codex/config.toml";
 }
 

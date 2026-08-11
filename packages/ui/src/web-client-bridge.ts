@@ -1,9 +1,10 @@
-type CcrApi = NonNullable<Window["ccr"]>;
+type CcrApi = NonNullable<Window["omr"]>;
+type OmrApi = CcrApi;
 
-const rpcEndpoint = "/api/ccr/rpc";
-const webAuthHeader = "x-ccr-web-auth";
-const webAuthQueryParam = "ccr_web_token";
-const webAuthStorageKey = "ccr.webAuthToken";
+const rpcEndpoint = "/api/omr/rpc";
+const webAuthHeader = "x-omr-web-auth";
+const webAuthQueryParam = "omr_web_token";
+const webAuthStorageKey = "omr.webAuthToken";
 const webAuthToken = readWebAuthToken();
 
 type RpcResponse =
@@ -29,8 +30,8 @@ async function rpc(method: string, args: unknown[] = []): Promise<unknown> {
     const message = payload && !payload.ok
       ? payload.error.message
       : response.status === 404
-        ? "CCR management service is unavailable. Make sure the CCR app or ccr ui command is running, then retry."
-        : `CCR web API failed with HTTP ${response.status}`;
+        ? "OMR management service is unavailable. Make sure the OMR app or omr ui command is running, then retry."
+        : `OMR web API failed with HTTP ${response.status}`;
     throw new Error(message);
   }
   return payload.value;
@@ -180,6 +181,10 @@ const webClientBridge: CcrApi = {
   waitBotGatewayQrLogin: (request) => rpc("waitBotGatewayQrLogin", [request]) as ReturnType<CcrApi["waitBotGatewayQrLogin"]>
 };
 
-if (!window.ccr) {
-  window.ccr = webClientBridge;
+if (!window.omr) {
+  window.omr = webClientBridge;
+  // Backward compat: also expose as window.ccr for legacy consumers
+  if (!window.ccr) {
+    (window as Record<string, unknown>).ccr = webClientBridge;
+  }
 }

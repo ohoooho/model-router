@@ -81,7 +81,7 @@ export function parseProviderManifestDeepLinkPayload(rawUrl: string): ProviderMa
   const host = url.hostname.toLowerCase();
   const firstPathSegment = url.pathname.split("/").filter(Boolean)[0]?.toLowerCase();
   if (host !== providerDeepLinkHost && firstPathSegment !== providerDeepLinkHost) {
-    throw new Error("Unsupported CCR link target.");
+    throw new Error("Unsupported OMR link target.");
   }
 
   const payload = readPayloadRecord(url.searchParams);
@@ -114,7 +114,7 @@ export function parseProviderDeepLinkPayload(rawUrl: string): ProviderDeepLinkPa
   const host = url.hostname.toLowerCase();
   const firstPathSegment = url.pathname.split("/").filter(Boolean)[0]?.toLowerCase();
   if (host !== providerDeepLinkHost && firstPathSegment !== providerDeepLinkHost) {
-    throw new Error("Unsupported CCR link target.");
+    throw new Error("Unsupported OMR link target.");
   }
 
   const params = url.searchParams;

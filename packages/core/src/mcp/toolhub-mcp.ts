@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import os from "node:os";
 import path from "node:path";
 import OpenAI from "openai";
+import { resolveRuntimeConfigDir } from "@ccr/core/runtime/app-paths";
 
 type JsonPrimitive = boolean | null | number | string;
 type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
@@ -319,7 +320,7 @@ async function handleJsonRpcRequest(payload: unknown): Promise<JsonRpcResponse |
           protocolVersion,
           serverInfo: {
             name: toolHubServerName,
-            title: "CCR ToolHub",
+            title: "OMR ToolHub",
             version: "1.0.0"
           }
         });
@@ -379,7 +380,7 @@ class ToolHubRuntime {
       catalog = await this.registry.listTools();
     }
     if (taskWantsChromeLoginImport(task) && !catalogHasChromeLoginImportTool(catalog)) {
-      await this.registry.refreshServers(["ccr-browser-automation"], true);
+      await this.registry.refreshServers(["omr-browser-automation"], true);
       catalog = await this.registry.listTools();
     }
     if (catalog.length === 0) {
@@ -1736,7 +1737,7 @@ async function waitForLocalResolverEndpoint(baseURL: string, apiKey: string, tim
       clearTimeout(timer);
     }
   }
-  throw new Error(`ToolHub resolver could not connect to CCR Gateway at ${readinessUrl}: ${formatError(lastError)}.`);
+  throw new Error(`ToolHub resolver could not connect to OMR Gateway at ${readinessUrl}: ${formatError(lastError)}.`);
 }
 
 function localResolverReadinessUrl(baseURL: string): string | undefined {
@@ -2056,9 +2057,9 @@ function buildSearchSystemPrompt(catalog: SearchCatalogItem[], topK: number): st
     "- Generic browser automation tools are a strong match for web tasks such as ordering, buying, booking, delivery, or checkout when no domain-specific MCP tool exists.",
     "- For browser navigation/open calls, prefer omitting waitUntil or using waitUntil: \"interactive\" so the agent can inspect and act as soon as the page is usable.",
     "- Do not use waitUntil: \"network_idle\" for Gmail, Google sign-in, SPAs, mail, chat, auth, checkout, verification, or pages with long-lived requests. Use network_idle only when the user explicitly asks for network quiescence.",
-    "- When selecting CCR browser automation tools, include the human-handoff follow-up tools needed if login, CAPTCHA, verification, blocked navigation, or manual confirmation appears.",
-    "- For CCR browser automation bundles, include browser_handoff_request and browser_handoff_wait when the workflow may need user help. Do not assume all browser tools are preloaded.",
-    "- For importing existing Chrome login state into CCR's in-app browser, select browser_chrome_login_import and include browser_chrome_login_import_status to check completion.",
+    "- When selecting OMR browser automation tools, include the human-handoff follow-up tools needed if login, CAPTCHA, verification, blocked navigation, or manual confirmation appears.",
+    "- For OMR browser automation bundles, include browser_handoff_request and browser_handoff_wait when the workflow may need user help. Do not assume all browser tools are preloaded.",
+    "- For importing existing Chrome login state into OMR's in-app browser, select browser_chrome_login_import and include browser_chrome_login_import_status to check completion.",
     "- If using member-call syntax, prefer tools.<catalog alias>(...) or mcp.<server namespace>.<remote tool name>(...).",
     "- For lookup tasks, do not stop at opening or navigating. Include the tools needed to read or extract the answer.",
     "- If the catalog has no strong match, return an empty toolNames array.",
@@ -2485,8 +2486,8 @@ function expandToolBundleWithCompanionTools(selectedTools: CatalogEntry[], catal
 }
 
 function isBrowserAutomationTool(tool: CatalogEntry): boolean {
-  return tool.serverName === "ccr-browser-automation" ||
-    tool.serverId === "ccr-browser-automation" ||
+  return tool.serverName === "omr-browser-automation" ||
+    tool.serverId === "omr-browser-automation" ||
     tool.serverNamespace === "ccr_browser_automation" ||
     tool.toolName.startsWith("mcp.ccr_browser_automation.");
 }
@@ -2805,7 +2806,7 @@ function normalizeToolDefinitionForCache(value: unknown): ToolDefinition | null 
 }
 
 function toolHubCacheFile(): string {
-  return env("TOOLHUB_CACHE_FILE") || path.join(os.homedir(), ".claude-code-router", "toolhub-cache.json");
+  return env("TOOLHUB_CACHE_FILE") || path.join(resolveRuntimeConfigDir(), "toolhub-cache.json");
 }
 
 function hashToolHubMcpServerConfig(config: GatewayMcpServerConfig): string {

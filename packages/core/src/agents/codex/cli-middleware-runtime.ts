@@ -77,11 +77,19 @@ function resolveConfigDir() {
   }
   if (process.platform === "win32") {
     const appData = process.env.APPDATA || process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Roaming");
-    const current = path.join(appData, "claude-code-router");
-    const legacy = path.join(appData, "Claude Code Router");
-    return fs.existsSync(current) || !fs.existsSync(legacy) ? current : legacy;
+    const current = path.join(appData, "omr");
+    const legacyCcr = path.join(appData, "claude-code-router");
+    const legacyApp = path.join(appData, "Claude Code Router");
+    if (fs.existsSync(current)) return current;
+    if (fs.existsSync(legacyCcr)) return legacyCcr;
+    if (fs.existsSync(legacyApp)) return legacyApp;
+    return current;
   }
-  return path.join(os.homedir(), ".claude-code-router");
+  const newPath = path.join(os.homedir(), ".omr");
+  const legacyPath = path.join(os.homedir(), ".claude-code-router");
+  if (fs.existsSync(newPath)) return newPath;
+  if (fs.existsSync(legacyPath)) return legacyPath;
+  return newPath;
 }
 
 function botBridge() {
@@ -160,7 +168,7 @@ async function runClaudeCodeCliWrapper(args) {
       return;
     }
     if (boolEnv("CCR_REMOTE_SYNC_NOTIFY_INBOUND") || !process.env.CCR_REMOTE_SYNC_NOTIFY_INBOUND) {
-      process.stdout.write("\n[CCR remote] " + text + "\n");
+      process.stdout.write("\n[OMR remote]" + text + "\n");
     }
   });
   child.on("error", (error) => {
@@ -1017,7 +1025,7 @@ function customAppServerLineResponse(line) {
       requestId: value.requestId || value.id || uuid(),
       status: 501,
       ok: false,
-      body: JSON.stringify({ error: "Transcribe is not available in CCR middleware." }),
+      body: JSON.stringify({ error: "Transcribe is not available in OMR middleware." }),
       headers: { "content-type": "application/json" }
     };
   }
@@ -4435,7 +4443,7 @@ function modelItemId(item) {
 }
 
 function codexModelItem(model, selectedModel) {
-  const provider = modelProviderFromSelector(model) || agentEnv(codexRuntimeAgent(), "MODEL_PROVIDER") || "claude-code-router";
+  const provider = modelProviderFromSelector(model) || agentEnv(codexRuntimeAgent(), "MODEL_PROVIDER") || "omr";
   const displayName = modelDisplayName(model);
   return {
     id: model,
@@ -4446,7 +4454,7 @@ function codexModelItem(model, selectedModel) {
     providerName: provider,
     modelProvider: provider,
     displayName,
-    description: "CCR model",
+    description: "OMR model",
     hidden: false,
     isDefault: model === selectedModel,
     contextWindow: 0,
@@ -4543,7 +4551,7 @@ function modelCatalogConfigItem(model, priority) {
   return {
     slug: model,
     display_name: model,
-    description: "CCR gateway model " + model,
+    description: "OMR gateway model " + model,
     default_reasoning_level: null,
     supported_reasoning_levels: [],
     shell_type: "shell_command",
@@ -4806,7 +4814,7 @@ function createRemoteSyncClient(options) {
     cwd: options.cwd || process.cwd(),
     endpoint,
     mode: options.mode || "agent",
-    title: options.title || "CCR Remote",
+    title: options.title || "OMR Remote",
     profileId: nonEmptyEnv("CCR_REMOTE_SYNC_PROFILE_ID"),
     profileName: nonEmptyEnv("CCR_REMOTE_SYNC_PROFILE_NAME")
   });
@@ -4929,7 +4937,7 @@ class RemoteSyncClient {
         signal: controller.signal
       });
       if (!response.ok) {
-        throw new Error("HTTP " + response.status + " from CCR remote sync");
+        throw new Error("HTTP " + response.status + " from OMR remote sync");
       }
       return await response.json();
     } finally {
@@ -5034,7 +5042,7 @@ function readBotGatewayBridgeConfig() {
     platform,
     pollIntervalMs: numberEnv("CCR_BOT_GATEWAY_POLL_INTERVAL_MS", 2000),
     profileId: nonEmptyEnv("CCR_BOT_PROFILE_ID") || agentEnv(codexRuntimeAgent(), "PROFILE") || "default",
-    profileName: nonEmptyEnv("CCR_BOT_PROFILE_NAME") || agentEnv(codexRuntimeAgent(), "WORKSPACE_NAME") || "CCR",
+    profileName: nonEmptyEnv("CCR_BOT_PROFILE_NAME") || agentEnv(codexRuntimeAgent(), "WORKSPACE_NAME") || "OMR",
     requestTimeoutMs: numberEnv("CCR_BOT_GATEWAY_REQUEST_TIMEOUT_MS", 600000),
     sessionIdleMinutes: numberEnv("CCR_BOT_GATEWAY_SESSION_IDLE_MINUTES", 0),
     shellEnabled: boolEnv("CCR_BOT_GATEWAY_SHELL_ENABLED"),
@@ -5806,7 +5814,7 @@ function evaluateHandoffPresence(config) {
     }
   }
   if (config.phoneWifiTargets.length || config.phoneBluetoothTargets.length) {
-    evidence.push("phone target checks are configured but not available in CCR middleware");
+    evidence.push("phone target checks are configured but not available in OMR middleware");
   }
   return { away: reasons.length > 0, reasons, evidence };
 }
@@ -5967,10 +5975,10 @@ function localizeBotReply(text, language) {
   if (language !== "zh-CN") return text;
   const replacements = [
     ["Unknown Bot command. Send /project or /session to see available commands.", "未知的 Bot 命令。发送 /project 或 /session 查看可用命令。"],
-    ["CCR App project commands", "CCR App 项目命令"],
-    ["CCR App session commands", "CCR App 会话命令"],
-    ["Projects are managed separately with /project. The relay is available only while this App is opened through CCR.", "项目通过 /project 单独管理。只有通过 CCR 打开此 App 时，消息接力才在线。"],
-    ["Sessions are managed separately with /session. The relay is available only while this App is opened through CCR.", "会话通过 /session 单独管理。只有通过 CCR 打开此 App 时，消息接力才在线。"],
+    ["OMR App project commands", "OMR App 项目命令"],
+    ["OMR App session commands", "OMR App 会话命令"],
+    ["Projects are managed separately with /project. The relay is available only while this App is opened through OMR.", "项目通过 /project 单独管理。只有通过 OMR 打开此 App 时，消息接力才在线。"],
+    ["Sessions are managed separately with /session. The relay is available only while this App is opened through OMR.", "会话通过 /session 单独管理。只有通过 OMR 打开此 App 时，消息接力才在线。"],
     [" - list Agent projects", " - 列出 Agent 项目"],
     [" - search Agent projects", " - 搜索 Agent 项目"],
     [" - show the selected project", " - 显示当前项目"],
@@ -6092,20 +6100,20 @@ function parseBotCommand(text) {
 
 function projectCommandHelpText(agentName) {
   return [
-    "CCR App project commands (" + agentName + "):",
+    "OMR App project commands (" + agentName + "):",
     "/project list - list Agent projects",
     "/project find <text> - search Agent projects",
     "/project current - show the selected project",
     "/project use <n> - select a listed project",
     "/project name <label> - set a Bot display label for the current project",
     "",
-    "Sessions are managed separately with /session. The relay is available only while this App is opened through CCR."
+    "Sessions are managed separately with /session. The relay is available only while this App is opened through OMR."
   ].join("\n");
 }
 
 function sessionCommandHelpText(agentName) {
   return [
-    "CCR App session commands (" + agentName + "):",
+    "OMR App session commands (" + agentName + "):",
     "/session list - list sessions in the current project",
     "/session find <text> - search sessions in the current project",
     "/session current - show the selected session",
@@ -6131,7 +6139,7 @@ function sessionCommandHelpText(agentName) {
     "/session doctor - show Bot connection and delivery diagnostics",
     "/session deliveries - show recent outbound delivery results",
     "",
-    "Projects are managed separately with /project. The relay is available only while this App is opened through CCR."
+    "Projects are managed separately with /project. The relay is available only while this App is opened through OMR."
   ].join("\n");
 }
 
@@ -6434,9 +6442,12 @@ function claudeConfigSourceDirs(template, order) {
 
 function inferBaseClaudeConfigDirFromSession(value) {
   const text = String(value || "");
-  const marker = path.sep + ".claude-code-router" + path.sep;
-  const index = text.indexOf(marker);
-  return index > 0 ? text.slice(0, index) : "";
+  const newMarker = path.sep + ".omr" + path.sep;
+  const legacyMarker = path.sep + ".claude-code-router" + path.sep;
+  const newIndex = text.indexOf(newMarker);
+  if (newIndex > 0) return text.slice(0, newIndex);
+  const legacyIndex = text.indexOf(legacyMarker);
+  return legacyIndex > 0 ? text.slice(0, legacyIndex) : "";
 }
 
 function uniqueExistingDirs(values) {

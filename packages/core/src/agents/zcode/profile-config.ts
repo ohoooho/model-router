@@ -52,7 +52,7 @@ export function writeZcodeGatewayConfig(
 ): ZcodeProfileConfigWriteResult {
   const file = resolveZcodeConfigFile(profile);
   const model = normalizeClientModel(profile.model) || defaultClientModel(config);
-  const providerId = sanitizeZcodeProviderId(profile.providerId || "") || "claude-code-router";
+  const providerId = sanitizeZcodeProviderId(profile.providerId || "") || "omr";
   const modelCatalog = buildZcodeModelCatalog(config, model);
   const values: ZcodeGatewayConfigValues = {
     baseUrl: gatewayEndpoint(config),

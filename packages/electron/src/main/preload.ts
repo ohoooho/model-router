@@ -96,7 +96,8 @@ function localizedIpcError(error: unknown): Error {
   return localized;
 }
 
-contextBridge.exposeInMainWorld("ccr", {
+const electronBridge = {
+
   applyClaudeAppGateway: (config?: AppConfig) => invoke(IPC_CHANNELS.appApplyClaudeAppGateway, config) as Promise<ClaudeAppGatewayApplyResult>,
   applyProfile: () => invoke(IPC_CHANNELS.appApplyProfile) as Promise<ProfileApplyResult>,
   cancelBotGatewayQrLogin: (request: BotGatewayQrLoginCancelRequest) => invoke(IPC_CHANNELS.appBotGatewayQrLoginCancel, request) as Promise<BotGatewayQrLoginCancelResult>,
@@ -199,4 +200,8 @@ contextBridge.exposeInMainWorld("ccr", {
     ipcRenderer.on(IPC_CHANNELS.appUpdateStatusChanged, handler);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.appUpdateStatusChanged, handler);
   }
-});
+};
+
+contextBridge.exposeInMainWorld("omr", electronBridge);
+// Backward compat: keep ccr alias
+contextBridge.exposeInMainWorld("ccr", electronBridge);

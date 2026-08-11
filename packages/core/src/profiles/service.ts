@@ -51,17 +51,28 @@ import {
 import { getProviderCatalogModels } from "@ccr/core/providers/model-catalog";
 import { resolveUsageModelAttribution } from "@ccr/core/usage/model-attribution";
 
-const managedRootStart = "# BEGIN CCR managed profile";
-const managedRootEnd = "# END CCR managed profile";
-const managedProviderStart = "# BEGIN CCR managed Codex provider";
-const managedProviderEnd = "# END CCR managed Codex provider";
-const managedToolHubMcpStart = "# BEGIN CCR managed ToolHub MCP";
-const managedToolHubMcpEnd = "# END CCR managed ToolHub MCP";
-const managedContextArchiveMcpStart = "# BEGIN CCR managed Context Archive MCP";
-const managedContextArchiveMcpEnd = "# END CCR managed Context Archive MCP";
-const managedConfiguredModelPrefix = "# CCR configured model = ";
-const originalBackupSuffix = ".ccr-original";
-const originalMissingSuffix = ".ccr-original-missing";
+const managedRootStart = "# BEGIN OMR managed profile";
+const managedRootEnd = "# END OMR managed profile";
+const managedProviderStart = "# BEGIN OMR managed Codex provider";
+const managedProviderEnd = "# END OMR managed Codex provider";
+const managedToolHubMcpStart = "# BEGIN OMR managed ToolHub MCP";
+const managedToolHubMcpEnd = "# END OMR managed ToolHub MCP";
+const managedContextArchiveMcpStart = "# BEGIN OMR managed Context Archive MCP";
+const managedContextArchiveMcpEnd = "# END OMR managed Context Archive MCP";
+const managedConfiguredModelPrefix = "# OMR configured model = ";
+const legacyManagedRootStart = "# BEGIN CCR managed profile";
+const legacyManagedRootEnd = "# END CCR managed profile";
+const legacyManagedProviderStart = "# BEGIN CCR managed Codex provider";
+const legacyManagedProviderEnd = "# END CCR managed Codex provider";
+const legacyManagedToolHubMcpStart = "# BEGIN CCR managed ToolHub MCP";
+const legacyManagedToolHubMcpEnd = "# END CCR managed ToolHub MCP";
+const legacyManagedContextArchiveMcpStart = "# BEGIN CCR managed Context Archive MCP";
+const legacyManagedContextArchiveMcpEnd = "# END CCR managed Context Archive MCP";
+const legacyManagedConfiguredModelPrefix = "# CCR configured model = ";
+const originalBackupSuffix = ".omr-original";
+const originalMissingSuffix = ".omr-original-missing";
+const legacyOriginalBackupSuffix = ".ccr-original";
+const legacyOriginalMissingSuffix = ".ccr-original-missing";
 const globalProfileTakeoverFile = path.join(CONFIGDIR, "global-profile-takeover.json");
 const fallbackClientToken = "omr-local";
 const privateDirMode = 0o700;
@@ -335,7 +346,7 @@ function applyClaudeDesignProfile(profile: ProfileConfig, appliedAt: string): Pr
     appliedAt,
     client: "claude-design",
     enabled: profile.enabled,
-    message: "Claude Design profile is managed by CCR Desktop.",
+    message: "Claude Design profile is managed by OMR Desktop.",
     ok: true,
     path: resolveUserPath(CONFIGDIR)
   };
@@ -386,8 +397,8 @@ function applyClaudeCodeProfile(config: AppConfig, profile: ProfileConfig, token
       client: "claude-code",
       enabled: true,
       message: changed
-        ? `Claude Code settings are managed by CCR (wrapper ${wrapperResult.file}).`
-        : "Claude Code settings already match CCR.",
+        ? `Claude Code settings are managed by OMR (wrapper ${wrapperResult.file}).`
+        : "Claude Code settings already match OMR.",
       ok: true,
       path: settingsFile
     };
@@ -410,13 +421,13 @@ function applyCodexProfile(config: AppConfig, profile: ProfileConfig, token: str
       profile,
       configFile,
       `${clientName} profile is disabled.`,
-      (content) => isManagedCodexConfigContent(content, sanitizeCodexProviderId(profile.providerId || "") || "claude-code-router")
+      (content) => isManagedCodexConfigContent(content, sanitizeCodexProviderId(profile.providerId || "") || "omr")
     );
   }
 
   try {
     const endpoint = `${gatewayEndpoint(config).replace(/\/+$/g, "")}/v1`;
-    const providerId = sanitizeCodexProviderId(profile.providerId || "") || "claude-code-router";
+    const providerId = sanitizeCodexProviderId(profile.providerId || "") || "omr";
     const providerName = profile.providerName?.trim() || "OMR";
     const model = normalizeClientModel(profile.model) || defaultClientModel(config);
     const source = existsSync(configFile) ? readFileSync(configFile, "utf8") : "";
@@ -477,8 +488,8 @@ function applyCodexProfile(config: AppConfig, profile: ProfileConfig, token: str
       client: profile.agent,
       enabled: true,
       message: changed
-        ? `${clientName} config is managed by CCR${extras.length ? ` (${extras.join(", ")})` : ""}.`
-        : `${clientName} config already matches CCR.`,
+        ? `${clientName} config is managed by OMR${extras.length ? ` (${extras.join(", ")})` : ""}.`
+        : `${clientName} config already matches OMR.`,
       ok: true,
       path: configFile
     };
@@ -507,8 +518,8 @@ function applyGrokProfile(config: AppConfig, profile: ProfileConfig, token: stri
       client: "grok",
       enabled: true,
       message: wrapperResult.changed
-        ? `Grok CLI is configured to use CCR (wrapper ${wrapperResult.file}).`
-        : "Grok CLI already points to CCR.",
+        ? `Grok CLI is configured to use OMR (wrapper ${wrapperResult.file}).`
+        : "Grok CLI already points to OMR.",
       ok: true,
       path: wrapperResult.file
     };
@@ -538,8 +549,8 @@ function applyKimiProfile(config: AppConfig, profile: ProfileConfig, token: stri
       client: "kimi",
       enabled: true,
       message: wrapperResult.changed
-        ? `Kimi CLI is configured to use CCR (wrapper ${wrapperResult.file}).`
-        : "Kimi CLI already points to CCR.",
+        ? `Kimi CLI is configured to use OMR (wrapper ${wrapperResult.file}).`
+        : "Kimi CLI already points to OMR.",
       ok: true,
       path: wrapperResult.file
     };
@@ -568,8 +579,8 @@ function applyPiProfile(config: AppConfig, profile: ProfileConfig, token: string
       client: "pi",
       enabled: true,
       message: wrapperResult.changed
-        ? `Pi is configured to use CCR (config ${wrapperResult.configFile}, wrapper ${wrapperResult.file}).`
-        : "Pi config already matches CCR.",
+        ? `Pi is configured to use OMR (config ${wrapperResult.configFile}, wrapper ${wrapperResult.file}).`
+        : "Pi config already matches OMR.",
       ok: true,
       path: wrapperResult.configFile
     };
@@ -605,8 +616,8 @@ function applyOpenCodeProfile(config: AppConfig, profile: ProfileConfig, token: 
       client: "opencode",
       enabled: true,
       message: configResult.changed || wrapperResult.changed
-        ? `OpenCode is configured to use CCR (config ${configResult.file}, wrapper ${wrapperResult.file}).`
-        : "OpenCode config already matches CCR.",
+        ? `OpenCode is configured to use OMR (config ${configResult.file}, wrapper ${wrapperResult.file}).`
+        : "OpenCode config already matches OMR.",
       ok: true,
       path: configResult.file
     };
@@ -642,8 +653,8 @@ function applyKiloProfile(config: AppConfig, profile: ProfileConfig, token: stri
       client: "kilo",
       enabled: true,
       message: configResult.changed || wrapperResult.changed
-        ? `Kilo CLI is configured to use CCR (config ${configResult.file}, wrapper ${wrapperResult.file}).`
-        : "Kilo CLI config already matches CCR.",
+        ? `Kilo CLI is configured to use OMR (config ${configResult.file}, wrapper ${wrapperResult.file}).`
+        : "Kilo CLI config already matches OMR.",
       ok: true,
       path: configResult.file
     };
@@ -665,7 +676,7 @@ function applyZcodeProfile(config: AppConfig, profile: ProfileConfig, token: str
   }
 
   try {
-    const providerId = sanitizeCodexProviderId(profile.providerId || "") || "claude-code-router";
+    const providerId = sanitizeCodexProviderId(profile.providerId || "") || "omr";
     const model = normalizeClientModel(profile.model) || defaultClientModel(config);
     const configResult = writeZcodeGatewayConfig(config, profile, token, { backup: true });
     const middlewareResult = profile.cliMiddleware
@@ -687,8 +698,8 @@ function applyZcodeProfile(config: AppConfig, profile: ProfileConfig, token: str
       client: "zcode",
       enabled: true,
       message: changed
-        ? `ZCode config is managed by CCR${extras.length ? ` (${extras.join(", ")})` : ""}.`
-        : "ZCode config already matches CCR.",
+        ? `ZCode config is managed by OMR${extras.length ? ` (${extras.join(", ")})` : ""}.`
+        : "ZCode config already matches OMR.",
       ok: true,
       path: configResult.file
     };
@@ -753,13 +764,13 @@ function profilePath(profile: ProfileConfig): string {
 
 function resolveClaudeCodeSettingsFile(profile: ProfileConfig): string {
   if (isGeneratedProfileScope(profile.scope)) {
-    return path.join(ccrManagedProfileDir(profile), "claude", "settings.json");
+    return path.join(omrManagedProfileDir(profile), "claude", "settings.json");
   }
   return resolveUserPath(profile.settingsFile || "~/.claude/settings.json");
 }
 
 function claudeCodeToolHubMcpConfigFile(profile: ProfileConfig): string {
-  return path.join(ccrManagedProfileDir(profile), "claude", "toolhub-mcp.json");
+  return path.join(omrManagedProfileDir(profile), "claude", "toolhub-mcp.json");
 }
 
 function writeClaudeCodeToolHubMcpConfig(config: AppConfig, profile: ProfileConfig, token: string): { changed: boolean; file?: string } {
@@ -858,7 +869,7 @@ function writeCodexToolHubMcpRuntimeConfig(config: AppConfig, token: string): { 
 function ensureToolHubMcpRuntimeFile(file: string): { changed: boolean } {
   const source = bundledToolHubMcpEntryPathCandidates().find((candidate) => existsSync(candidate));
   if (!source) {
-    throw new Error(`ToolHub MCP runtime was not found. Rebuild or reinstall CCR and try again. Checked: ${bundledToolHubMcpEntryPathCandidates().join(", ")}`);
+    throw new Error(`ToolHub MCP runtime was not found. Rebuild or reinstall OMR and try again. Checked: ${bundledToolHubMcpEntryPathCandidates().join(", ")}`);
   }
   return writeGeneratedFileIfChanged(file, readFileSync(source, "utf8"), { mode: publicExecutableMode });
 }
@@ -868,7 +879,7 @@ function resolveCodexConfigFile(profile: ProfileConfig): string {
     return resolveZcodeConfigFile(profile);
   }
   if (isGeneratedProfileScope(profile.scope)) {
-    return path.join(ccrManagedProfileDir(profile), codexConfigSubdir(profile.agent), "config.toml");
+    return path.join(omrManagedProfileDir(profile), codexConfigSubdir(profile.agent), "config.toml");
   }
   const codexHome = profile.codexHome?.trim();
   if (codexHome) {
@@ -878,14 +889,14 @@ function resolveCodexConfigFile(profile: ProfileConfig): string {
 }
 
 function codexModelCatalogFile(configFile: string): string {
-  return path.join(path.dirname(configFile), "ccr-model-catalog.json");
+  return path.join(path.dirname(configFile), "omr-model-catalog.json");
 }
 
 function zcodeMiddlewareModelCatalogFile(configFile: string): string {
-  return path.join(path.dirname(configFile), "ccr-zcode-middleware-model-catalog.json");
+  return path.join(path.dirname(configFile), "omr-zcode-middleware-model-catalog.json");
 }
 
-function ccrManagedProfileDir(profile: ProfileConfig): string {
+function omrManagedProfileDir(profile: ProfileConfig): string {
   const slug = sanitizeProfilePathSegment(profile.id || profile.name || profile.agent);
   const baseDir = path.join(CONFIGDIR, "profiles", slug || "profile");
   return profile.scope === "custom" ? path.join(baseDir, "custom") : baseDir;
@@ -914,7 +925,15 @@ function buildCodexConfigToml(
     managedToolHubMcpStart,
     managedToolHubMcpEnd,
     managedContextArchiveMcpStart,
-    managedContextArchiveMcpEnd
+    managedContextArchiveMcpEnd,
+    legacyManagedRootStart,
+    legacyManagedRootEnd,
+    legacyManagedProviderStart,
+    legacyManagedProviderEnd,
+    legacyManagedToolHubMcpStart,
+    legacyManagedToolHubMcpEnd,
+    legacyManagedContextArchiveMcpStart,
+    legacyManagedContextArchiveMcpEnd
   ]);
   content = removeCodexProviderTable(content, values.providerId);
   content = removeCodexMcpServerTable(content, TOOL_HUB_MCP_SERVER_NAME);
@@ -1069,8 +1088,8 @@ function writeClaudeCodeApiKeyHelper(profile: ProfileConfig, token: string): { b
 function claudeCodeApiKeyHelperFilename(profile: ProfileConfig): string {
   const slug = sanitizeProfilePathSegment(profile.id || profile.name || profile.agent) || "claude-code";
   return process.platform === "win32"
-    ? `ccr-claude-code-api-key-${slug}.cmd`
-    : `ccr-claude-code-api-key-${slug}`;
+    ? `omr-claude-code-api-key-${slug}.cmd`
+    : `omr-claude-code-api-key-${slug}`;
 }
 
 function claudeCodeApiKeyHelperShellScript(token: string): string {
@@ -1108,8 +1127,8 @@ function writeClaudeCodeWrapper(config: AppConfig, profile: ProfileConfig, apiKe
 function claudeCodeWrapperFilename(profile: ProfileConfig): string {
   const slug = sanitizeProfilePathSegment(profile.id || profile.name || profile.agent).toLowerCase() || "claude-code";
   return process.platform === "win32"
-    ? `ccr-claude-code-wrapper-${slug}.cmd`
-    : `ccr-claude-code-wrapper-${slug}`;
+    ? `omr-claude-code-wrapper-${slug}.cmd`
+    : `omr-claude-code-wrapper-${slug}`;
 }
 
 function claudeCodeWrapperShellScript(config: AppConfig, profile: ProfileConfig, runtimeFile: string, apiKeyHelperFile: string, mcpConfigFile: string | undefined): string {
@@ -1196,8 +1215,8 @@ function openCodeWrapperPath(profile: ProfileConfig): string {
 function openCodeWrapperFilename(profile: ProfileConfig): string {
   const slug = sanitizeProfilePathSegment(profile.id || profile.name || profile.agent).toLowerCase() || "opencode";
   return process.platform === "win32"
-    ? `ccr-opencode-wrapper-${slug}.cmd`
-    : `ccr-opencode-wrapper-${slug}`;
+    ? `omr-opencode-wrapper-${slug}.cmd`
+    : `omr-opencode-wrapper-${slug}`;
 }
 
 function openCodeWrapperShellScript(profile: ProfileConfig, configFile: string, inlineConfig: string): string {
@@ -1266,8 +1285,8 @@ function kiloWrapperPath(profile: ProfileConfig): string {
 function kiloWrapperFilename(profile: ProfileConfig): string {
   const slug = sanitizeProfilePathSegment(profile.id || profile.name || profile.agent).toLowerCase() || "kilo";
   return process.platform === "win32"
-    ? `ccr-kilo-wrapper-${slug}.cmd`
-    : `ccr-kilo-wrapper-${slug}`;
+    ? `omr-kilo-wrapper-${slug}.cmd`
+    : `omr-kilo-wrapper-${slug}`;
 }
 
 function kiloWrapperShellScript(profile: ProfileConfig, configFile: string, inlineConfig: string): string {
@@ -1339,8 +1358,8 @@ function kimiWrapperPath(profile: ProfileConfig): string {
 function kimiWrapperFilename(profile: ProfileConfig): string {
   const slug = sanitizeProfilePathSegment(profile.id || profile.name || profile.agent).toLowerCase() || "kimi";
   return process.platform === "win32"
-    ? `ccr-kimi-cli-wrapper-${slug}.cmd`
-    : `ccr-kimi-cli-wrapper-${slug}`;
+    ? `omr-kimi-cli-wrapper-${slug}.cmd`
+    : `omr-kimi-cli-wrapper-${slug}`;
 }
 
 function kimiWrapperShellScript(config: AppConfig, profile: ProfileConfig, profileHome: string): string {
@@ -1529,7 +1548,7 @@ function buildKimiProfileConfigToml(
   const firstTableIndex = firstTomlTableIndex(preserved);
   const rootSource = firstTableIndex === -1 ? preserved : preserved.slice(0, firstTableIndex);
   const restSource = firstTableIndex === -1 ? "" : preserved.slice(firstTableIndex);
-  const providerId = "claude-code-router";
+  const providerId = "omr";
   const baseUrl = `${gatewayEndpoint(config).replace(/\/+$/g, "")}/v1`;
   const headers = kimiProfileCustomHeaderEntries(profile);
   const providerBlock = [
@@ -1603,8 +1622,8 @@ function kimiProfileCustomHeaderEntries(profile: ProfileConfig): Record<string, 
       headers[key] = value;
     }
   }
-  headers["x-ccr-client"] = "kimi";
-  headers["x-ccr-profile"] = profile.id || profile.name || "kimi";
+  headers["x-omr-client"] = "kimi";
+  headers["x-omr-profile"] = profile.id || profile.name || "kimi";
   return headers;
 }
 
@@ -1774,8 +1793,8 @@ function grokWrapperPath(profile: ProfileConfig): string {
 function grokWrapperFilename(profile: ProfileConfig): string {
   const slug = sanitizeProfilePathSegment(profile.id || profile.name || profile.agent).toLowerCase() || "grok";
   return process.platform === "win32"
-    ? `ccr-grok-cli-wrapper-${slug}.cmd`
-    : `ccr-grok-cli-wrapper-${slug}`;
+    ? `omr-grok-cli-wrapper-${slug}.cmd`
+    : `omr-grok-cli-wrapper-${slug}`;
 }
 
 function grokWrapperShellScript(config: AppConfig, profile: ProfileConfig, token: string, model: string, profileHome: string): string {
@@ -1990,14 +2009,14 @@ function claudeCodeRuntimeEnv(config: AppConfig, profile: ProfileConfig, setting
 }
 
 function codexMiddlewareRuntimeFilename(): string {
-  return "ccr-codex-cli-middleware.js";
+  return "omr-codex-cli-middleware.js";
 }
 
 function codexMiddlewareFilename(profile: ProfileConfig, providerId: string): string {
   const slug = sanitizeCodexProviderId(profile.id || profile.name || providerId) || "codex";
   return process.platform === "win32"
-    ? `ccr-codex-cli-stdio-${slug}.cmd`
-    : `ccr-codex-cli-stdio-${slug}`;
+    ? `omr-codex-cli-stdio-${slug}.cmd`
+    : `omr-codex-cli-stdio-${slug}`;
 }
 
 function shellProfileSurfaceExports(surface: "auto" | "cli" | "app"): string[] {
@@ -2306,12 +2325,18 @@ function managedModelAssignment(source: string, configuredModel: string): string
 }
 
 function managedConfiguredModel(source: string): string | undefined {
-  const pattern = new RegExp(`^\\s*${escapeRegExp(managedConfiguredModelPrefix)}(.+?)\\s*$`, "m");
+  const prefixPattern = [managedConfiguredModelPrefix, legacyManagedConfiguredModelPrefix]
+    .map((prefix) => escapeRegExp(prefix))
+    .join("|");
+  const pattern = new RegExp(`^\\s*(?:${prefixPattern})(.+?)\\s*$`, "m");
   return source.match(pattern)?.[1];
 }
 
 function removeManagedConfiguredModelLine(source: string): string {
-  const pattern = new RegExp(`^\\s*${escapeRegExp(managedConfiguredModelPrefix)}.*(?:\\n|$)`, "gm");
+  const prefixPattern = [managedConfiguredModelPrefix, legacyManagedConfiguredModelPrefix]
+    .map((prefix) => escapeRegExp(prefix))
+    .join("|");
+  const pattern = new RegExp(`^\\s*(?:${prefixPattern}).*(?:\\n|$)`, "gm");
   return source.replace(pattern, "");
 }
 
@@ -2578,7 +2603,7 @@ function cleanupInactiveOpenCodeWrappers(profiles: ProfileConfig[]): number {
 
   let removed = 0;
   for (const entry of entries) {
-    if (!entry.startsWith("ccr-opencode-wrapper-") || activeFiles.has(entry)) {
+    if (!entry.startsWith("omr-opencode-wrapper-") || activeFiles.has(entry)) {
       continue;
     }
     rmSync(path.join(binDir, entry), { force: true });
@@ -2601,7 +2626,7 @@ function cleanupInactiveKiloWrappers(profiles: ProfileConfig[]): number {
 
   let removed = 0;
   for (const entry of entries) {
-    if (!entry.startsWith("ccr-kilo-wrapper-") || activeFiles.has(entry)) {
+    if (!entry.startsWith("omr-kilo-wrapper-") || activeFiles.has(entry)) {
       continue;
     }
     rmSync(path.join(binDir, entry), { force: true });
@@ -2611,7 +2636,7 @@ function cleanupInactiveKiloWrappers(profiles: ProfileConfig[]): number {
 }
 
 function generatedBinBackupBaseName(entry: string): string | undefined {
-  const backupMarker = ".ccr-backup-";
+  const backupMarker = ".omr-backup-";
   const backupIndex = entry.indexOf(backupMarker);
   if (backupIndex !== -1) {
     return entry.slice(0, backupIndex);
@@ -2626,18 +2651,29 @@ function generatedBinBackupBaseName(entry: string): string | undefined {
 
 function isManagedGeneratedBinFile(fileName: string): boolean {
   const normalized = fileName.replace(/\.cmd$/i, "");
-  return normalized === "ccr" ||
+  return normalized === "omr" ||
+    normalized === "omr-app" ||
+    normalized === "omr-cli.js" ||
+    normalized === "ccr" ||
     normalized === "ccr-app" ||
     normalized === "ccr-cli.js" ||
     normalized === TOOL_HUB_MCP_RUNTIME_FILE_NAME ||
     normalized === codexMiddlewareRuntimeFilename() ||
+    normalized.startsWith("omr-claude-code-api-key-") ||
     normalized.startsWith("ccr-claude-code-api-key-") ||
+    normalized.startsWith("omr-claude-code-wrapper-") ||
     normalized.startsWith("ccr-claude-code-wrapper-") ||
+    normalized.startsWith("omr-grok-cli-wrapper-") ||
     normalized.startsWith("ccr-grok-cli-wrapper-") ||
+    normalized.startsWith("omr-kimi-cli-wrapper-") ||
     normalized.startsWith("ccr-kimi-cli-wrapper-") ||
+    normalized.startsWith("omr-pi-wrapper-") ||
     normalized.startsWith("ccr-pi-wrapper-") ||
+    normalized.startsWith("omr-opencode-wrapper-") ||
     normalized.startsWith("ccr-opencode-wrapper-") ||
+    normalized.startsWith("omr-kilo-wrapper-") ||
     normalized.startsWith("ccr-kilo-wrapper-") ||
+    normalized.startsWith("omr-codex-cli-stdio-") ||
     normalized.startsWith("ccr-codex-cli-stdio-");
 }
 
@@ -2700,7 +2736,7 @@ function disabledProfileStatus(profile: ProfileConfig): ProfileClientApplyStatus
       (content) => isManagedKiloConfigContent(content, providerId)
     );
   }
-  const providerId = sanitizeCodexProviderId(profile.providerId || "") || "claude-code-router";
+  const providerId = sanitizeCodexProviderId(profile.providerId || "") || "omr";
   return restoreDisabledGlobalProfile(
     profile,
     resolveCodexConfigFile(profile),
@@ -2734,7 +2770,7 @@ export function restoreInactiveGlobalProfileConfigs(profiles: ProfileConfig[]): 
       ...codexProfiles.map(globalCodexConfigCandidate)
     ])) {
       const restoreResult = restoreGlobalConfigFile(file, {
-        isManagedContent: (content) => isManagedCodexConfigContent(content, "claude-code-router"),
+        isManagedContent: (content) => isManagedCodexConfigContent(content, "omr") || isManagedCodexConfigContent(content, "omr"),
         mode: privateFileMode
       });
       if (restoreResult.changed || restoreResult.missingBackup) {
@@ -2745,7 +2781,8 @@ export function restoreInactiveGlobalProfileConfigs(profiles: ProfileConfig[]): 
   const openCodeProfiles = profiles.filter((profile) => profile.agent === "opencode");
   if (openCodeProfiles.length > 0 && !openCodeProfiles.some((profile) => profile.enabled && isGlobalProfile(profile))) {
     const providerIds = [...new Set([
-      "claude-code-router",
+      "omr",
+      "omr",
       ...openCodeProfiles.map(openCodeProviderId)
     ])];
     for (const file of uniqueResolvedPaths(openCodeProfiles.map(globalOpenCodeConfigCandidate))) {
@@ -2761,7 +2798,8 @@ export function restoreInactiveGlobalProfileConfigs(profiles: ProfileConfig[]): 
   const kiloProfiles = profiles.filter((profile) => profile.agent === "kilo");
   if (kiloProfiles.length > 0 && !kiloProfiles.some((profile) => profile.enabled && isGlobalProfile(profile))) {
     const providerIds = [...new Set([
-      "claude-code-router",
+      "omr",
+      "omr",
       ...kiloProfiles.map(kiloProviderId)
     ])];
     for (const file of uniqueResolvedPaths(kiloProfiles.map(globalKiloConfigCandidate))) {
@@ -2777,7 +2815,8 @@ export function restoreInactiveGlobalProfileConfigs(profiles: ProfileConfig[]): 
   const zcodeProfiles = profiles.filter((profile) => profile.agent === "zcode");
   if (zcodeProfiles.length > 0 && !zcodeProfiles.some((profile) => profile.enabled && isGlobalProfile(profile))) {
     const providerIds = [...new Set([
-      "claude-code-router",
+      "omr",
+      "omr",
       ...zcodeProfiles.map((profile) => sanitizeCodexProviderId(profile.providerId || "")).filter(Boolean)
     ])];
     const configFiles = uniqueResolvedPaths([
@@ -2947,7 +2986,7 @@ function inactiveGlobalCleanupStatus(
     client,
     enabled: false,
     message: restoreResult.missingBackup
-      ? `No active global ${codexCompatibleClientName(client)} profile is configured, but the global config is managed by CCR and no original backup was found.`
+      ? `No active global ${codexCompatibleClientName(client)} profile is configured, but the global config is managed by OMR and no original backup was found.`
       : `${codexCompatibleClientName(client)} global config was restored because no active global profile is configured.`,
     ok: !restoreResult.missingBackup,
     path: resolveUserPath(file)
@@ -2989,7 +3028,7 @@ function restoreDisabledZcodeProfile(profile: ProfileConfig, configFile: string)
     return disabledStatus("zcode", configFile, disabledMessage);
   }
 
-  const providerId = sanitizeCodexProviderId(profile.providerId || "") || "claude-code-router";
+  const providerId = sanitizeCodexProviderId(profile.providerId || "") || "omr";
   const storageRoot = zcodeHomeFromConfigFile(configFile);
   const files = [
     configFile,
@@ -3013,8 +3052,8 @@ function restoreDisabledZcodeProfile(profile: ProfileConfig, configFile: string)
       ? `${disabledMessage} No original ZCode config backup was found for ${profile.name || profile.id || "this profile"}.`
       : restored
         ? changed
-          ? "ZCode config was restored from the CCR backup because the global profile is disabled."
-          : "ZCode config already matches the CCR backup; profile is disabled."
+          ? "ZCode config was restored from the OMR backup because the global profile is disabled."
+          : "ZCode config already matches the OMR backup; profile is disabled."
         : disabledMessage,
     ok: !missingBackup,
     path: resolveUserPath(configFile)
@@ -3036,8 +3075,8 @@ function disabledRestoreStatus(
       ? `${disabledMessage} No original ${codexCompatibleClientName(client)} config backup was found for ${profileName}.`
       : restoreResult.restored
         ? restoreResult.changed
-          ? `${codexCompatibleClientName(client)} config was restored from the CCR backup because the global profile is disabled.`
-          : `${codexCompatibleClientName(client)} config already matches the CCR backup; profile is disabled.`
+          ? `${codexCompatibleClientName(client)} config was restored from the OMR backup because the global profile is disabled.`
+          : `${codexCompatibleClientName(client)} config already matches the OMR backup; profile is disabled.`
         : disabledMessage,
     ok: !restoreResult.missingBackup,
     path: resolveUserPath(file)
@@ -3092,10 +3131,10 @@ function originalSnapshotCandidate(
   file: string,
   isManagedContent: (content: string) => boolean
 ): { content: string; file: string } | undefined {
-  // Prefer the most recent non-CCR snapshot captured immediately before the
-  // latest takeover. The permanent .ccr-original file can be stale when the
-  // user changes the agent config between separate CCR sessions.
-  for (const candidate of [...backupFiles(file).reverse(), originalBackupFilePath(file)]) {
+  // Prefer the most recent non-OMR snapshot captured immediately before the
+  // latest takeover. The permanent .omr-original file can be stale when the
+  // user changes the agent config between separate OMR sessions.
+  for (const candidate of [...backupFiles(file).reverse(), originalBackupFilePath(file), legacyOriginalBackupFilePath(file)]) {
     if (!existsSync(candidate)) {
       continue;
     }
@@ -3116,10 +3155,11 @@ function backupCurrentConfigFile(file: string, mode: number | undefined): string
 
 function backupFiles(file: string): string[] {
   const dir = path.dirname(file);
-  const prefix = `${path.basename(file)}.ccr-backup-`;
+  const prefix = `${path.basename(file)}.omr-backup-`;
+  const legacyPrefix = `${path.basename(file)}.ccr-backup-`;
   try {
     return readdirSync(dir)
-      .filter((entry) => entry.startsWith(prefix))
+      .filter((entry) => entry.startsWith(prefix) || entry.startsWith(legacyPrefix))
       .sort()
       .map((entry) => path.join(dir, entry));
   } catch {
@@ -3155,7 +3195,7 @@ function chmodFileIfRequested(file: string, mode: number | undefined): void {
 
 function backupFilePath(file: string): string {
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  return `${file}.ccr-backup-${timestamp}`;
+  return `${file}.omr-backup-${timestamp}`;
 }
 
 function originalBackupFilePath(file: string): string {
@@ -3164,6 +3204,14 @@ function originalBackupFilePath(file: string): string {
 
 function originalMissingFilePath(file: string): string {
   return `${file}${originalMissingSuffix}`;
+}
+
+function legacyOriginalBackupFilePath(file: string): string {
+  return `${file}${legacyOriginalBackupSuffix}`;
+}
+
+function legacyOriginalMissingFilePath(file: string): string {
+  return `${file}${legacyOriginalMissingSuffix}`;
 }
 
 function disabledStatus(client: ProfileClientKind, file: string, message: string): ProfileClientApplyStatus {
@@ -3199,7 +3247,7 @@ function isManagedClaudeCodeSettingsContent(content: string): boolean {
     return false;
   }
   const apiKeyHelper = typeof settings.apiKeyHelper === "string" ? settings.apiKeyHelper : "";
-  if (apiKeyHelper.includes("ccr-claude-code-api-key-")) {
+  if (apiKeyHelper.includes("omr-claude-code-api-key-") || apiKeyHelper.includes("ccr-claude-code-api-key-")) {
     return true;
   }
   const env = isRecord(settings.env) ? settings.env : {};
@@ -3226,7 +3274,12 @@ function isPureManagedClaudeCodeSettings(settings: Record<string, unknown>): boo
 }
 
 function isManagedCodexConfigContent(content: string, providerId: string): boolean {
-  if (content.includes(managedRootStart) || content.includes(managedProviderStart)) {
+  if (
+    content.includes(managedRootStart) ||
+    content.includes(managedProviderStart) ||
+    content.includes(legacyManagedRootStart) ||
+    content.includes(legacyManagedProviderStart)
+  ) {
     return true;
   }
   const escapedProvider = escapeRegExp(providerId);
@@ -3380,7 +3433,7 @@ function defaultCodexConfigFile(agent: ProfileConfig["agent"]): string {
     : agent === "pi"
       ? "~/.pi/agent"
       : agent === "claude-design"
-        ? "~/.claude-code-router/claude-design"
+        ? "~/.omr/claude-design"
         : "~/.codex/config.toml";
 }
 

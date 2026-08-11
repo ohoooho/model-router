@@ -601,7 +601,7 @@ function contextArchiveAnthropicMessagesTool(toolName: string): Record<string, u
 function contextArchiveToolDescription(): string {
   return [
     "Ask the archived pre-compaction agent lineage a natural-language history task.",
-    "Use this when the compact handoff says historical details are available in CCR archived history.",
+    "Use this when the compact handoff says historical details are available in OMR archived history.",
     "Pass archive_id and session_token exactly from the compact handoff.",
     "For many related questions, include every question id and full question text in one task and ask for JSON evidence keyed by question id."
   ].join(" ");
@@ -622,7 +622,7 @@ function contextArchiveToolSchema(): Record<string, unknown> {
 
 function contextArchiveToolContinuationGuidance(toolName: string): string {
   return [
-    "CCR context archive is available for this compacted continuation.",
+    "OMR context archive is available for this compacted continuation.",
     `If the compact handoff indicates missing historical details are stored in archived history, use the ${toolName} tool when that history is needed.`,
     "Use ordinary task judgment: answer directly when the compact handoff and retained tail are sufficient; call the history tool when exact pre-compaction details are needed."
   ].join(" ");

@@ -1,11 +1,14 @@
 import path from "node:path";
-import { APP_NAME, APP_STORAGE_NAME, LEGACY_CONFIGDIR, resolveRuntimeAppPath, resolveRuntimeConfigDir, resolveRuntimeDataDir } from "@ccr/core/runtime/app-paths";
+import { APP_NAME, APP_STORAGE_NAME, LEGACY_CONFIGDIR, migrateLegacyConfigDir, resolveRuntimeAppPath, resolveRuntimeConfigDir, resolveRuntimeDataDir } from "@ccr/core/runtime/app-paths";
 import { copyMissingDirectoryContents } from "@ccr/core/storage/migration";
 
 export { IPC_CHANNELS } from "@ccr/core/contracts/ipc-channels";
 export const LEGACY_CONFIG_FILE = path.join(LEGACY_CONFIGDIR, "config.json");
 
 export { APP_NAME, APP_STORAGE_NAME, LEGACY_CONFIGDIR };
+
+// Migrate legacy ~/.claude-code-router → ~/.omr before resolving config dir
+migrateLegacyConfigDir();
 
 export const CONFIGDIR = resolveRuntimeConfigDir();
 export const LEGACY_WINDOWS_CONFIGDIR = path.join(resolveRuntimeAppPath("appData"), APP_NAME);

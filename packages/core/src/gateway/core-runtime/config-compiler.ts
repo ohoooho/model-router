@@ -14,7 +14,7 @@ import { resolveGatewayPublicModelId } from "@ccr/core/gateway/features/model-di
 import { activeProviderCredentials, inferProtocol, normalizedProviderCapabilities, normalizeProviderProtocol, providerCapabilityForClientProtocol, providerCapabilityInternalName, providerCapabilityNameMatches, providerCredentialInternalName, providerProtocolForClientProtocol, sortProviderCredentialsForConfig, toCoreGatewayProviders } from "@ccr/core/providers/runtime-topology";
 import { buildRawTraceConfig } from "@ccr/core/observability/raw-trace-sync";
 import { endpoint, resolveUndiciProxyAgentModule, resolveUpstreamHeaderSanitizerEntry, writeGatewayProxyPreloadFile } from "@ccr/core/gateway/core-runtime/supervisor";
-import { billingUsageSyncHeader, billingUsageSyncPath, claudeCodeOauthBetaHeader, claudeCodeOauthRequiredBeta, coreGatewayAuthHeader, coreGatewayAuthTokenEnv } from "@ccr/core/gateway/internal/shared";
+import { billingUsageSyncHeader, billingUsageSyncPath, claudeCodeOauthBetaHeader, claudeCodeOauthRequiredBeta, coreGatewayAuthTokenEnv, omrCoreGatewayAuthHeader } from "@ccr/core/gateway/internal/shared";
 import type { BrowserWebSearchMcpIntegration, CoreGatewayProvider } from "@ccr/core/gateway/internal/shared";
 import { uniqueStrings } from "@ccr/core/gateway/internal/collections";
 import { isLocalClaudeCodeOauthProviderPlugin, mergeAnthropicBetaValues } from "@ccr/core/providers/oauth-plugin";
@@ -113,7 +113,7 @@ export async function compileCoreGatewayConfig(
       staticApiKeys: {
         keyBearerOnly: false,
         keyEnv: coreGatewayAuthTokenEnv,
-        keyHeader: coreGatewayAuthHeader,
+        keyHeader: omrCoreGatewayAuthHeader,
         keys: [coreAuthToken]
       }
     },

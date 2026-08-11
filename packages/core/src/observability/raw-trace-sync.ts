@@ -1513,10 +1513,10 @@ export async function readRawTraceRequestLogBundle(
   const target = isRecord(manifest.target) ? manifest.target : {};
   const rawUrl = stringValue(upstreamRequestMetadata?.url);
   const url = sanitizeUrlForLog(rawUrl);
-  const attempt = positiveAttemptNumber(readUnknownHeader(
-    clientRequestMetadata?.headers,
-    "x-ccr-route-attempt"
-  ));
+  const attempt = positiveAttemptNumber(
+    readUnknownHeader(clientRequestMetadata?.headers, "x-omr-route-attempt") ??
+    readUnknownHeader(clientRequestMetadata?.headers, "x-ccr-route-attempt")
+  );
 
   return {
     files: {

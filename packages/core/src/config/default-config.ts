@@ -211,7 +211,7 @@ export function createDefaultAppConfig(options: DefaultAppConfigOptions = {}): A
         enabled: true,
         managedCompact: false,
         model: "",
-        providerId: "claude-code-router",
+        providerId: "omr",
         providerName: "OMR",
         showAllSessions: false
       },
@@ -247,7 +247,7 @@ export function createDefaultAppConfig(options: DefaultAppConfigOptions = {}): A
           managedCompact: false,
           model: "",
           name: "Codex",
-          providerId: "claude-code-router",
+          providerId: "omr",
           providerName: "OMR",
           showAllSessions: false,
           scope: "global",

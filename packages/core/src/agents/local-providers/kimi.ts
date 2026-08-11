@@ -438,7 +438,7 @@ function persistKimiAuth(auth: KimiTokenSet): void {
     } catch {
       // Ignore temporary-file cleanup failures.
     }
-    // Best effort. The refreshed access token is still usable for this CCR run.
+    // Best effort. The refreshed access token is still usable for this OMR run.
   }
 }
 

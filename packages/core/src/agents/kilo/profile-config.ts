@@ -81,11 +81,11 @@ export function isManagedKiloConfigContent(content: string, providerId: string):
     return false;
   }
   const headers = isRecord(provider.options.headers) ? provider.options.headers : {};
-  return headers["x-ccr-client"] === "kilo" || headers["X-CCR-Client"] === "kilo";
+  return headers["x-omr-client"] === "kilo" || headers["x-ccr-client"] === "kilo" || headers["X-CCR-Client"] === "kilo";
 }
 
 export function kiloProviderId(profile: Pick<ProfileConfig, "providerId">): string {
-  return sanitizeProviderId(profile.providerId || "") || "claude-code-router";
+  return sanitizeProviderId(profile.providerId || "") || "omr";
 }
 
 function kiloGatewayOverrides(config: AppConfig, profile: ProfileConfig, token: string): Record<string, unknown> {
@@ -106,8 +106,8 @@ function kiloGatewayOverrides(config: AppConfig, profile: ProfileConfig, token: 
           apiKey: token,
           baseURL: `${gatewayEndpoint(config).replace(/\/+$/g, "")}/v1`,
           headers: {
-            "x-ccr-client": "kilo",
-            "x-ccr-profile": profile.id || profile.name || "kilo"
+            "x-omr-client": "kilo",
+            "x-omr-profile": profile.id || profile.name || "kilo"
           }
         }
       }

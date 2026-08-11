@@ -21,6 +21,7 @@
   "main": "dist/main/cli.js",
   "bin": {
     "model-router": "dist/main/cli.js",
+    "omr": "dist/main/cli.js",
     "ccr": "dist/main/cli.js"
   },
   "files": [
