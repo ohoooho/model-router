@@ -222,6 +222,20 @@ export type ProviderModelMetadata = {
   supportsReasoningSummaries?: boolean;
 };
 
+// OMR-FORK-CHANGE-004（@omr/fork/multi-cred-strategies, 2026-08-11）
+// 桃仙 OMR 多 Credential 路由策略：4 策略架构
+// 见 dopple/MULTI-CRED-STRATEGIES.md
+//   auto-balance (默认): 按剩余容量加权分配，平滑用满所有 key
+//   waterfall:          先用 A 用完再用 B 用完
+//   priority:           首选 A，A 挂了才用 B
+//   manual:             OMR 不自动切，请求时按用户选
+// 策略绑在 virtualModelProfile 上（也可在 credential 上 per-key 覆盖）。
+export type CredentialRoutingStrategy =
+  | "auto-balance"
+  | "manual"
+  | "priority"
+  | "waterfall";
+
 export type ProviderCredentialConfig = {
   account?: ProviderAccountConfig;
   api_key?: string;
@@ -233,6 +247,8 @@ export type ProviderCredentialConfig = {
   name?: string;
   limits?: ApiKeyLimitConfig;
   priority?: number;
+  // OMR-FORK-CHANGE-004: per-credential 策略覆盖（可选，virtualModelProfile.strategy 优先）
+  strategy?: CredentialRoutingStrategy;
   weight?: number;
 };
 
@@ -1043,6 +1059,8 @@ export type VirtualModelProfileConfig = {
   match: VirtualModelMatchConfig;
   materialization: VirtualModelMaterializationConfig;
   metadata?: Record<string, unknown>;
+  // OMR-FORK-CHANGE-004: 策略绑在 virtualModelProfile 上（默认 auto-balance）
+  strategy?: CredentialRoutingStrategy;
   toolChoice?: unknown;
   tools: VirtualModelToolConfig[];
 };
