@@ -1476,7 +1476,7 @@ export function requestLogSampled(requestId: string, rate: number): boolean {
 
 
 function rawTraceEnabledFromEnv(): boolean {
-  const value = (process.env.CCR_RAW_TRACE_ENABLED ?? process.env.CCR_RAW_TRACE ?? "").trim().toLowerCase();
+  const value = (process.env.OMR_RAW_TRACE_ENABLED ?? process.env.OMR_RAW_TRACE ?? "").trim().toLowerCase();
   return value === "1" || value === "true" || value === "yes" || value === "on";
 }
 

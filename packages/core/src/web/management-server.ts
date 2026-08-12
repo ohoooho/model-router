@@ -130,9 +130,9 @@ const webBridgeScriptTag = '    <script src="../../assets/web-client-bridge.js">
 
 
 export async function startWebManagementServer(options: WebManagementServerOptions = {}): Promise<WebManagementServerRuntime> {
-  const host = options.host?.trim() || readEnvString("CCR_WEB_HOST") || defaultWebHost;
-  const requestedPort = options.port ?? readEnvPort("CCR_WEB_PORT") ?? defaultWebPort;
-  const authToken = options.authToken?.trim() || readEnvString("CCR_WEB_AUTH_TOKEN") || randomBytes(32).toString("base64url");
+  const host = options.host?.trim() || readEnvString("OMR_WEB_HOST") || defaultWebHost;
+  const requestedPort = options.port ?? readEnvPort("OMR_WEB_PORT") ?? defaultWebPort;
+  const authToken = options.authToken?.trim() || readEnvString("OMR_WEB_AUTH_TOKEN") || randomBytes(32).toString("base64url");
   let security: WebManagementSecurityContext | undefined;
   const server = createServer((request, response) => {
     if (!security) {
@@ -293,10 +293,10 @@ const rpcHandlers: Record<string, RpcHandler> = {
   getGatewayStatus: () => gatewayService.getStatus(),
   getServiceIdentity: (serviceToken) => ({
     pid: process.pid,
-    serviceTokenConfigured: Boolean(process.env.CCR_SERVICE_INSTANCE_TOKEN?.trim()),
+    serviceTokenConfigured: Boolean(process.env.OMR_SERVICE_INSTANCE_TOKEN?.trim()),
     serviceTokenMatches: typeof serviceToken === "string" &&
       Boolean(serviceToken.trim()) &&
-      serviceToken === process.env.CCR_SERVICE_INSTANCE_TOKEN
+      serviceToken === process.env.OMR_SERVICE_INSTANCE_TOKEN
   }),
   getLocalAgentProviderCandidates: () => getLocalAgentProviderCandidates(),
   getOnboardingFinished: () => loadOnboardingFinished(),

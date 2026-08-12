@@ -19,7 +19,7 @@ const BOT_RUNTIME_STATE_VERSION = 1;
 const REQUEST_TIMEOUT_MS = numberEnv("CCR_CODEX_APP_REQUEST_TIMEOUT_MS", 10 * 60 * 1000);
 const TURN_IDLE_TIMEOUT_MS = numberEnv("CCR_CODEX_CLAUDE_TURN_IDLE_TIMEOUT_MS", 10 * 60 * 1000);
 const CONFIG_DIR = resolveConfigDir();
-const LOG_PATH = process.env.CCR_CODEX_CLI_MIDDLEWARE_LOG || "";
+const LOG_PATH = process.env.OMR_CODEX_CLI_MIDDLEWARE_LOG || "";
 const CLAUDE_CODE_MCP_CONFIG_ENV = "CCR_CLAUDE_CODE_MCP_CONFIG";
 const CODEXL_CLAUDE_CODE_MCP_CONFIG_ENV = "CODEXL_CLAUDE_CODE_MCP_CONFIG";
 const CLAUDE_CODE_CHINA_TIME_ZONES = new Set([
@@ -101,19 +101,19 @@ function botBridge() {
 
 async function main() {
   const args = directProfileDispatchArgs(process.argv.slice(2));
-  if (process.env.CCR_OPENCODE_BOT_WORKER === "1" || args[0] === "opencode-bot-worker") {
+  if (process.env.OMR_OPENCODE_BOT_WORKER === "1" || args[0] === "opencode-bot-worker") {
     await runOpenCodeBotWorker(args);
     return;
   }
-  if (process.env.CCR_CLAUDE_CODE_BOT_WORKER === "1" || args[0] === "claude-bot-worker") {
+  if (process.env.OMR_CLAUDE_CODE_BOT_WORKER === "1" || args[0] === "claude-bot-worker") {
     await runClaudeCodeBotWorker(args);
     return;
   }
-  if (process.env.CCR_CODEX_BOT_WORKER === "1" || args[0] === "codex-bot-worker") {
+  if (process.env.OMR_CODEX_BOT_WORKER === "1" || args[0] === "codex-bot-worker") {
     await runCodexBotWorker(args);
     return;
   }
-  if (process.env.CCR_CLAUDE_CODE_WRAPPER === "1") {
+  if (process.env.OMR_CLAUDE_CODE_WRAPPER === "1") {
     await runClaudeCodeCliWrapper(args);
     return;
   }
@@ -125,7 +125,7 @@ async function main() {
 }
 
 function directProfileDispatchArgs(args) {
-  if (process.env.CCR_CLI_DIRECT_PROFILE_DISPATCH !== "1") {
+  if (process.env.OMR_CLI_DIRECT_PROFILE_DISPATCH !== "1") {
     return args;
   }
   const forwarded = args.slice(1);
@@ -167,7 +167,7 @@ async function runClaudeCodeCliWrapper(args) {
       child.stdin.write(text + "\n");
       return;
     }
-    if (boolEnv("CCR_REMOTE_SYNC_NOTIFY_INBOUND") || !process.env.CCR_REMOTE_SYNC_NOTIFY_INBOUND) {
+    if (boolEnv("CCR_REMOTE_SYNC_NOTIFY_INBOUND") || !process.env.OMR_REMOTE_SYNC_NOTIFY_INBOUND) {
       process.stdout.write("\n[OMR remote]" + text + "\n");
     }
   });
@@ -4801,7 +4801,7 @@ function writeLine(stream, value) {
 
 function createRemoteSyncClient(options) {
   const endpoint = normalizeRemoteSyncEndpoint(nonEmptyEnv("CCR_REMOTE_SYNC_ENDPOINT"));
-  const enabled = endpoint && !["0", "false", "no", "off"].includes(String(process.env.CCR_REMOTE_SYNC_ENABLED || "1").trim().toLowerCase());
+  const enabled = endpoint && !["0", "false", "no", "off"].includes(String(process.env.OMR_REMOTE_SYNC_ENABLED || "1").trim().toLowerCase());
   if (!enabled || typeof fetch !== "function") {
     return {
       postEvent: async () => {},

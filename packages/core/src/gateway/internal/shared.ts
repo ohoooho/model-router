@@ -232,7 +232,7 @@ export const claudeCodeOauthRequiredBeta = "oauth-2025-04-20";
 export const coreGatewayAuthHeader = "x-ccr-core-auth";
 export const omrCoreGatewayAuthHeader = "x-omr-core-auth";
 
-export const coreGatewayAuthTokenEnv = "CCR_CORE_GATEWAY_AUTH_TOKEN";
+export const coreGatewayAuthTokenEnv = "OMR_CORE_GATEWAY_AUTH_TOKEN";
 
 export const clientClosedRequestStatusCode = 499;
 
@@ -298,7 +298,7 @@ export const rawTraceSyncPath = "/__ccr/raw-trace-sync";
 
 export const billingUsageSyncPath = "/__ccr/billing-usage-sync";
 
-export const gatewayEntryOverrideEnv = "CCR_GATEWAY_ENTRY";
+export const gatewayEntryOverrideEnv = "OMR_GATEWAY_ENTRY";
 
 export const gatewayPackageCandidates = ["@the-next-ai/ai-gateway", "gateway"];
 

@@ -61,7 +61,7 @@ export async function compileCoreGatewayConfig(
   const coreEndpoint = endpoint(config.gateway.coreHost, config.gateway.corePort);
   const proxyPreloadFile = upstreamProxyUrl ? writeGatewayProxyPreloadFile() : undefined;
   const proxyEnv = upstreamProxyUrl
-    ? { CCR_UPSTREAM_PROXY_URL: upstreamProxyUrl, CCR_UNDICI_MODULE: resolveUndiciProxyAgentModule() }
+    ? { OMR_UPSTREAM_PROXY_URL: upstreamProxyUrl, OMR_UNDICI_MODULE: resolveUndiciProxyAgentModule() }
     : undefined;
   const builtinToolArtifacts = await fusionBuiltinToolArtifacts(
     virtualModelProfiles,

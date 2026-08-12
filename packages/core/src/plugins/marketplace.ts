@@ -51,7 +51,7 @@ export async function getPluginMarketplace(): Promise<PluginMarketplaceEntry[]> 
 }
 
 function marketplaceUrl(): string {
-  return process.env.CCR_PLUGIN_MARKETPLACE_URL?.trim() || defaultMarketplaceUrl;
+  return process.env.OMR_PLUGIN_MARKETPLACE_URL?.trim() || defaultMarketplaceUrl;
 }
 
 async function fetchPluginMarketplace(url: string): Promise<PluginMarketplaceEntry[]> {

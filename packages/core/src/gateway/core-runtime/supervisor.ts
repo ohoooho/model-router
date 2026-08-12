@@ -263,7 +263,7 @@ function createGatewayProcessEnv(
     AUTH_STATIC_API_KEY_BEARER_ONLY: "false",
     AUTH_STATIC_API_KEY_ENV: coreGatewayAuthTokenEnv,
     AUTH_STATIC_API_KEY_HEADER: omrCoreGatewayAuthHeader,
-    CCR_GATEWAY_RUNTIME_ID: runtimeId,
+    OMR_GATEWAY_RUNTIME_ID: runtimeId,
     [coreGatewayAuthTokenEnv]: coreAuthToken,
     HOST: config.gateway.coreHost,
     PORT: String(config.gateway.corePort)
@@ -301,8 +301,8 @@ function createGatewayProcessEnv(
   env.http_proxy = upstreamProxyUrl;
   env.https_proxy = upstreamProxyUrl;
   env.all_proxy = upstreamProxyUrl;
-  env.CCR_UPSTREAM_PROXY_URL = upstreamProxyUrl;
-  env.CCR_UNDICI_MODULE = resolveUndiciProxyAgentModule();
+  env.OMR_UPSTREAM_PROXY_URL = upstreamProxyUrl;
+  env.OMR_UNDICI_MODULE = resolveUndiciProxyAgentModule();
   return env;
 }
 
@@ -321,7 +321,7 @@ function resolveGatewayNodeRuntime(): GatewayNodeRuntime {
 }
 
 function configuredGatewayNodeRuntimeCandidates(): GatewayNodeRuntime[] {
-  const configured = process.env.CCR_NODE_BIN?.trim();
+  const configured = process.env.OMR_NODE_BIN?.trim();
   return configured ? [{ command: configured, electronRunAsNode: false }] : [];
 }
 
@@ -425,8 +425,8 @@ export function writeGatewayProxyPreloadFile(): string {
     file,
     [
       "\"use strict\";",
-      "const up = process.env.CCR_UPSTREAM_PROXY_URL;",
-      "const um = process.env.CCR_UNDICI_MODULE;",
+      "const up = process.env.OMR_UPSTREAM_PROXY_URL;",
+      "const um = process.env.OMR_UNDICI_MODULE;",
       "if (up && um) {",
       "  const { ProxyAgent } = require(um);",
       "  const agent = new ProxyAgent(up);",

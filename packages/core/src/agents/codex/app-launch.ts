@@ -57,7 +57,7 @@ const codexAppSpec: CodexCompatibleAppSpec = {
   bundledCliNames: ["codex", "Codex", "OpenAI Codex"],
   defaultCliCommand: "codex",
   displayName: codexDesktopAppName,
-  envPathKeys: ["CCR_CHATGPT_APP_PATH", "CHATGPT_APP_PATH", "CODEXL_CHATGPT_PATH", "CCR_CODEX_APP_PATH", "CODEX_APP_PATH", "CODEXL_CODEX_PATH"],
+  envPathKeys: ["OMR_CHATGPT_APP_PATH", "CHATGPT_APP_PATH", "CODEXL_CHATGPT_PATH", "OMR_CODEX_APP_PATH", "CODEX_APP_PATH", "CODEXL_CODEX_PATH"],
   kind: "codex",
   linuxCandidates: [
     "/opt/ChatGPT/chatgpt",
@@ -117,7 +117,7 @@ const zcodeAppSpec: CodexCompatibleAppSpec = {
   bundledCliNames: ["glm/zcode.cjs", "zcode", "ZCode", "Z Code", "z-code", "zai-code", "codex", "Codex"],
   defaultCliCommand: "zcode",
   displayName: "ZCode App",
-  envPathKeys: ["CCR_ZCODE_APP_PATH", "ZCODE_APP_PATH", "CODEXL_ZCODE_PATH"],
+  envPathKeys: ["OMR_ZCODE_APP_PATH", "ZCODE_APP_PATH", "CODEXL_ZCODE_PATH"],
   kind: "zcode",
   linuxCandidates: [
     "/opt/ZCode/zcode",
@@ -374,7 +374,7 @@ function launchCodexCompatibleAppProfile(
     ...(config ? botGatewayProfileEnv(config, profile, "app") : {}),
     ...codexProfileEnv(profile, lookup.executable, spec),
     CODEXL_PROFILE_SURFACE: "app",
-    CCR_PROFILE_SURFACE: "app",
+    OMR_PROFILE_SURFACE: "app",
     ...codexAppAgentEnv(spec, plan.command, codexHome, userDataDir, modelCatalogFile),
     ELECTRON_ENABLE_LOGGING: "1"
   };
@@ -383,9 +383,9 @@ function launchCodexCompatibleAppProfile(
     ...appEnv
   };
   delete env.ELECTRON_RUN_AS_NODE;
-  delete env.CCR_CODEX_MODEL_CATALOG_B64;
+  delete env.OMR_CODEX_MODEL_CATALOG_B64;
   delete env.CODEXL_CODEX_MODEL_CATALOG_B64;
-  delete env.CCR_ZCODE_MODEL_CATALOG_B64;
+  delete env.OMR_ZCODE_MODEL_CATALOG_B64;
   delete env.CODEXL_ZCODE_MODEL_CATALOG_B64;
   sanitizeCodexCompatibleAppEnv(env, spec.kind);
 
@@ -426,8 +426,8 @@ function codexProfileEnv(profile: ProfileConfig, appExecutable: string, spec: Co
   }
   return {
     ...(profile.model.trim() ? { CCR_CODEX_MODEL: profile.model.trim() } : {}),
-    ...(process.env.CCR_CODEX_CLI_MIDDLEWARE_LOG?.trim()
-      ? { CCR_CODEX_CLI_MIDDLEWARE_LOG: process.env.CCR_CODEX_CLI_MIDDLEWARE_LOG.trim() }
+    ...(process.env.OMR_CODEX_CLI_MIDDLEWARE_LOG?.trim()
+      ? { CCR_CODEX_CLI_MIDDLEWARE_LOG: process.env.OMR_CODEX_CLI_MIDDLEWARE_LOG.trim() }
       : {}),
     ...codexSharedChatGptAuthEnv(),
     CCR_CODEX_MODEL_PROVIDER: providerId,
@@ -446,7 +446,7 @@ function codexProfileEnv(profile: ProfileConfig, appExecutable: string, spec: Co
 
 function codexSharedChatGptAuthEnv(): Record<string, string> {
   const configured = [
-    process.env.CCR_CODEX_CHATGPT_AUTH_FILE,
+    process.env.OMR_CODEX_CHATGPT_AUTH_FILE,
     process.env.CODEXL_CODEX_CHATGPT_AUTH_FILE
   ].map((value) => value?.trim()).find((value) => value && isFile(resolveUserPath(value)));
   if (!configured) {

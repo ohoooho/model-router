@@ -55,7 +55,7 @@ const codexMediaPreviewMaxResidentVideos = 2;
 
 export function shouldEnableCodexMediaPreviewBridge(mediaToolsEnabled: boolean): boolean {
   if (!mediaToolsEnabled) return false;
-  const configured = process.env.CCR_CODEX_INLINE_VIDEO_PREVIEW?.trim().toLowerCase();
+  const configured = process.env.OMR_CODEX_INLINE_VIDEO_PREVIEW?.trim().toLowerCase();
   return configured !== "0" && configured !== "false" && configured !== "off";
 }
 
