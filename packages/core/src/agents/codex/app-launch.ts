@@ -412,11 +412,11 @@ function codexProfileEnv(profile: ProfileConfig, appExecutable: string, spec: Co
   const remoteFrontendMode = normalizeCodexRemoteFrontendMode(profile.remoteFrontendMode);
   if (spec.kind === "zcode") {
     return {
-      ...(profile.model.trim() ? { CCR_ZCODE_MODEL: profile.model.trim() } : {}),
-      CCR_ZCODE_MODEL_PROVIDER: providerId,
-      CCR_ZCODE_PROFILE: providerId,
-      CCR_ZCODE_REMOTE_FRONTEND_MODE: remoteFrontendMode,
-      CCR_REAL_ZCODE_CLI_PATH: realCliPath,
+      ...(profile.model.trim() ? { OMR_ZCODE_MODEL: profile.model.trim() } : {}),
+      OMR_ZCODE_MODEL_PROVIDER: providerId,
+      OMR_ZCODE_PROFILE: providerId,
+      OMR_ZCODE_REMOTE_FRONTEND_MODE: remoteFrontendMode,
+      OMR_REAL_ZCODE_CLI_PATH: realCliPath,
       CODEXL_REAL_ZCODE_CLI_PATH: realCliPath,
       CODEXL_ZCODE_CORE_MODE: remoteFrontendMode,
       CODEXL_ZCODE_MODEL_PROVIDER: providerId,
@@ -425,14 +425,14 @@ function codexProfileEnv(profile: ProfileConfig, appExecutable: string, spec: Co
     };
   }
   return {
-    ...(profile.model.trim() ? { CCR_CODEX_MODEL: profile.model.trim() } : {}),
+    ...(profile.model.trim() ? { OMR_CODEX_MODEL: profile.model.trim() } : {}),
     ...(process.env.OMR_CODEX_CLI_MIDDLEWARE_LOG?.trim()
-      ? { CCR_CODEX_CLI_MIDDLEWARE_LOG: process.env.OMR_CODEX_CLI_MIDDLEWARE_LOG.trim() }
+      ? { OMR_CODEX_CLI_MIDDLEWARE_LOG: process.env.OMR_CODEX_CLI_MIDDLEWARE_LOG.trim() }
       : {}),
     ...codexSharedChatGptAuthEnv(),
-    CCR_CODEX_MODEL_PROVIDER: providerId,
-    CCR_CODEX_PROFILE: providerId,
-    CCR_CODEX_REMOTE_FRONTEND_MODE: remoteFrontendMode,
+    OMR_CODEX_MODEL_PROVIDER: providerId,
+    OMR_CODEX_PROFILE: providerId,
+    OMR_CODEX_REMOTE_FRONTEND_MODE: remoteFrontendMode,
     CCR_BUNDLED_CODEX_CLI_PATH: realCliPath,
     CCR_REAL_CODEX_CLI_PATH: realCliPath,
     CODEXL_BUNDLED_CODEX_CLI_PATH: realCliPath,
@@ -472,7 +472,7 @@ function codexAppAgentEnv(
 ): Record<string, string> {
   return spec.kind === "zcode"
     ? {
-        CCR_ZCODE_MODEL_CATALOG_FILE: modelCatalogFile,
+        OMR_ZCODE_MODEL_CATALOG_FILE: modelCatalogFile,
         CODEXL_ZCODE_MODEL_CATALOG_FILE: modelCatalogFile,
         ZCODE_CLI_PATH: launcher,
         ZCODE_ELECTRON_USER_DATA_PATH: userDataDir,
@@ -480,7 +480,7 @@ function codexAppAgentEnv(
         ZCODE_STORAGE_DIR: home
       }
     : {
-        CCR_CODEX_MODEL_CATALOG_FILE: modelCatalogFile,
+        OMR_CODEX_MODEL_CATALOG_FILE: modelCatalogFile,
         CODEX_CLI_PATH: launcher,
         CODEX_ELECTRON_USER_DATA_PATH: userDataDir,
         CODEX_HOME: home,
