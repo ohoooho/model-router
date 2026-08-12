@@ -71,7 +71,7 @@ function isClaudeCodeChinaTimeZone(timeZone) {
 }
 
 function resolveConfigDir() {
-  const configured = nonEmptyEnv("CODEXL_HOME") || nonEmptyEnv("CCR_CONFIG_DIR");
+  const configured = nonEmptyEnv("CODEXL_HOME") || nonEmptyEnv("OMR_CONFIG_DIR") || nonEmptyEnv("CCR_CONFIG_DIR");
   if (configured) {
     return expandHome(configured);
   }
@@ -139,7 +139,7 @@ function directProfileDispatchArgs(args) {
 }
 
 async function runClaudeCodeCliWrapper(args) {
-  const realCli = expandHome(nonEmptyEnv("CCR_REAL_CLAUDE_CODE_BIN") || nonEmptyEnv("CCR_CLAUDE_CODE_BIN") || nonEmptyEnv("CODEXL_CLAUDE_CODE_BIN") || "claude");
+  const realCli = expandHome(nonEmptyEnv("OMR_REAL_CLAUDE_CODE_BIN") || nonEmptyEnv("CCR_REAL_CLAUDE_CODE_BIN") || nonEmptyEnv("OMR_CLAUDE_CODE_BIN") || nonEmptyEnv("CCR_CLAUDE_CODE_BIN") || nonEmptyEnv("CODEXL_CLAUDE_CODE_BIN") || "claude");
   const realArgs = claudeCodeCliWrapperArgs(args);
   log("claude_code_wrapper_start", { realCli, args, realArgs });
   const captureStdout = shouldCaptureClaudeCodeCliStdout(args);
@@ -147,7 +147,7 @@ async function runClaudeCodeCliWrapper(args) {
     args,
     cwd: process.cwd(),
     mode: "claude-cli",
-    title: nonEmptyEnv("CCR_REMOTE_SYNC_PROFILE_NAME") || "Claude Code"
+    title: nonEmptyEnv("OMR_REMOTE_SYNC_PROFILE_NAME") || nonEmptyEnv("CCR_REMOTE_SYNC_PROFILE_NAME") || "Claude Code"
   });
   const injectRemoteStdin = boolEnv("CCR_REMOTE_SYNC_INJECT_STDIN");
   const child = spawnAgentCli(realCli, realArgs, {
@@ -4077,7 +4077,7 @@ function emitReasoningDelta(work, stream, text) {
 }
 
 function claudeCommand(work) {
-  const command = nonEmptyEnv("CCR_CLAUDE_CODE_BIN") || nonEmptyEnv("CODEXL_CLAUDE_CODE_BIN") || "claude";
+  const command = nonEmptyEnv("OMR_CLAUDE_CODE_BIN") || nonEmptyEnv("CCR_CLAUDE_CODE_BIN") || nonEmptyEnv("CODEXL_CLAUDE_CODE_BIN") || "claude";
   if (work.claudeConfigDir) {
     ensureClaudeSessionConfig(work.claudeConfigDir);
   }
@@ -4816,7 +4816,7 @@ function createRemoteSyncClient(options) {
     mode: options.mode || "agent",
     title: options.title || "OMR Remote",
     profileId: nonEmptyEnv("CCR_REMOTE_SYNC_PROFILE_ID"),
-    profileName: nonEmptyEnv("CCR_REMOTE_SYNC_PROFILE_NAME")
+    profileName: nonEmptyEnv("OMR_REMOTE_SYNC_PROFILE_NAME") || nonEmptyEnv("CCR_REMOTE_SYNC_PROFILE_NAME")
   });
 }
 
