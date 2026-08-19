@@ -263,7 +263,12 @@ function createGatewayProcessEnv(
     AUTH_STATIC_API_KEY_BEARER_ONLY: "false",
     AUTH_STATIC_API_KEY_ENV: coreGatewayAuthTokenEnv,
     AUTH_STATIC_API_KEY_HEADER: omrCoreGatewayAuthHeader,
+    // OMR fork 2026-08-19: dual-write CCR_* 兼容上游 @the-next-ai/ai-gateway v1.0.15
+    // 外部包 /health handler 仍读 CCR_GATEWAY_RUNTIME_ID (commit 97fe211 OMR-FORK-CHANGE-005
+    // 改了写路径 OMR_GATEWAY_RUNTIME_ID，但 ai-gateway 外部包没法同步改读路径)。
+    // 不 dual-write 会导致 health.runtimeId 永远 undefined → supervisor 等不到 healthy → gateway 永远启不起来。
     OMR_GATEWAY_RUNTIME_ID: runtimeId,
+    CCR_GATEWAY_RUNTIME_ID: runtimeId,
     [coreGatewayAuthTokenEnv]: coreAuthToken,
     HOST: config.gateway.coreHost,
     PORT: String(config.gateway.corePort)
@@ -303,6 +308,10 @@ function createGatewayProcessEnv(
   env.all_proxy = upstreamProxyUrl;
   env.OMR_UPSTREAM_PROXY_URL = upstreamProxyUrl;
   env.OMR_UNDICI_MODULE = resolveUndiciProxyAgentModule();
+  // OMR fork 2026-08-19: dual-write CCR_* 让 ai-gateway 外部包仍能读
+  // (proxyPreloadFile 之前的 97fe211 commit 只改了 OMR_ 名, 漏了 CCR_ 兼容)
+  env.CCR_UPSTREAM_PROXY_URL = upstreamProxyUrl;
+  env.CCR_UNDICI_MODULE = resolveUndiciProxyAgentModule();
   return env;
 }
 
@@ -321,7 +330,9 @@ function resolveGatewayNodeRuntime(): GatewayNodeRuntime {
 }
 
 function configuredGatewayNodeRuntimeCandidates(): GatewayNodeRuntime[] {
-  const configured = process.env.OMR_NODE_BIN?.trim();
+  // OMR fork 2026-08-19: dual-read 让 OMR_NODE_BIN 和 CCR_NODE_BIN 都能用
+  // (97fe211 commit 只改了读 OMR_NODE_BIN, 漏了 CCR_NODE_BIN 兼容)
+  const configured = process.env.OMR_NODE_BIN?.trim() ?? process.env.CCR_NODE_BIN?.trim();
   return configured ? [{ command: configured, electronRunAsNode: false }] : [];
 }
 
@@ -425,8 +436,9 @@ export function writeGatewayProxyPreloadFile(): string {
     file,
     [
       "\"use strict\";",
-      "const up = process.env.OMR_UPSTREAM_PROXY_URL;",
-      "const um = process.env.OMR_UNDICI_MODULE;",
+      // OMR fork 2026-08-19: dual-read 兼容, ?? 优先 OMR_ (新名), 兜底 CCR_ (老名给 ai-gateway 外部包)
+      "const up = process.env.OMR_UPSTREAM_PROXY_URL ?? process.env.CCR_UPSTREAM_PROXY_URL;",
+      "const um = process.env.OMR_UNDICI_MODULE ?? process.env.CCR_UNDICI_MODULE;",
       "if (up && um) {",
       "  const { ProxyAgent } = require(um);",
       "  const agent = new ProxyAgent(up);",
