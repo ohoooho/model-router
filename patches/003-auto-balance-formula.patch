@@ -1,0 +1,116 @@
+From 6f6bd56b1aedec163ac33f38c9269c1d3854f7d5 Mon Sep 17 00:00:00 2001
+From: AI Assistant <ai@openclaw.local>
+Date: Tue, 11 Aug 2026 16:54:10 +0800
+Subject: [PATCH 3/6] =?UTF-8?q?feat(omr/fork):=20OMR-FORK-CHANGE-004b=20?=
+ =?UTF-8?q?=E9=87=8D=E5=86=99=20auto-balance=20=E4=B8=BA=20effective=5Fwei?=
+ =?UTF-8?q?ght=20=E5=85=AC=E5=BC=8F?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+用户拍板 2026-08-11 16:47：按 (weight × (1-utilization)) DESC 排序
+（方案 B），比之前的 "priority + spillover" 更直觉。
+
+- 删除死代码 providerCredentialSpilloverThreshold（已被新算法覆盖）
+- 加测试 case 验证 effective_weight 公式（weight=5 util=0.5 vs weight=1 util=0）
+
+测试：13/13 PASS（4 策略行为 + 边界 + 策略解析 + weight 区分）
+---
+ .../core/src/gateway/upstream/executor.ts     | 36 +++++--------------
+ packages/core/test/routing-strategies.test.ts | 20 +++++++++++
+ 2 files changed, 29 insertions(+), 27 deletions(-)
+
+diff --git a/packages/core/src/gateway/upstream/executor.ts b/packages/core/src/gateway/upstream/executor.ts
+index a02dacf..286390b 100644
+--- a/packages/core/src/gateway/upstream/executor.ts
++++ b/packages/core/src/gateway/upstream/executor.ts
+@@ -23,8 +23,6 @@ import { claudeCodeOauthBetaHeader, claudeCodeOauthRequiredBeta, UpstreamRequest
+ import type { ApiKeyLimitUsage, ProviderCredentialRoutingTarget, UpstreamAttempt, UpstreamFailedAttempt, UpstreamFetchResult } from "@ccr/core/gateway/internal/shared";
+ import type { RouteTraceObserver } from "@ccr/core/observability/route-trace";
+ 
+-const providerCredentialSpilloverThreshold = 0.8;
+-
+ 
+ export function applyProviderCapabilityRouting(input: {
+   body?: Buffer;
+@@ -893,37 +891,21 @@ export function sortProviderCredentialCandidates<T extends {
+ }
+ 
+ 
+-// auto-balance (默认): 保留原有"按 priority + spillover"行为作为向后兼容基线
+-//   第一轮: priority asc, utilization asc, weight desc → 低优先级 + 低利用率先吃
+-//   spillover: 当 primary-priority 所有 candidate 都 >= 80% utilization 时改用 utilization asc
+-//   本质是"先用满便宜的 key，满了再切下一个"
++// auto-balance (默认): 按 effective_weight = weight × (1 - utilization) DESC 排序
++//   剩余容量越多（weight 大 × utilization 低）→ 越优先被尝试
++//   这是用户拍板方案 B（2026-08-11 16:47）：比之前的 "priority + spillover" 更直觉
++//   tie-break: index asc（稳定排序，配置顺序优先）
+ function sortAutoBalance<T extends {
+   index: number;
+   limitState: { utilization: number };
+   priority: number;
+   weight: number;
+ }>(candidates: T[]): T[] {
+-  const prioritySorted = [...candidates].sort((left, right) =>
+-    left.priority - right.priority ||
+-    left.limitState.utilization - right.limitState.utilization ||
+-    right.weight - left.weight ||
+-    left.index - right.index
+-  );
+-  const primaryPriority = prioritySorted[0]?.priority;
+-  const primaryCandidates = prioritySorted.filter((candidate) => candidate.priority === primaryPriority);
+-  const shouldSpillOver = primaryCandidates.length > 0 &&
+-    primaryCandidates.every((candidate) => candidate.limitState.utilization >= providerCredentialSpilloverThreshold);
+-
+-  if (shouldSpillOver) {
+-    return prioritySorted.sort((left, right) =>
+-      left.limitState.utilization - right.limitState.utilization ||
+-      left.priority - right.priority ||
+-      right.weight - left.weight ||
+-      left.index - right.index
+-    );
+-  }
+-
+-  return prioritySorted;
++  return [...candidates].sort((left, right) => {
++    const leftEffective = left.weight * (1 - left.limitState.utilization);
++    const rightEffective = right.weight * (1 - right.limitState.utilization);
++    return rightEffective - leftEffective || left.index - right.index;
++  });
+ }
+ 
+ 
+diff --git a/packages/core/test/routing-strategies.test.ts b/packages/core/test/routing-strategies.test.ts
+index c854d68..fde9d13 100644
+--- a/packages/core/test/routing-strategies.test.ts
++++ b/packages/core/test/routing-strategies.test.ts
+@@ -164,6 +164,26 @@ test("sortProviderCredentialCandidates with auto-balance prefers low-utilization
+   assert.equal(sorted[2].credential.label, "carol", "highest utilization should be last");
+ });
+ 
++test("auto-balance uses effective_weight = weight × (1 - utilization), not utilization alone", () => {
++  // 用户拍板方案 B（2026-08-11 16:47）：按剩余容量加权，重 credential 优先
++  // 关键场景: heavy credential 即使 utilization 高，剩余容量也更多 → 应该优先
++  const heavyUsed = makeCredential("heavy-used", { weight: 5 });
++  const lightFresh = makeCredential("light-fresh", { weight: 1 });
++
++  const candidates: Candidate[] = [
++    // lightFresh: weight=1, util=0 → effective = 1.0
++    makeCandidate(lightFresh, 0, 1, 0, 1),
++    // heavyUsed: weight=5, util=0.5 → effective = 5 × 0.5 = 2.5
++    makeCandidate(heavyUsed, 0.5, 1, 1, 5)
++  ];
++
++  const sorted = sortProviderCredentialCandidates(candidates, "auto-balance");
++  // heavyUsed (effective=2.5) 应该赢，即使 utilization 更高
++  assert.equal(sorted[0].credential.label, "heavy-used",
++    `weight×(1-utilization) should favor heavy credential even when its utilization is higher (heavy: 5×0.5=2.5 vs light: 1×1.0=1.0)`);
++  assert.equal(sorted[1].credential.label, "light-fresh");
++});
++
+ // ── Case 2: waterfall ────────────────────────────────────────────────────────
+ 
+ test("waterfall sends all 100 requests to priority=1 credential", () => {
+-- 
+2.53.0
+
