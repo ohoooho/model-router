@@ -290,6 +290,53 @@ const rpcHandlers: Record<string, RpcHandler> = {
   getAgentTracePayload: (request) => getAgentTracePayload(request as AgentAnalysisTracePayloadRequest),
   getAppInfo: () => getCliAppInfo(),
   getConfig: () => loadAppConfig(),
+  // ─── OMR UI v2 (老板 09-14 00:12 lockin) ─────────────────────────────
+  // 热重载 config: 改 config.json 不重启 gateway daemon (除非 runtime 必须)
+  reloadConfig: async () => {
+    const previousConfig = await loadAppConfig();
+    const syncedClaudeAppConfig = await syncClaudeAppGatewayConfig(previousConfig);
+    const nextConfig = syncedClaudeAppConfig.config;
+    let runtimeStatus = gatewayService.getStatus();
+    const needsRestart = syncedClaudeAppConfig.configChanged || shouldRestartGatewayForRuntimeConfigChange(previousConfig, nextConfig) || runtimeStatus.state !== "running";
+    if (needsRestart) {
+      runtimeStatus = await gatewayService.start(nextConfig);
+    } else {
+      await gatewayService.updateConfig(nextConfig);
+      runtimeStatus = gatewayService.getStatus();
+    }
+    await applyProfileIfServiceRunning(nextConfig, runtimeStatus);
+    return {
+      reloaded: runtimeStatus.state === "running",
+      gatewayState: runtimeStatus.state,
+      hotReload: !needsRestart,
+      mtime: Date.now(),
+      message: runtimeStatus.state === "running"
+        ? needsRestart
+          ? "OMR config applied; gateway restarted to apply changes."
+          : "OMR config hot-reloaded; gateway kept running."
+        : `Reload failed: ${runtimeStatus.lastError || "unknown error"}`
+    };
+  },
+  // 新 UI v2 主页用: 拿全 state (providers + 4 档虚拟路由 + gateway 健康)
+  getConfigState: async () => {
+    const config = await loadAppConfig();
+    const gatewayStatus = gatewayService.getStatus();
+    return {
+      providers: (Array.isArray(config.Providers) ? config.Providers : []).map((p: { name?: string; models?: unknown[]; disabled?: boolean; baseUrl?: string; baseurl?: string; api_base_url?: string }) => ({
+        name: typeof p.name === "string" ? p.name : "",
+        modelCount: Array.isArray(p.models) ? p.models.length : 0,
+        enabled: p.disabled !== true,
+        baseUrl: p.baseUrl || p.baseurl || p.api_base_url || "",
+      })),
+      virtualModelProfile: (config as Record<string, unknown>).virtualModelProfile || {},
+      gateway: {
+        state: gatewayStatus.state,
+        host: config.gateway?.host || "127.0.0.1",
+        port: config.gateway?.port || 3456,
+      },
+      timestamp: Date.now(),
+    };
+  },
   getGatewayStatus: () => gatewayService.getStatus(),
   getServiceIdentity: (serviceToken) => ({
     pid: process.pid,
