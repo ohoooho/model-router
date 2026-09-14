@@ -16,6 +16,7 @@ import { ensureProfileGateway, ProfileGatewayUnavailableError } from "@ccr/core/
 import { buildProfileLaunchPlan, defaultProfileOpenSurface, findProfileForOpen, profileLaunchSpawnCommand, resolveProfileOpenSurface, shouldAutoStartProfileGateway } from "@ccr/core/profiles/launch-core";
 import { openSystemExternal, startWebManagementServer } from "@ccr/core/web/management-server";
 import { assertAvailableGatewayModels, type AppConfig, type GatewayStatus, type ProfileConfig, type ProfileOpenResult, type ProfileOpenSurface } from "@ccr/core/contracts/app";
+import { verifyLicenseFile, type License as TaoxianLicense } from "./license/taoxian-license.js";
 
 installSocketTypeOfServiceCompat();
 
@@ -66,6 +67,36 @@ const serviceStopTimeoutMs = 10_000;
 const profileGatewayIdleGraceMs = 2_000;
 const profileGatewayLeasePollMs = 500;
 const webAuthHeader = "x-omr-web-auth";
+
+/**
+ * Taoxian License v1.2 verify (K-251) — 装脚本验签位置
+ * 跳过条件: TAOXIAN_LICENSE_SKIP=1 (开发模式) 或 cli 入口是 dev (npm run dev)
+ */
+async function verifyTaoxianLicenseOrExit(): Promise<TaoxianLicense> {
+  if (process.env.TAOXIAN_LICENSE_SKIP === "1") {
+    return { customerId: "dev-skip", expMode: 0, scopes: 0n, issuedAt: 0, taoxianVersion: 1 };
+  }
+  const licensePaths = [
+    process.env.TAOXIAN_LICENSE_PATH,
+    "/etc/taoxian/license.bin",
+    "/root/.taoxian/license.bin",
+    `${process.env.HOME || ""}/.taoxian/license.bin`,
+  ].filter(Boolean) as string[];
+  for (const p of licensePaths) {
+    try {
+      const license = verifyLicenseFile(p);
+      process.stdout.write(`Taoxian license verified (customer=${license.customerId}, scopes=0x${license.scopes.toString(16)})\n`);
+      return license;
+    } catch {
+      // 试下一个
+    }
+  }
+  process.stderr.write(
+    `Taoxian license verification failed: not found in [${licensePaths.join(", ")}]\n` +
+    `Set TAOXIAN_LICENSE_PATH=/path/to/license.bin or TAOXIAN_LICENSE_SKIP=1 (dev only).\n`
+  );
+  process.exit(2);
+}
 const webAuthQueryParam = "ccr_web_token";
 const defaultCliCommandName = "omr";
 const prepareProfileOnlyEnv = "CCR_CLI_PREPARE_PROFILE_ONLY";
@@ -374,6 +405,7 @@ function parseWebArgs(args: string[], command: WebCliOptions["command"], default
 }
 
 async function startService(options: WebCliOptions): Promise<ServiceState> {
+  await verifyTaoxianLicenseOrExit();
   const releaseStartLock = await acquireServiceStartLock();
   try {
     const current = readServiceState();
@@ -477,6 +509,7 @@ function serviceChildEnv(serviceToken: string): NodeJS.ProcessEnv {
 }
 
 async function runWebServer(options: WebCliOptions): Promise<void> {
+  await verifyTaoxianLicenseOrExit();
   const runtime = await startWebManagementServer({
     host: options.host,
     open: options.open,

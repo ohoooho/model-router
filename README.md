@@ -37,7 +37,19 @@ Instead of configuring a separate model endpoint for every AI tool, you configur
 
 ## Quick Start
 
-### CLI (recommended)
+### 1. Peach install (recommended — Taoxian 桃仙 deployment)
+
+One-line install for 桃仙 / Taoxian customer deployment (Windows / macOS / Linux):
+
+```sh
+curl -fsSL https://get.ohoooho.com/omr | bash
+```
+
+- Bundles Node.js 22 runtime check + OMR model router + license verification (Taoxian License v1.2) + SQLite config + auto-start
+- After install: open `http://127.0.0.1:3456/#v2` (new UI)
+- License verification is **offline** (RS256 + L2 only, no machine binding) — see `LICENSE` and Taoxian license spec
+
+### 2. CLI (npm fallback)
 
 Requires Node.js 22+:
 

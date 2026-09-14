@@ -37,7 +37,19 @@ OMR 是面向 AI 编程工具的本地模型网关与控制平面。
 
 ## 快速开始
 
-### CLI（推荐）
+### 1. 桃仙装机 (推荐 — Taoxian 部署)
+
+桃仙 / Taoxian 客户一键装机 (Windows / macOS / Linux)：
+
+```sh
+curl -fsSL https://get.ohoooho.com/omr | bash
+```
+
+- 内含 Node.js 22 运行时检查 + OMR 模型路由 + 桃仙 License v1.2 验签 + SQLite 配置 + 自启动
+- 装完后打开 `http://127.0.0.1:3456/#v2`（新 UI）
+- License 验签**脱机**（RS256 + L2 only，不绑机器）— 详见 `LICENSE` 与桃仙 License 规范
+
+### 2. CLI (npm 备用)
 
 需要 Node.js 22+：
 
