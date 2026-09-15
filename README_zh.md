@@ -47,6 +47,12 @@ curl -fsSL https://get.ohoooho.com/omr | bash
 
 - 内含 Node.js 22 运行时检查 + OMR 模型路由 + 桃仙 License v1.2 验签 + SQLite 配置 + 自启动
 - 装完后打开 `http://127.0.0.1:3456/#v2`（新 UI）
+
+### UI v2 完善 (K-295 / 2026-09-15)
+
+- 顶部状态栏新增 **License 状态卡片**（`packages/ui/src/components/license-status.tsx`），实时显示桃仙 License v1.2 是否激活、剩余天数、preset 名称，< 7 天自动转 warn 色
+- License 卡片只读，修改走 CLI `model-router license`
+- 仓库元信息已统一指向 https://github.com/ohoooho/model-router（`repository.url` / `homepage` / `bugs.url`），与 Gitea 解耦
 - License 验签**脱机**（RS256 + L2 only，不绑机器）— 详见 `LICENSE` 与桃仙 License 规范
 
 ### 2. CLI (npm 备用)

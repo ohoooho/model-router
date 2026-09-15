@@ -6,12 +6,12 @@
   "description": "桃仙模型路由网关 OMR — Local model router gateway with CLI and web management UI (fork of claude-code-router)",
   "repository": {
     "type": "git",
-    "url": "https://git.dbhys.com/ohoooho/ohoooho-model-router.git"
+    "url": "https://github.com/ohoooho/model-router.git"
   },
   "bugs": {
-    "url": "https://github.com/musistudio/claude-code-router/issues"
+    "url": "https://github.com/ohoooho/model-router/issues"
   },
-  "homepage": "https://git.dbhys.com/ohoooho/ohoooho-model-router",
+  "homepage": "https://github.com/ohoooho/model-router",
   "keywords": [
     "claude-code",
     "codex",
