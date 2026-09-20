@@ -96,3 +96,7 @@ verify.sh 输出 4 状态:
 2. ⏳ 跑 install.sh (online + @版本)
 3. ⏳ 跑 verify.sh 看 4 状态
 4. ⏳ commit + push (老板 K-302 我不动, 给老板建议)
+
+## patches/ 子目录
+
+- `patches/0006-omr-data-dir.sh`: OMR_DATA_DIR 品牌化 patch (77 行, sed-based, 幂等). apply.sh 重建后或升级 OMR fork 时调用, 保持 ~/.omr 路径而不是 OMR upstream musistudio/claude-code-router 写的 ~/.claude-code-router/. 失职 255 闭环 (helper 不能插 2 次).
