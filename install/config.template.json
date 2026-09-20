@@ -28,21 +28,32 @@
       "displayName": "Coding Auto (编程通用)",
       "enabled": true,
       "strategy": "manual",
-      "match": { "exactAliases": ["coding-auto"] }
+      "match": { "exactAliases": ["coding-auto"] },
+      "key_id": "baozi-coding-auto"
     },
     {
       "id": "assist-auto",
       "displayName": "Assist Auto (通用助手)",
       "enabled": true,
       "strategy": "auto-balance",
-      "match": { "exactAliases": ["assist-auto"] }
+      "match": { "exactAliases": ["assist-auto"] },
+      "key_id": "baozi-assist-auto"
     },
     {
       "id": "chat-auto",
       "displayName": "Chat Auto (日常聊天)",
       "enabled": true,
       "strategy": "auto-balance",
-      "match": { "exactAliases": ["chat-auto"] }
+      "match": { "exactAliases": ["chat-auto"] },
+      "key_id": "baozi-chat-auto"
+    },
+    {
+      "id": "team-auto",
+      "displayName": "Team Auto (团队协作)",
+      "enabled": true,
+      "strategy": "priority",
+      "match": { "exactAliases": ["team-auto"] },
+      "key_id": "baozi-team-auto"
     }
   ]
 }

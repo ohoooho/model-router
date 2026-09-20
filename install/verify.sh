@@ -108,37 +108,48 @@ process.stdout.write(row?.content || '');
 " 2>/dev/null || echo "")
 
 # 失职 259: 不再 hardcode "Bearer ***" (永远 401)
-# baozi_key 从 env 读 (OMR_BAOZI_KEY), 没设就 skip (而不是误诊 401)
-OMR_BAOZI_KEY="${OMR_BAOZI_KEY:-}"
-if [ -z "${OMR_BAOZI_KEY}" ]; then
-    echo "  ⚠️ OMR_BAOZI_KEY 未设, 跳过 upstream_ready 真路由测试"
-    echo "      (export OMR_BAOZI_KEY=<baozi真key> 后重跑 verify.sh)"
-    UPSTREAM_READY=0
-elif [ "${OMR_BAOZI_KEY}" = "***" ]; then
-    echo "  ❌ OMR_BAOZI_KEY="***" 是 dummy (失职 259), 拒绝测试"
-    FAIL_LIST="${FAIL_LIST} [upstream: dummy key]"
-else
-    ROUTE_CODE=$(curl -s -m 10 -o /tmp/omr-route.json -w '%{http_code}' \
+
+# 失职 267 立刻认: K-261 锁点 — 4 场景独立测为默认行为, 不需要 OMR_BAOZI_KEY gate
+# 每个场景 OMR_BAOZI_<SCENE>_KEY env, 没设用 fake_<scene>_*** 占位
+SCENE_OK=0
+SCENE_FAIL=0
+for SCENE in chat-auto coding-auto assist-auto team-auto; do
+    SCENE_KEY_VAR="OMR_BAOZI_$(echo ${SCENE%-*} | tr 'a-z' 'A-Z')_KEY"
+    SCENE_KEY=$(eval echo "\${${SCENE_KEY_VAR}:-}")
+    [ -z "${SCENE_KEY}" ] && SCENE_KEY="fake_${SCENE//-/_}_***"
+    if [ "${SCENE_KEY}" = "***" ]; then
+        echo "  ❌ ${SCENE} key=*** dummy (失职 259), 拒绝"
+        FAIL_LIST="${FAIL_LIST} [upstream: ${SCENE} dummy]"
+        continue
+    fi
+    SCENE_CODE=$(curl -s -m 10 -o /tmp/omr-route-${SCENE}.json -w '%{http_code}' \
         -X POST http://127.0.0.1:3456/v1/chat/completions \
         -H "Content-Type: application/json" \
-        -H "Authorization: Bearer ${OMR_BAOZI_KEY}" \
-        -d '{"model":"chat-auto","messages":[{"role":"user","content":"ping"}],"max_tokens":3}' 2>/dev/null || echo "000")
-
-    if [ "${ROUTE_CODE}" = "200" ]; then
-        echo "  ✅ POST /v1/chat/completions = 200 (真路由通, baozi_key 有效)"
-        UPSTREAM_READY=1
-    elif [ "${ROUTE_CODE}" = "401" ]; then
-        echo "  ⚠️ = 401 (baozi_key 无效或过期, 路由层 OK)"
-        UPSTREAM_READY=0
-    elif [ "${ROUTE_CODE}" = "000" ]; then
-        echo "  ❌ gateway 不可达"
-        FAIL_LIST="${FAIL_LIST} [upstream: no gw]"
+        -H "Authorization: Bearer ${SCENE_KEY}" \
+        -d "{\"model\":\"${SCENE}\",\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}],\"max_tokens\":3}" 2>/dev/null || echo "000")
+    if [ "${SCENE_CODE}" = "200" ]; then
+        echo "  ✅ ${SCENE} POST = 200 (key ${SCENE_KEY:0:10}...)"
+        SCENE_OK=$((SCENE_OK+1))
+    elif [ "${SCENE_CODE}" = "401" ]; then
+        echo "  ⚠️ ${SCENE} = 401 (key 无效/过期, fake 占位也算)"
+        SCENE_FAIL=$((SCENE_FAIL+1))
+    elif [ "${SCENE_CODE}" = "000" ]; then
+        echo "  ❌ ${SCENE} gateway 不可达"
+        FAIL_LIST="${FAIL_LIST} [upstream: ${SCENE} no gw]"
     else
-        echo "  ⚠️ POST = ${ROUTE_CODE} (看 /tmp/omr-route.json)"
+        echo "  ⚠️ ${SCENE} POST = ${SCENE_CODE}"
     fi
+done
+if [ ${SCENE_OK} -ge 3 ]; then
+    UPSTREAM_READY=1
+    echo "  ✅ upstream_ready 4 场景 ${SCENE_OK}/4 通过 (3+ 算通)"
+elif [ ${SCENE_OK} -ge 1 ]; then
+    UPSTREAM_READY=0
+    echo "  ⚠️ upstream_ready 4 场景 ${SCENE_OK}/4 通过 (<3 不算通, 但路由层 OK)"
+else
+    UPSTREAM_READY=0
+    echo "  ⚠️ upstream_ready 4 场景全 401/fail (路由层 OK, 等真 baozi_key 物料)"
 fi
-
-
 
 # === 汇总 ===
 echo ""
@@ -146,7 +157,7 @@ echo "==> OMR 4 状态汇总 (契约 §7.3)"
 echo "    installed:       $([ ${INSTALLED} -eq 1 ] && echo "✅ passed" || echo "❌ failed")"
 echo "    configured:      $([ ${CONFIGURED} -eq 1 ] && echo "✅ passed" || echo "❌ failed")"
 echo "    healthy:         $([ ${HEALTHY} -eq 1 ] && echo "✅ passed" || echo "❌ failed")"
-echo "    upstream_ready:  $([ ${UPSTREAM_READY} -eq 1 ] && echo "✅ passed" || echo "⚠️ skipped (需要 admin auth)")"
+echo "    upstream_ready:  $([ ${UPSTREAM_READY} -eq 1 ] && echo "✅ passed" || echo "⚠️ skipped (4 场景测了, 等真 baozi_key 物料, K-261 锁点)")"
 
 if [ -n "${FAIL_LIST}" ]; then
     echo ""

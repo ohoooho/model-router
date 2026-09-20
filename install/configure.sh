@@ -34,6 +34,12 @@ CONTEXT_FILE="${TX_CONTEXT_FILE:-${SCRIPT_DIR}/component.context.json}"
 BAOZI_PERSONA_KEY=""
 BAOZI_BUTLER_KEY=""
 BAOZI_API_KEY=""               # 老单 key (向后兼容)
+
+# K-261 锁点: 4 场景 baozi_key (老板 07:51 lockin)
+BAOZI_CHAT_KEY=""
+BAOZI_CODING_KEY=""
+BAOZI_ASSIST_KEY=""
+BAOZI_TEAM_KEY=""
 ADMIN_API_KEY=""
 LICENSE_PATH=""
 LICENSE_JSON=""
@@ -48,6 +54,11 @@ if [ -f "${CONTEXT_FILE}" ] && command -v jq >/dev/null; then
     BAOZI_PERSONA_KEY=$(jq -r '.inputs.baozi_persona_key.value // empty' "${CONTEXT_FILE}" 2>/dev/null || echo "")
     BAOZI_BUTLER_KEY=$(jq -r '.inputs.baozi_butler_key.value // empty' "${CONTEXT_FILE}" 2>/dev/null || echo "")
     BAOZI_API_KEY=$(jq -r '.inputs.baozi_api_key.value // empty' "${CONTEXT_FILE}" 2>/dev/null || echo "")
+    # K-261 锁点: 4 场景 baozi_key 从 scene_key_map 读
+    BAOZI_CHAT_KEY=$(jq -r '.inputs.scene_key_map.value."chat-auto" // empty' "${CONTEXT_FILE}" 2>/dev/null | sed 's/{{BAOZI_CHAT_KEY}}//' || echo "")
+    BAOZI_CODING_KEY=$(jq -r '.inputs.scene_key_map.value."coding-auto" // empty' "${CONTEXT_FILE}" 2>/dev/null | sed 's/{{BAOZI_CODING_KEY}}//' || echo "")
+    BAOZI_ASSIST_KEY=$(jq -r '.inputs.scene_key_map.value."assist-auto" // empty' "${CONTEXT_FILE}" 2>/dev/null | sed 's/{{BAOZI_ASSIST_KEY}}//' || echo "")
+    BAOZI_TEAM_KEY=$(jq -r '.inputs.scene_key_map.value."team-auto" // empty' "${CONTEXT_FILE}" 2>/dev/null | sed 's/{{BAOZI_TEAM_KEY}}//' || echo "")
     ADMIN_API_KEY=$(jq -r '.inputs.omr_admin_api_key.value // empty' "${CONTEXT_FILE}" 2>/dev/null || echo "")
     LICENSE_PATH=$(jq -r '.inputs.license_path.value // empty' "${CONTEXT_FILE}" 2>/dev/null || echo "")
 fi
@@ -62,6 +73,19 @@ fi
 if [ -z "${BAOZI_BUTLER_KEY}" ] && [ -n "${OMR_BAOZI_BUTLER_KEY:-}" ]; then
     BAOZI_BUTLER_KEY="${OMR_BAOZI_BUTLER_KEY}"
 fi
+# K-261 锁点: 4 场景 baozi_key env fallback
+if [ -z "${BAOZI_CHAT_KEY}" ] && [ -n "${OMR_BAOZI_CHAT_KEY:-}" ]; then
+    BAOZI_CHAT_KEY="${OMR_BAOZI_CHAT_KEY}"
+fi
+if [ -z "${BAOZI_CODING_KEY}" ] && [ -n "${OMR_BAOZI_CODING_KEY:-}" ]; then
+    BAOZI_CODING_KEY="${OMR_BAOZI_CODING_KEY}"
+fi
+if [ -z "${BAOZI_ASSIST_KEY}" ] && [ -n "${OMR_BAOZI_ASSIST_KEY:-}" ]; then
+    BAOZI_ASSIST_KEY="${OMR_BAOZI_ASSIST_KEY}"
+fi
+if [ -z "${BAOZI_TEAM_KEY}" ] && [ -n "${OMR_BAOZI_TEAM_KEY:-}" ]; then
+    BAOZI_TEAM_KEY="${OMR_BAOZI_TEAM_KEY}"
+fi
 if [ -z "${ADMIN_API_KEY}" ] && [ -n "${OMR_API_KEY:-}" ]; then
     ADMIN_API_KEY="${OMR_API_KEY}"
 fi
@@ -74,6 +98,15 @@ LICENSE_PATH="${LICENSE_PATH:-/opt/taoxian/license/license.json}"
 [ -z "${BAOZI_PERSONA_KEY}" ] && BAOZI_PERSONA_KEY="${BAOZI_API_KEY:-***}"
 [ -z "${BAOZI_BUTLER_KEY}" ] && BAOZI_BUTLER_KEY="${BAOZI_API_KEY:-***}"
 [ -z "${BAOZI_API_KEY}" ] && BAOZI_API_KEY="${BAOZI_BUTLER_KEY:-***}"
+
+# K-261 锁点: 4 场景 baozi_key fake 占位 (没真 key 时用 fake_<scene>_***)
+[ -z "${BAOZI_CHAT_KEY}" ]   && BAOZI_CHAT_KEY="fake_chat_***"
+[ -z "${BAOZI_CODING_KEY}" ] && BAOZI_CODING_KEY="fake_coding_***"
+[ -z "${BAOZI_ASSIST_KEY}" ] && BAOZI_ASSIST_KEY="fake_assist_***"
+[ -z "${BAOZI_TEAM_KEY}" ]   && BAOZI_TEAM_KEY="fake_team_***"
+
+# 4 场景 baozi_key export 给 write-config.js 用
+export BAOZI_CHAT_KEY BAOZI_CODING_KEY BAOZI_ASSIST_KEY BAOZI_TEAM_KEY
 
 # 打印脱敏后的 key 来源 (K-125 不打印明文)
 echo "    inputs (脱敏):"

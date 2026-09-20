@@ -100,3 +100,28 @@ verify.sh 输出 4 状态:
 ## patches/ 子目录
 
 - `patches/0006-omr-data-dir.sh`: OMR_DATA_DIR 品牌化 patch (77 行, sed-based, 幂等). apply.sh 重建后或升级 OMR fork 时调用, 保持 ~/.omr 路径而不是 OMR upstream musistudio/claude-code-router 写的 ~/.claude-code-router/. 失职 255 闭环 (helper 不能插 2 次).
+
+## K-261 锁点 (老板 2026-09-21 07:51 lockin): 4 场景 = 4 baozi_key
+
+| 场景 | 模板 | Fake 占位 | API key id |
+|---|---|---|---|
+| chat-auto (日常档) | `{{BAOZI_CHAT_KEY}}` | `fake_chat_***` | baozi-chat-auto |
+| coding-auto (编程档) | `{{BAOZI_CODING_KEY}}` | `fake_coding_***` | baozi-coding-auto |
+| assist-auto (办公档) | `{{BAOZI_ASSIST_KEY}}` | `fake_assist_***` | baozi-assist-auto |
+| team-auto (团队档) | `{{BAOZI_TEAM_KEY}}` | `fake_team_***` | baozi-team-auto |
+
+**原则**: 契约 component.yaml inputs 必须定义 4 个 baozi_key, 没真 key 时用 fake 占位 + 模板表达式预留. 验证场景独立测 (verify.sh 4 场景 for-loop), 不允许一个 dummy "***" 通杀.
+
+**维度澄清**:
+- 场景维度 (chat/coding/assist/team): 使用场景, 4 个不同 key
+- 调用者维度 (persona/butler): 谁在调 baozi (分身 vs 大管家)
+- 两维度正交, 共 2*4=8 个潜在 key (但目前用场景维度 4 + 调用者维度 2 = 6 key 落地)
+
+**失职闭环**:
+- 失职 259: 上次 hardcode "Bearer ***" 永远 401, 误诊 "admin key 不对"
+- 失职 260: amend a31ded2 时残留 ROUTE_CODE chain 没删, set -u 触发 unbound
+- 失职 261: 我之前理解错 — 把 4 档虚拟模型当成 "1 个 key", 应该是 4 个
+- 失职 262: python3 batch edit line 73 assert 失败 (old text 不匹配)
+- 失职 263: omr.service 是 2 行 Environment=, 不是 1 行, batch 失败
+- 失职 264: component.context.json 加 JS // 注释, JSON 不支持
+

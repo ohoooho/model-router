@@ -61,6 +61,18 @@
       "present": true,
       "source": "default",
       "value": true
+    },
+    "scene_key_map": {
+      "_comment": "K-261 锁点: 4 场景 4 key (老板 07:51 lockin)",
+      "kind": "scene_keys",
+      "present": true,
+      "source": "contract",
+      "value": {
+        "chat-auto": "{{BAOZI_CHAT_KEY}}",
+        "coding-auto": "{{BAOZI_CODING_KEY}}",
+        "assist-auto": "{{BAOZI_ASSIST_KEY}}",
+        "team-auto": "{{BAOZI_TEAM_KEY}}"
+      }
     }
   }
 }

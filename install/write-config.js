@@ -26,9 +26,21 @@ const OMR_DATA_DIR = (process.env.OMR_DATA_DIR && process.env.OMR_DATA_DIR.trim(
 const CONFIG_DB = path.join(OMR_DATA_DIR, 'config.sqlite');
 
 // 2. inputs (TX_CONTEXT_FILE 0600 受保护, 契约 §6.2.4)
-const BAOZI_KEY = process.env.BAOZI_KEY || '***';
-const PERSONA_BAOZI_KEY = process.env.PERSONA_BAOZI_KEY || BAOZI_KEY;  // 双 baozi_key (persona + butler)
-const BUTLER_BAOZI_KEY = process.env.BUTLER_BAOZI_KEY || BAOZI_KEY;    // 老板 17:42 lockin
+// 4 场景 baozi_key (K-261 锁点, 老板 07:51 lockin)
+// 模板表达式 {{BAOZI_<SCENE>_KEY}} + fake_<scene>_*** 占位
+function resolveSceneKey(envVal, fakeName) {
+  if (envVal && envVal.trim() && envVal.indexOf('{{') === -1) return envVal.trim();
+  return 'fake_' + fakeName + '_***';
+}
+const SCENE_KEYS = {
+  'chat-auto':   resolveSceneKey(process.env.BAOZI_CHAT_KEY,   'chat'),
+  'coding-auto': resolveSceneKey(process.env.BAOZI_CODING_KEY, 'coding'),
+  'assist-auto': resolveSceneKey(process.env.BAOZI_ASSIST_KEY, 'assist'),
+  'team-auto':   resolveSceneKey(process.env.BAOZI_TEAM_KEY,   'team'),
+};
+const BAOZI_KEY = process.env.BAOZI_KEY || SCENE_KEYS['chat-auto'];
+const PERSONA_BAOZI_KEY = process.env.PERSONA_BAOZI_KEY || BAOZI_KEY;
+const BUTLER_BAOZI_KEY = process.env.BUTLER_BAOZI_KEY || BAOZI_KEY;
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 const LICENSE_JSON = process.env.LICENSE_JSON || '';
 const OMR_VERSION = process.env.OMR_VERSION || '0.1.0-fork3.0.18+p5';
@@ -112,12 +124,12 @@ const OMR_CONFIG = {
     persona_key_id: 'baozi-persona',
     butler_key_id: 'baozi-butler',
   },
-  // v-models (老板 10:15 lockin)
+  // v-models (老板 10:15 lockin + K-310 加 team-auto)
   virtual_models: {
-    'coding-auto':  { display_name: 'Coding Auto (编程通用)', strategy: 'manual',       match: { exactAliases: ['coding-auto'] } },
-    'assist-auto':  { display_name: 'Assist Auto (通用助手)', strategy: 'auto-balance', match: { exactAliases: ['assist-auto'] } },
-    'chat-auto':    { display_name: 'Chat Auto (日常聊天)',   strategy: 'auto-balance', match: { exactAliases: ['chat-auto'] } },
-    // TODO: 团队档 (老板 lockin 4 档, 待加 team-auto)
+    'coding-auto':  { display_name: 'Coding Auto (编程通用)', strategy: 'manual',       match: { exactAliases: ['coding-auto'] }, key_id: 'baozi-coding-auto' },
+    'assist-auto':  { display_name: 'Assist Auto (通用助手)', strategy: 'auto-balance', match: { exactAliases: ['assist-auto'] }, key_id: 'baozi-assist-auto' },
+    'chat-auto':    { display_name: 'Chat Auto (日常聊天)',   strategy: 'auto-balance', match: { exactAliases: ['chat-auto'] }, key_id: 'baozi-chat-auto' },
+    'team-auto':    { display_name: 'Team Auto (团队协作)',   strategy: 'priority',      match: { exactAliases: ['team-auto'] }, key_id: 'baozi-team-auto' },
   },
   // 网关
   gateway: {
@@ -161,6 +173,19 @@ upsertApiKey.run(
   process.env.BAOZI_BUTLER_EXPIRES || '',
   JSON.stringify({ rpm: 30, tpm: 50000 })
 );
+// 4 场景 baozi_key (K-261 锁点) — 写入 api_keys 表
+for (const [scene, key] of Object.entries(SCENE_KEYS)) {
+  const isFake = key.indexOf('fake_') === 0;
+  upsertApiKey.run(
+    'baozi-' + scene,
+    'Baozi Scene Key (' + scene + ')' + (isFake ? ' [FAKE placeholder]' : ''),
+    key,
+    'plain',
+    '',
+    JSON.stringify({ rpm: 60, tpm: 100000, scene: scene, fake: isFake })
+  );
+}
+
 // 老单 baozi_key (向后兼容, 指向 butler)
 upsertApiKey.run(
   'baozi',

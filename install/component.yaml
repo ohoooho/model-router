@@ -68,7 +68,57 @@ network:
 
 # 组件需要的输入。只声明需求，不在这里填写输入值。
 inputs:
-  # 双 baozi_key (老板 17:42 lockin: persona + butler)
+  # K-261 锁点 (老板 07:51 锁点): 4 档场景 = 4 个不同 baozi_key
+  # 4 档虚拟模型 (chat-auto / coding-auto / assist-auto / team-auto) 需要独立 baozi_key
+  # 场景 key 是【场景维度】(使用场景) — 跟 persona/butler 【调用者维度】正交
+  # 模板表达式: {{BAOZI_<SCENE>_KEY}} (无真 key 时用 fake_${scene}_*** 占位)
+  # 失职 261 立刻认: 之前我 hardcode "Bearer ***" 是错的, 应该 4 场景 4 key
+
+  - id: baozi_chat_key            # chat-auto 场景 (日常档)
+    kind: secret
+    required: false              # 可用 fake 占位
+    template: "{{BAOZI_CHAT_KEY}}"
+    fake: "fake_chat_***"
+    source: [order_material, user_prompt, generated_fake]
+    delivery: context_json
+    persist: component_managed
+    scope: omr
+    _comment: "日常档 (chat-auto) baozi_key. 模板预留, 无真 key 用 fake_chat_***"
+
+  - id: baozi_coding_key          # coding-auto 场景 (编程档)
+    kind: secret
+    required: false
+    template: "{{BAOZI_CODING_KEY}}"
+    fake: "fake_coding_***"
+    source: [order_material, user_prompt, generated_fake]
+    delivery: context_json
+    persist: component_managed
+    scope: omr
+    _comment: "编程档 (coding-auto) baozi_key. 模板预留, 无真 key 用 fake_coding_***"
+
+  - id: baozi_assist_key          # assist-auto 场景 (办公档)
+    kind: secret
+    required: false
+    template: "{{BAOZI_ASSIST_KEY}}"
+    fake: "fake_assist_***"
+    delivery: context_json
+    persist: component_managed
+    scope: omr
+    source: [order_material, user_prompt, generated_fake]
+    _comment: "办公档 (assist-auto) baozi_key. 模板预留, 无真 key 用 fake_assist_***"
+
+  - id: baozi_team_key            # team-auto 场景 (团队档, 待加)
+    kind: secret
+    required: false
+    template: "{{BAOZI_TEAM_KEY}}"
+    fake: "fake_team_***"
+    delivery: context_json
+    persist: component_managed
+    scope: omr
+    source: [order_material, user_prompt, generated_fake]
+    _comment: "团队档 (team-auto) baozi_key. 模板预留, 无真 key 用 fake_team_*** (K-310 拍板后正式启用)"
+
+  # 双 baozi_key (老板 17:42 lockin: persona + butler) — 这是【调用者维度】
   - id: baozi_persona_key
     kind: secret
     required: true                  # 订单物料必填
@@ -127,6 +177,18 @@ inputs:
     delivery: env
     scope: omr
     _comment: "OMR_DATA_DIR env 优先级最高, 默认 ~/.omr (失职 243 品牌化)"
+
+# 场景 → key 映射表 (K-261 锁点)
+# VirtualModels.match_json 里凭 scene 字段匹配该用哪个 key
+scene_keys:
+  chat-auto: "{{BAOZI_CHAT_KEY}}"
+  coding-auto: "{{BAOZI_CODING_KEY}}"
+  assist-auto: "{{BAOZI_ASSIST_KEY}}"
+  team-auto: "{{BAOZI_TEAM_KEY}}"
+  _meta:
+    reason: "老板 07:51 lockin: 不同场景不同 key, 契约定义, 模板预留"
+    fake_fallback: "无真 key 时用 fake_<scene>_*** 替代 (verify.sh 测试不炸)"
+    dimension: "场景维度 (4 档虚拟模型) 跟 persona/butler (调用者维度) 正交"
 
 # 实际安装物料。正式发布时必须有真实哈希和大小。
 artifacts:

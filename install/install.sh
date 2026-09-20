@@ -141,3 +141,21 @@ cat <<EOF
 EOF
 echo ""
 echo "✅ OMR install 完. 跑 verify.sh 4 状态真验证."
+
+# === K-261 锁点: 4 场景 baozi_key fake 占位 (老板 07:51 lockin) ===
+# 装机时如果没传 4 场景 baozi_key, 自动生成 fake_<scene>_*** 占位
+# 写 /etc/taoxian/omr.env (供 configure.sh + write-config.js 读)
+mkdir -p /etc/taoxian
+cat > /etc/taoxian/omr.env <<EOF
+# 4 场景 baozi_key (K-261 锁点, 老板 07:51 lockin: 不同场景不同 key)
+BAOZI_CHAT_KEY="${BAOZI_CHAT_KEY:-fake_chat_***}"
+BAOZI_CODING_KEY="${BAOZI_CODING_KEY:-fake_coding_***}"
+BAOZI_ASSIST_KEY="${BAOZI_ASSIST_KEY:-fake_assist_***}"
+BAOZI_TEAM_KEY="${BAOZI_TEAM_KEY:-fake_team_***}"
+# 双 baozi_key (老板 17:42 lockin: persona + butler)
+PERSONA_BAOZI_KEY="${PERSONA_BAOZI_KEY:-fake_persona_***}"
+BUTLER_BAOZI_KEY="${BUTLER_BAOZI_KEY:-fake_butler_***}"
+EOF
+chmod 0600 /etc/taoxian/omr.env
+echo "✅ 4 场景 baozi_key fake 占位已写 /etc/taoxian/omr.env (K-261 锁点)"
+

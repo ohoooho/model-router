@@ -72,3 +72,25 @@ else
     echo "❌ E2E 失败 HTTP $STATUS"
     exit 1
 fi
+
+# === 4 场景 4 fake key E2E (K-261 锁点) ===
+echo ""
+echo "=== 4 场景 4 fake key E2E (K-261 锁点, 老板 07:51 lockin) ==="
+SCENE_OK=0
+for SCENE in chat-auto coding-auto assist-auto team-auto; do
+  SCENE_KEY_VAR="OMR_BAOZI_$(echo ${SCENE} | tr 'a-z-' 'A-Z_')_KEY"
+  SCENE_KEY=$(eval echo \$${SCENE_KEY_VAR})
+  [ -z "${SCENE_KEY}" ] && SCENE_KEY="fake_${SCENE//-/}_***"
+  SCENE_CODE=$(curl -s -m 5 -o /tmp/e2e-${SCENE}.json -w '%{http_code}' \
+      -X POST http://127.0.0.1:3456/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer ${SCENE_KEY}" \
+      -d "{\"model\":\"${SCENE}\",\"messages\":[{\"role\":\"user\",\"content\":\"e2e ping\"}],\"max_tokens\":2}" 2>/dev/null || echo "000")
+  if [ "${SCENE_CODE}" = "200" ]; then
+    echo "  ✅ ${SCENE} POST = 200"
+    SCENE_OK=$((SCENE_OK+1))
+  else
+    echo "  ⚠️ ${SCENE} POST = ${SCENE_CODE}"
+  fi
+done
+echo "  4 场景 ${SCENE_OK}/4 通过 (无真 baozi_key 时会全 401, fake 占位不阻断路由)"
