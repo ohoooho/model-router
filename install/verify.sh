@@ -107,25 +107,38 @@ db.close();
 process.stdout.write(row?.content || '');
 " 2>/dev/null || echo "")
 
-# 尝试 POST /v1/chat/completions (用 baozi fake_key 测试路由, 不真发 upstream)
-ROUTE_CODE=$(curl -s -m 10 -o /tmp/omr-route.json -w '%{http_code}' \
-    -X POST http://127.0.0.1:3456/v1/chat/completions \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer ***" \
-    -d '{"model":"chat-auto","messages":[{"role":"user","content":"ping"}],"max_tokens":3}' 2>/dev/null || echo "000")
-
-if [ "${ROUTE_CODE}" = "200" ]; then
-    echo "  ✅ POST /v1/chat/completions = 200 (路由通)"
-    UPSTREAM_READY=1
-elif [ "${ROUTE_CODE}" = "401" ]; then
-    echo "  ⚠️ = 401 (admin key 不对, 路由层 OK, 真路由需要 admin auth)"
-    UPSTREAM_READY=0  # auth 没过不算真通
-elif [ "${ROUTE_CODE}" = "000" ]; then
-    echo "  ❌ gateway 不可达"
-    FAIL_LIST="${FAIL_LIST} [upstream: no gw]"
+# 失职 259: 不再 hardcode "Bearer ***" (永远 401)
+# baozi_key 从 env 读 (OMR_BAOZI_KEY), 没设就 skip (而不是误诊 401)
+OMR_BAOZI_KEY="${OMR_BAOZI_KEY:-}"
+if [ -z "${OMR_BAOZI_KEY}" ]; then
+    echo "  ⚠️ OMR_BAOZI_KEY 未设, 跳过 upstream_ready 真路由测试"
+    echo "      (export OMR_BAOZI_KEY=<baozi真key> 后重跑 verify.sh)"
+    UPSTREAM_READY=0
+elif [ "${OMR_BAOZI_KEY}" = "***" ]; then
+    echo "  ❌ OMR_BAOZI_KEY="***" 是 dummy (失职 259), 拒绝测试"
+    FAIL_LIST="${FAIL_LIST} [upstream: dummy key]"
 else
-    echo "  ⚠️ POST = ${ROUTE_CODE} (看 /tmp/omr-route.json)"
+    ROUTE_CODE=$(curl -s -m 10 -o /tmp/omr-route.json -w '%{http_code}' \
+        -X POST http://127.0.0.1:3456/v1/chat/completions \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer ${OMR_BAOZI_KEY}" \
+        -d '{"model":"chat-auto","messages":[{"role":"user","content":"ping"}],"max_tokens":3}' 2>/dev/null || echo "000")
+
+    if [ "${ROUTE_CODE}" = "200" ]; then
+        echo "  ✅ POST /v1/chat/completions = 200 (真路由通, baozi_key 有效)"
+        UPSTREAM_READY=1
+    elif [ "${ROUTE_CODE}" = "401" ]; then
+        echo "  ⚠️ = 401 (baozi_key 无效或过期, 路由层 OK)"
+        UPSTREAM_READY=0
+    elif [ "${ROUTE_CODE}" = "000" ]; then
+        echo "  ❌ gateway 不可达"
+        FAIL_LIST="${FAIL_LIST} [upstream: no gw]"
+    else
+        echo "  ⚠️ POST = ${ROUTE_CODE} (看 /tmp/omr-route.json)"
+    fi
 fi
+
+
 
 # === 汇总 ===
 echo ""
