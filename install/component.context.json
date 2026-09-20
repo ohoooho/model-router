@@ -1,0 +1,66 @@
+{
+  "$schema": "https://docs.ohoooho.com/schemas/component-context-v1.json",
+  "_comment": "OMR 组件 context.json 模板 — 跟 md COMPONENT-CONTEXT-TEMPLATE.json 对齐. 失职 213 改造. 实例由 Installer 写入, 此文件不含真实 Key.",
+
+  "schema_version": 1,
+  "operation": "install",
+  "installer_version": "0.3.0",
+
+  "component": {
+    "id": "omr",
+    "default_version": "0.1.0-fork3.0.18+p5",
+    "resolved_version": "0.1.0-fork3.0.18+p5",
+    "version_policy": "default"
+  },
+
+  "host": {
+    "os": "linux",
+    "os_version": "Ubuntu 26.04",
+    "arch": "x86_64",
+    "home": "/root",
+    "shell": "bash",
+    "node_version": "v22.19.0",
+    "npm_version": "10.9.3",
+    "is_admin": true
+  },
+
+  "network": {
+    "artifact_download": "available",
+    "upstream_api": "available",
+    "proxy_configured": false,
+    "offline_install": false
+  },
+
+  "paths": {
+    "home": "/root",
+    "component_data": "/root/.omr",
+    "artifact_dir": "/var/cache/taoxian-install/artifacts"
+  },
+
+  "inputs": {
+    "baozi_api_key": {
+      "kind": "secret",
+      "present": true,
+      "source": "order_material",
+      "value": "<injected-at-runtime-and-never-committed>"
+    },
+    "omr_admin_api_key": {
+      "kind": "secret",
+      "present": true,
+      "source": "generated",
+      "value": "<32-64-char-uuid-v4>"
+    },
+    "license_path": {
+      "kind": "path",
+      "present": true,
+      "source": "default",
+      "value": "/opt/taoxian/license/license.json"
+    },
+    "enable_background_service": {
+      "kind": "boolean",
+      "present": true,
+      "source": "default",
+      "value": true
+    }
+  }
+}

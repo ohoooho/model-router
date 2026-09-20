@@ -1,0 +1,246 @@
+# 桃仙组件清单模板
+# 文件名约定：component.yaml
+#
+# 这是组件开发者提交的静态清单，不包含用户 Key、License 或其他秘密。
+# 实际发行时必须替换所有 <...> 占位符，并为每个 artifact 生成真实 sha256/size。
+#
+# 改造依据: docs/COMPONENT-INSTALLATION-CONTRACT.md V1 (md 17:30 commit 8da0744)
+# 改造者: baxian (失职 213)
+# 改造时间: 2026-09-20 17:40
+
+schema_version: 1
+
+component:
+  id: omr
+  name: Ohoooho Model Router
+  description: |
+    桃仙模型路由网关 (fork of claude-code-router v3.0.18).
+    提供 CLI + Web UI + 4 档虚拟模型 (chat-auto/coding-auto/assist-auto)
+    + 4 策略 (auto-balance/waterfall/priority/manual) + 自家 patches 5 个
+    (K-251 License 验签 / K-272 README / K-273 装机脚本 / K-294 sandbox / K-295 License 卡片).
+  maintainer: ohoooho
+  type: npm                         # npm | binary | archive | skill | script
+
+# 产品默认版本可以随发行清单更新；一次具体安装会解析为 resolved_version。
+release:
+  default_channel: stable
+  default_version: 0.1.0-fork3.0.18+p5   # 老板 lockin semver + fork base + patch count (建议 7)
+  channels:
+    stable:
+      version: 0.1.0-fork3.0.18+p5
+    beta:
+      version: 0.2.0-fork3.0.18+p6        # 下一版, 占位 (实际未发布)
+
+# 组件支持矩阵。没有列出的 OS/架构不能声称支持。
+platforms:
+  - os: linux
+    arch: x86_64
+  - os: linux
+    arch: arm64
+  - os: macos
+    arch: arm64
+  - os: macos
+    arch: x86_64
+  # windows 暂不支持 (TODO: 等测试通过再加, 不冒充已支持)
+
+# 宿主机和其他桃仙组件依赖。
+dependencies:
+  runtime:
+    - id: node
+      version: ">=22.0.0"      # 123 端实测 v22.19.0
+    - id: npm
+      version: ">=10.0.0"      # 123 端实测 10.9.3
+    - id: systemd              # linux 守护; macos 用 launchd (TODO)
+  components: []               # 暂不依赖其他桃仙组件 (OpenClaw 还没装到 taoxian)
+
+# 安装/运行时网络要求。安装物料网络和上游 API 网络分开声明。
+network:
+  install:
+    offline_capable: true      # 老板 14:29 lockin: online + offline 双轨
+    proxy_supported: true      # 标准 HTTP_PROXY / HTTPS_PROXY / NO_PROXY
+    required_for_local_install: false
+  upstream:
+    required_for_local_install: false
+    proxy_supported: true
+    endpoints:
+      - https://baozi.ohoooho.com/api/v1
+      - https://ark.cn-beijing.volces.com/api/v3
+
+# 组件需要的输入。只声明需求，不在这里填写输入值。
+inputs:
+  # 双 baozi_key (老板 17:42 lockin: persona + butler)
+  - id: baozi_persona_key
+    kind: secret
+    required: true                  # 订单物料必填
+    source: [order_material]
+    delivery: context_json           # 0600 受保护
+    persist: component_managed       # 落到 api_keys 表 (encrypted)
+    scope: omr
+    _comment: "分身调用 baozi 的 key (e.g. OMR 替分身调 chat/completions)"
+
+  - id: baozi_butler_key
+    kind: secret
+    required: true
+    source: [order_material]
+    delivery: context_json
+    persist: component_managed
+    scope: omr
+    _comment: "大管家 (OpenClaw) 调 baozi 的 key (e.g. /version RPC, License 验签)"
+
+  - id: baozi_api_key                  # 兼容老单 key (alias for butler)
+    kind: secret
+    required: false
+    source: [existing_config, user_prompt]
+    delivery: context_json
+    persist: component_managed
+    scope: omr
+    _comment: "老调用方式, 默认指向 butler (向后兼容, 老板 17:42 lockin)"
+
+  - id: omr_admin_api_key
+    kind: secret
+    required: false
+    source: [generated]                # OMR fork 启动时自动生成 sk-ccr- 前缀
+    delivery: context_json
+    persist: component_managed
+    scope: omr
+
+  - id: license_path
+    kind: path
+    required: false
+    source: [order_material, existing_config, default]
+    delivery: context_json
+    default: /opt/taoxian/license/license.json
+    persist: read_only
+
+  - id: enable_background_service
+    kind: boolean
+    required: false
+    source: [user_prompt, default]
+    default: true
+    delivery: context_json
+
+  - id: omr_data_dir
+    kind: path
+    required: false
+    source: [default, user_prompt]
+    default: ~/.omr
+    delivery: env
+    scope: omr
+    _comment: "OMR_DATA_DIR env 优先级最高, 默认 ~/.omr (失职 243 品牌化)"
+
+# 实际安装物料。正式发布时必须有真实哈希和大小。
+artifacts:
+  - id: omr-npm-package
+    version: 0.1.0-fork3.0.18+p5
+    platform: linux-x64
+    kind: npm-tarball
+    package: "@ohoooho/model-router"
+    path: npm/@ohoooho-model-router-0.1.0.tgz
+    sha256: <generated-sha256-by-build>
+    size_bytes: <generated-by-wc>
+    npm_integrity: <generated-by-npm-pack-dist.integrity>
+
+  - id: omr-component-scripts
+    version: 0.1.0-fork3.0.18+p5
+    platform: any
+    kind: archive
+    path: install.tar.gz          # 本仓 install/ 整个目录打的 tar.gz (含 manifest + 8 脚本 + template)
+    sha256: <generated-sha256-by-build>
+    size_bytes: <generated-by-wc>
+
+# 用户目录、配置和系统权限边界。
+# 失职 243 闭环 (K-302 边界修正): OMR fork 仓是我的项目, 路径品牌化由我负责.
+# OMR fork 源码加 OMR_DATA_DIR env (cli.js getOMRDataDir() helper), 优先级最高.
+# 默认 ~/.omr (品牌化, 不是 fork 原版的 ~/.claude-code-router).
+# 契约 §5 paths 必填: user_data / config / install_prefix / binary
+paths:
+  user_data: ${OMR_DATA_DIR:-~/.omr}
+  config: ${OMR_DATA_DIR:-~/.omr}/config.sqlite
+  install_prefix: /usr/local/lib/node_modules/@ohoooho/model-router
+  binary: /usr/local/bin/ccr
+  _meta:
+    branding_strategy: OMR_DATA_DIR env 优先, 默认 ~/.omr
+    fork_original_path: ~/.claude-code-router/config.sqlite (fork 自 claude-code-router v3.0.18, 沿用)
+    brand_commit: 2026-09-20 19:00 (失职 243 闭环)
+    schema: 6 张表 (app_config + api_keys + runtime_state + config_schema_migrations + legacy_storage_backups + legacy_storage_cleanup)
+
+permissions:
+  requires_admin: true             # 写 /usr/local/lib + /etc/systemd/system 需要 root
+  system_write: true               # 写 systemd unit
+  modifies_shell_profile: false
+  registers_background_service: true   # omr.service
+  creates_user_data_dir: true      # ~/.omr (首次装)
+
+# 各平台生命周期入口。脚本必须幂等、失败返回非零、不得泄露输入。
+lifecycle:
+  macos_linux:
+    install: install/install.sh
+    configure: install/configure.sh
+    doctor: install/verify.sh
+    upgrade: install/install.sh       # install.sh 是幂等的, 可作为 upgrade 入口
+    uninstall: install/rollback.sh    # 用 rollback 反向卸载 (TODO: 独立 uninstall.sh)
+  windows:
+    install: <not-supported-yet>
+    configure: <not-supported-yet>
+    doctor: <not-supported-yet>
+    upgrade: <not-supported-yet>
+    uninstall: <not-supported-yet>
+
+# doctor 必须验证真实版本和组件能力，不得只检查目录存在。
+# 契约 §7.3: installed / configured / healthy / upstream_ready 四状态
+verification:
+  command: /usr/local/bin/ccr --version
+  expected_version: resolved_version
+  checks:
+    - executable_available           # 命令存在
+    - version_matches                # 实际版本 = resolved_version
+    - config_valid                   # config.sqlite 结构 + 必填字段
+    - runtime_dependency_valid       # node ≥22 + npm ≥10
+    - background_service_active      # omr.service active (linux)
+    - gateway_port_open              # 127.0.0.1:3456 listening
+    - web_ui_port_open               # 127.0.0.1:3458 listening
+    - upstream_api                   # POST /v1/chat/completions 真路由 (online)
+
+# 组件失败时给用户的人工命令和说明入口。
+recovery:
+  manual_install_doc: install/README.md
+  retry_safe: true                  # install.sh 幂等
+  preserves_user_data: true         # ~/.omr/config.sqlite 备份后改, 不覆盖
+
+# === 契约外补充 (失职 243 闭环: 我的项目我自己管, 不进发行清单) ===
+# K-302 死规真边界: md 责任 = taoxian/deploy/ + deploy.sh + site/install.sh
+# OMR fork 仓 (本仓) = baxian 责任, _internal 段是 baxian 内部调试, 不进 md 发行清单
+_internal:
+  upstream_dependencies:
+    fork_of: claude-code-router v3.0.18
+    patches_count: 6
+    patches:
+      - id: K-251
+        what: License v1.2 verifier
+      - id: K-272
+        what: README 桃仙装机路径
+      - id: K-273
+        what: get.ohoooho.com/omr 装机脚本
+      - id: K-294
+        what: sandbox push 试
+      - id: K-295
+        what: License 状态卡片 v2
+      - id: K-243                              # 新增, 路径品牌化
+        what: cli.js 加 OMR_DATA_DIR env (3 处 hardcoded 路径 → .omr)
+  fork_base:
+    repo: https://github.com/musistudio/claude-code-router
+    commit: v3.0.18
+  self_repo: https://git.dbhys.com/ohoooho/ohoooho-model-router.git
+  brand:
+    data_dir: ~/.omr                            # 默认
+    fork_original: ~/.claude-code-router         # fork 自带, 已通过 OMR_DATA_DIR env 覆盖
+    env_var: OMR_DATA_DIR                       # 优先级最高
+    brand_commit: 2026-09-20-19:00
+    reason: 失职 243 K-302 边界修正 (OMR fork 仓是我的项目, 路径品牌化由我负责)
+  失职_closure_log:
+    - 失职_235-238: component.yaml paths 错 + 双 baozi_key 漏 + sha256 占位符 + npm.ohoooho.com 探测
+    - 失职_239: K-305 死规我说"OMR 配置 = 1 JSON"是错的 (实际是 SQLite 6 表)
+    - 失职_240: heredoc 引号转义炸, python3 sqlite3 模块一秒挖到
+    - 失职_241: paths.config 路径错
+    - 失职_242: write-config.js schema 6 表全错 (我之前写的 3 表 vs OMR fork 真 6 表)
+    - 失职_243: K-302 边界错 (OMR fork 仓是 md 责任错的, 是我的责任)

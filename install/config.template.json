@@ -1,0 +1,48 @@
+{
+  "Providers": [
+    {
+      "name": "baozi",
+      "api_base_url": "https://baozi.ohoooho.com/api/v1",
+      "api_key": "***}",
+      "models": ["baozi"],
+      "protocol": "openai_chat_completions",
+      "enabled": true,
+      "_meta": {
+        "fake_key": true,
+        "purpose": "OMR 路由标识, 不真调 (老板 10:15 lockin)",
+        "scene_coverage": ["chat", "coding", "task", "office", "image", "vision"]
+      }
+    },
+    {
+      "name": "ark-cp",
+      "api_base_url": "https://ark.cn-beijing.volces.com/api/v3",
+      "api_key": "***}",
+      "models": ["doubao-seed-2.0-code", "doubao-seed-2.0-lite"],
+      "protocol": "openai_chat_completions",
+      "enabled": true
+    }
+  ],
+  "VirtualModels": [
+    {
+      "id": "coding-auto",
+      "displayName": "Coding Auto (编程通用)",
+      "enabled": true,
+      "strategy": "manual",
+      "match": { "exactAliases": ["coding-auto"] }
+    },
+    {
+      "id": "assist-auto",
+      "displayName": "Assist Auto (通用助手)",
+      "enabled": true,
+      "strategy": "auto-balance",
+      "match": { "exactAliases": ["assist-auto"] }
+    },
+    {
+      "id": "chat-auto",
+      "displayName": "Chat Auto (日常聊天)",
+      "enabled": true,
+      "strategy": "auto-balance",
+      "match": { "exactAliases": ["chat-auto"] }
+    }
+  ]
+}

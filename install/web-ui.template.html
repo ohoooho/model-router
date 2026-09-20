@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OMR · 桃仙智能路由</title>
+<link rel="stylesheet" href="../../assets/main.css" />
+<style>
+  :root { --brand:#5b8def; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; --off:#9ca3af; --bg:#0b1020; --card:#141a2e; --txt:#e8eaf3; --mut:#9aa3b2; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--txt); padding:24px; min-height:100vh; }
+  header { max-width:980px; margin:0 auto 20px; display:flex; align-items:flex-start; justify-content:space-between; }
+  h1 { font-size:22px; font-weight:600; }
+  h1 span { color:var(--brand); }
+  .sub { color:var(--mut); font-size:13px; margin-top:2px; }
+  .header-meta { text-align:right; font-size:11px; color:var(--mut); font-family:ui-monospace,monospace; }
+  .header-meta .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--off); margin-right:4px; }
+  .header-meta .dot.ok { background:var(--ok); }
+  .header-meta .dot.err { background:var(--err); }
+  nav { display:flex; gap:8px; margin-bottom:16px; max-width:980px; margin-left:auto; margin-right:auto; }
+  nav button { background:transparent; color:var(--mut); border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:14px; }
+  nav button.on { background:var(--card); color:var(--txt); }
+  main { max-width:980px; margin:0 auto; }
+  .screen { display:none; }
+  .screen.on { display:block; }
+  .card { background:var(--card); border-radius:12px; padding:20px; margin-bottom:16px; }
+  .card h3 { font-size:17px; margin-bottom:6px; }
+  .card .desc { color:var(--mut); font-size:13px; line-height:1.5; margin-bottom:12px; }
+  .card .intern { font-size:11px; color:var(--mut); font-family:ui-monospace,"SF Mono",monospace; opacity:.7; padding-top:8px; border-top:1px solid rgba(255,255,255,.06); margin-top:10px; word-break:break-all; }
+  .section-title { color:var(--mut); font-size:11px; text-transform:uppercase; letter-spacing:1px; margin:12px 0 6px; font-weight:600; }
+  .btn-group { display:flex; gap:6px; flex-wrap:wrap; }
+  .btn-pick { background:transparent; color:var(--mut); border:1px solid rgba(255,255,255,.12); padding:6px 12px; border-radius:8px; cursor:pointer; font-size:12px; font-family:ui-monospace,monospace; transition:all .15s; }
+  .btn-pick.on { background:var(--brand); color:#fff; border-color:var(--brand); }
+  .btn-pick.fake { border-style:dashed; opacity:.7; }
+  .btn-pick:hover:not(.on) { background:rgba(255,255,255,.04); color:var(--txt); }
+  .btn-pick.planned { opacity:.5; cursor:not-allowed; }
+  .btn-pick.planned::before { content:"🚧 "; }
+  .btn-copy { background:var(--brand); color:#fff; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px; margin-top:10px; }
+  .btn-copy:hover { filter:brightness(1.1); }
+  .btn-copy.retry { background:var(--err); }
+  .row { background:var(--card); border-radius:10px; padding:14px 18px; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; }
+  .dot { width:10px; height:10px; border-radius:50%; background:var(--off); display:inline-block; margin-right:8px; }
+  .dot.ok { background:var(--ok); }
+  .dot.err { background:var(--err); }
+  .row .name { font-weight:500; }
+  .row .meta { color:var(--mut); font-size:12px; margin-top:2px; word-break:break-all; }
+  .badge { display:inline-block; padding:2px 6px; border-radius:4px; font-size:10px; margin-left:6px; background:rgba(91,141,239,.2); color:var(--brand); }
+  .badge.fake { background:rgba(245,158,11,.2); color:var(--warn); }
+  .toast { position:fixed; bottom:24px; right:24px; background:var(--brand); color:#fff; padding:12px 20px; border-radius:8px; opacity:0; transition:opacity .2s; max-width:420px; z-index:9999; }
+  .toast.show { opacity:1; }
+  .toast.err { background:var(--err); }
+  .toast.warn { background:var(--warn); color:#000; }
+  .note { background:rgba(91,141,239,.08); border-left:3px solid var(--brand); padding:10px 14px; border-radius:6px; font-size:12px; color:var(--mut); margin-bottom:16px; max-width:980px; margin-left:auto; margin-right:auto; }
+  .note strong { color:var(--brand); }
+  /* Onboarding modal */
+  .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; z-index:9998; }
+  .modal-bg.hidden { display:none; }
+  .modal { background:var(--card); border-radius:16px; padding:32px; max-width:560px; width:90%; }
+  .modal h2 { font-size:20px; margin-bottom:8px; }
+  .modal p { color:var(--mut); font-size:13px; line-height:1.6; margin-bottom:16px; }
+  .modal ol { padding-left:20px; color:var(--txt); font-size:14px; line-height:2; }
+  .modal ol li { margin-bottom:4px; }
+  .modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:24px; }
+  .modal-actions button { padding:8px 16px; border-radius:8px; border:none; cursor:pointer; font-size:13px; }
+  .modal-actions .primary { background:var(--brand); color:#fff; }
+  .modal-actions .secondary { background:transparent; color:var(--mut); border:1px solid rgba(255,255,255,.12); }
+  /* 用量屏 */
+  .stat-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:16px; }
+  .stat { background:var(--card); border-radius:10px; padding:16px; }
+  .stat .label { font-size:11px; color:var(--mut); text-transform:uppercase; letter-spacing:1px; }
+  .stat .value { font-size:24px; font-weight:600; margin-top:4px; }
+  .stat .sub { font-size:11px; color:var(--mut); margin-top:2px; }
+  /* 开关 */
+  .switch { position:relative; width:44px; height:24px; background:var(--off); border-radius:12px; cursor:pointer; transition:background .2s; display:inline-block; vertical-align:middle; }
+  .switch.on { background:var(--brand); }
+  .switch::after { content:""; position:absolute; top:2px; left:2px; width:20px; height:20px; background:#fff; border-radius:50%; transition:left .2s; }
+  .switch.on::after { left:22px; }
+  .switch-row { display:flex; align-items:center; justify-content:space-between; padding:8px 0; }
+  .switch-row .label { font-size:13px; color:var(--txt); }
+  .switch-row .desc { font-size:11px; color:var(--mut); margin-top:2px; }
+  /* 健康条 */
+  .health-bar { height:6px; border-radius:3px; background:rgba(255,255,255,.06); overflow:hidden; margin-top:8px; }
+  .health-bar > div { height:100%; background:var(--ok); transition:width .3s; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1><span>OMR</span> · 桃仙智能路由</h1>
+    <div class="sub" id="sub-title">v0.1.0 · 加载中...</div>
+  </div>
+  <div class="header-meta">
+    <div><span class="dot" id="h-dot"></span><span id="h-status">检查中</span></div>
+    <div id="h-meta">config: -</div>
+    <div id="h-err"></div>
+  </div>
+</header>
+
+<nav>
+  <button data-tab="models" class="on">模型</button>
+  <button data-tab="providers">Provider</button>
+  <button data-tab="usage">用量</button>
+</nav>
+
+<div class="note">
+  💡 <strong>OMR 战略</strong> (老板 10:15 lockin): 慢慢全部自家实现. 现在 fork ~70% / 自家 ~30%. 
+  <strong>策略哲学</strong> (老板 10:33 lockin): 用户选 vs fallback 看用户喜好, 界面要有选择 (即使暂未实现, UI 上不丢).
+</div>
+
+<main>
+  <section id="screen-models" class="screen on"><div id="model-list"></div></section>
+  <section id="screen-providers" class="screen"><div id="provider-rows"></div></section>
+  <section id="screen-usage" class="screen">
+    <div class="stat-grid" id="stat-grid"></div>
+    <div class="card">
+      <h3>OMR 真 RPC 验证</h3>
+      <p class="desc">fetch /v1/models 拿到 OMR 真实支持的模型列表. 失败显示红色 toast + 重试.</p>
+      <div id="rpc-status" class="intern">未验证</div>
+      <button class="btn-copy retry" onclick="verifyOMR()">立即验证</button>
+    </div>
+  </section>
+</main>
+
+<div id="toast" class="toast"></div>
+
+<!-- Onboarding modal -->
+<div id="onboarding" class="modal-bg hidden">
+  <div class="modal">
+    <h2>👋 欢迎使用 OMR</h2>
+    <p>OMR 是桃仙智能模型路由. 4 步上手:</p>
+    <ol>
+      <li>选择虚拟模型 (日常 / 编程 / 办公)</li>
+      <li>选择 Provider (按钮组, 多 key 一目了然)</li>
+      <li>选择路由策略 (manual / auto-balance / waterfall / priority)</li>
+      <li>开启 fallback (主 provider 挂了自动切 baozi)</li>
+    </ol>
+    <p style="color:var(--mut);font-size:12px;">fake key (***) 仅用于路由标识, 不会真调用 baozi.</p>
+    <div class="modal-actions">
+      <button class="secondary" onclick="skipOnboarding()">跳过</button>
+      <button class="primary" onclick="completeOnboarding()">开始使用</button>
+    </div>
+  </div>
+</div>
+
+<!-- SSR 注入真 OMR config (generator 替换占位符) -->
+<script id="omr-config" type="application/json">{{OMR_CONFIG_DATA}}</script>
+
+<script>
+// ===== 1. SSR 注入真 OMR config (从 ~/.omr/config.json, generator 嵌的) =====
+let OMR_CFG;
+try {
+  OMR_CFG = JSON.parse(document.getElementById('omr-config').textContent || '{}');
+} catch (e) {
+  OMR_CFG = { providers: [], virtualModels: [], configBytes: 0, configMtime: 0 };
+  showToast('⚠️ OMR config 解析失败, 使用默认空配置', 'warn');
+}
+const PROVIDERS = OMR_CFG.providers || [];
+const VIRTUAL_MODELS = OMR_CFG.virtualModels || [];
+const CONFIG_BYTES = OMR_CFG.configBytes || 0;
+const CONFIG_MTIME = OMR_CFG.configMtime ? new Date(OMR_CFG.configMtime).toLocaleString('zh-CN') : '-';
+
+// 4 策略 (fork patch 002 已实现 4 + 1 规划)
+const STRATEGIES = [
+  { id:'auto-balance', name:'auto-balance', desc:'按剩余容量加权分配', implemented:true },
+  { id:'waterfall',    name:'waterfall',    desc:'按 priority 升序, A 用完用 B', implemented:true },
+  { id:'priority',     name:'priority',     desc:'首选 A, A 挂了才用 B', implemented:true },
+  { id:'manual',       name:'manual',       desc:'OMR 不自动切, 用户/UI 选', implemented:true },
+  { id:'auto-fallback',name:'auto-fallback', desc:'主 provider 挂了 → 自动 fallback baozi', implemented:false },
+];
+
+// ===== 2. 用户选择 (localStorage) =====
+const SELECTIONS = JSON.parse(localStorage.getItem('omr-selections') || '{}');
+VIRTUAL_MODELS.forEach(m => {
+  if (!SELECTIONS[m.id]) SELECTIONS[m.id] = {
+    provider: PROVIDERS.find(p => p.enabled && !p.fake)?.name || PROVIDERS[0]?.name || '',
+    strategy: m.strategy || 'manual',
+    fallback: true,
+  };
+});
+const FALLBACK_GLOBAL = localStorage.getItem('omr-fallback-global') !== 'false';
+
+function saveSelections() {
+  localStorage.setItem('omr-selections', JSON.stringify(SELECTIONS));
+  localStorage.setItem('omr-fallback-global', FALLBACK_GLOBAL ? 'true' : 'false');
+}
+
+function pickProvider(modelId, providerName) {
+  SELECTIONS[modelId].provider = providerName;
+  saveSelections(); renderModels();
+  showToast(modelId + ' → ' + providerName);
+}
+function pickStrategy(modelId, stratId) {
+  SELECTIONS[modelId].strategy = stratId;
+  saveSelections(); renderModels();
+  showToast(modelId + ' 策略: ' + stratId);
+}
+function toggleFallback(modelId) {
+  SELECTIONS[modelId].fallback = !SELECTIONS[modelId].fallback;
+  saveSelections(); renderModels();
+}
+function toggleFallbackGlobal() {
+  FALLBACK_GLOBAL = !FALLBACK_GLOBAL;
+  saveSelections();
+}
+
+function copyCurl(modelId) {
+  const s = SELECTIONS[modelId];
+  const cmd = `curl -X POST http://127.0.0.1:3456/v1/chat/completions \\\n  -H "Authorization: Bearer <OMR_API_KEY>" \\\n  -H "Content-Type: application/json" \\\n  -H "x-omr-provider: ${s.provider}" \\\n  -H "x-omr-strategy: ${s.strategy}" \\\n  -d '{"model":"${modelId}","messages":[{"role":"user","content":"你好"}]}'`;
+  navigator.clipboard?.writeText(cmd);
+  showToast('已复制 curl (' + s.strategy + ' / ' + s.provider + ')');
+}
+
+// ===== 3. 渲染 =====
+function renderModels() {
+  const list = document.getElementById('model-list');
+  if (VIRTUAL_MODELS.length === 0) {
+    list.innerHTML = '<div class="card"><p class="desc">⚠️ OMR config 加载失败或为空. 检查 /root/.omr/config.json</p></div>';
+    return;
+  }
+  list.innerHTML = VIRTUAL_MODELS.map(m => {
+    const s = SELECTIONS[m.id];
+    const cur = PROVIDERS.find(p => p.name === s.provider) || {};
+    return `
+      <div class="card">
+        <h3>${m.displayName || m.id} <span style="color:var(--mut);font-size:12px;font-weight:400;">(${m.id})</span></h3>
+        <p class="desc">用户选择 vs 自动 fallback <em>看用户喜好</em> (老板 10:33 lockin).</p>
+        <div class="section-title">Provider (按钮组)</div>
+        <div class="btn-group">
+          ${PROVIDERS.map(p => `
+            <button class="btn-pick ${p.name===s.provider?'on':''} ${p.fake?'fake':''} ${!p.enabled?'planned':''}" 
+                    onclick="${p.enabled?`pickProvider('${m.id}','${p.name}')`:`showToast('${p.name} 已禁用', 'warn')`}">
+              ${p.name}${p.fake?' (mock)':''}
+            </button>
+          `).join('')}
+        </div>
+        <div class="section-title">路由策略</div>
+        <div class="btn-group">
+          ${STRATEGIES.map(st => `
+            <button class="btn-pick ${st.id===s.strategy?'on':''} ${!st.implemented?'planned':''}" 
+                    onclick="${st.implemented?`pickStrategy('${m.id}','${st.id}')`:`showToast('🚧 auto-fallback 规划中 (UI 留位)', 'warn')`}" 
+                    title="${st.desc}">
+              ${st.name}
+            </button>
+          `).join('')}
+        </div>
+        <div class="switch-row">
+          <div>
+            <div class="label">自动 fallback</div>
+            <div class="desc">主 provider 挂了 → baozi (fake)</div>
+          </div>
+          <div class="switch ${s.fallback&&FALLBACK_GLOBAL?'on':''}" onclick="toggleFallback('${m.id}')"></div>
+        </div>
+        <button class="btn-copy" onclick="copyCurl('${m.id}')">复制 curl →</button>
+        <div class="intern">
+          ${s.provider} → ${cur.models?.[0] || '?'}${cur.fake?' (fake, 仅路由)':''} · 策略: ${s.strategy}${s.fallback&&FALLBACK_GLOBAL?' + fallback':''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderProviders() {
+  document.getElementById('provider-rows').innerHTML = PROVIDERS.map(p => `
+    <div class="row">
+      <div>
+        <span class="dot ${p.enabled?'ok':''}"></span>
+        <span class="name">${p.name}</span>
+        ${p.fake?'<span class="badge fake">fake</span>':''}
+        ${!p.enabled?'<span class="badge" style="background:rgba(239,68,68,.2);color:var(--err);">disabled</span>':''}
+        <div class="meta">${p.models.length} model · key: ${p.apiKeyMasked}</div>
+        <div class="meta">${p.baseUrl || '(no baseUrl)'}</div>
+      </div>
+    </div>
+  `).join('') || '<div class="card"><p class="desc">⚠️ 0 provider, 检查 config.json</p></div>';
+}
+
+function renderStats() {
+  const ok = PROVIDERS.filter(p => p.enabled && !p.fake).length;
+  const fake = PROVIDERS.filter(p => p.fake).length;
+  const off = PROVIDERS.filter(p => !p.enabled).length;
+  document.getElementById('stat-grid').innerHTML = `
+    <div class="stat"><div class="label">Provider</div><div class="value">${PROVIDERS.length}</div><div class="sub">${ok} 在线 · ${fake} fake · ${off} 禁用</div></div>
+    <div class="stat"><div class="label">虚拟模型</div><div class="value">${VIRTUAL_MODELS.length}</div><div class="sub">${VIRTUAL_MODELS.filter(v => v.userSelectable).length} 用户可选</div></div>
+    <div class="stat"><div class="label">策略</div><div class="value">${STRATEGIES.filter(s => s.implemented).length}/${STRATEGIES.length}</div><div class="sub">已实现 / 规划中</div></div>
+    <div class="stat"><div class="label">Config</div><div class="value">${CONFIG_BYTES}</div><div class="sub">bytes · ${CONFIG_MTIME}</div></div>
+  `;
+}
+
+// ===== 4. OMR 真 RPC 验证 (fetch /health 不需 auth, /v1/models 要 admin key) =====
+async function verifyOMR() {
+  const statusEl = document.getElementById('rpc-status');
+  const subTitle = document.getElementById('sub-title');
+  const hDot = document.getElementById('h-dot');
+  const hStatus = document.getElementById('h-status');
+  const hErr = document.getElementById('h-err');
+  statusEl.textContent = '⏳ 验证中...';
+  // 4.1 /health (无需 auth, 验证 OMR 在线)
+  try {
+    const rh = await fetch('http://127.0.0.1:3456/health', { signal: AbortSignal.timeout(3000) });
+    if (!rh.ok) throw new Error(`HTTP ${rh.status}`);
+    const dh = await rh.json();
+    statusEl.textContent = `✅ OMR /health 200, core=${dh.core || '?'}, ts=${(dh.timestamp||'').slice(11,19)}`;
+    hDot.className = 'dot ok';
+    hStatus.textContent = 'OMR 在线';
+    hErr.textContent = '';
+    subTitle.textContent = `v0.1.0 · ${PROVIDERS.length} provider · ${VIRTUAL_MODELS.length} v-model · OMR 在线`;
+    showToast(`✅ OMR 在线 (core ${dh.core || 'unknown'})`, 'ok');
+  } catch (e) {
+    statusEl.textContent = `❌ OMR /health 不可达: ${e.message}`;
+    hDot.className = 'dot err';
+    hStatus.textContent = 'OMR 离线';
+    hErr.textContent = e.message.slice(0, 100);
+    showToast(`❌ OMR 不可达: ${e.message}`, 'err');
+    return;  // /health 失败就别试 /v1/models 了
+  }
+  // 4.2 /v1/models (要 admin key, 验证 OMR 真暴露模型列表)
+  try {
+    const rm = await fetch('http://127.0.0.1:3456/v1/models', {
+      method: 'GET',
+      headers: { 'Authorization': 'Bearer ***' },  // OMR admin key 由 SSR 注入
+      signal: AbortSignal.timeout(3000),
+    });
+    if (rm.status === 401 || rm.status === 403) {
+      statusEl.textContent += ` · /v1/models 401 (需要 admin key, SSR 注入了 fake, 真 key 在 /root/.omr/.admin-key)`;
+      return;
+    }
+    if (!rm.ok) throw new Error(`HTTP ${rm.status}`);
+    const dm = await rm.json();
+    const models = dm.data || dm.models || [];
+    statusEl.textContent += ` · /v1/models ${models.length} 个 model`;
+  } catch (e) {
+    // /v1/models 失败不影响 /health 已显示 OMR 在线
+  }
+}
+
+// ===== 5. Toast (支持 ok/err/warn 三色) =====
+function showToast(msg, kind = 'ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + (kind === 'err' ? 'err' : kind === 'warn' ? 'warn' : '');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ===== 6. Onboarding =====
+function showOnboarding() {
+  document.getElementById('onboarding').classList.remove('hidden');
+}
+function completeOnboarding() {
+  localStorage.setItem('omr-onboarded', 'true');
+  document.getElementById('onboarding').classList.add('hidden');
+}
+function skipOnboarding() {
+  localStorage.setItem('omr-onboarded', 'skip');
+  document.getElementById('onboarding').classList.add('hidden');
+}
+
+// ===== 7. Tab 切换 =====
+document.querySelectorAll('nav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('on'));
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
+    btn.classList.add('on');
+    document.getElementById('screen-' + btn.dataset.tab).classList.add('on');
+    if (btn.dataset.tab === 'usage') verifyOMR();  // 进用量屏自动验证
+  });
+});
+
+// ===== 8. 初始化 =====
+document.getElementById('sub-title').textContent = 
+  `v0.1.0 · ${PROVIDERS.length} provider · ${VIRTUAL_MODELS.length} v-model · manual 策略`;
+document.getElementById('h-meta').textContent = `config: ${CONFIG_BYTES} bytes · ${CONFIG_MTIME}`;
+
+renderModels();
+renderProviders();
+renderStats();
+
+// 第 1 次访问显示 onboarding
+const onboarded = localStorage.getItem('omr-onboarded');
+if (!onboarded) showOnboarding();
+
+// 默认进首页时验证一次 OMR 真状态
+verifyOMR();
+</script>
+</body>
+</html>
