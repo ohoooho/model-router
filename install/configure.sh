@@ -44,23 +44,38 @@ ADMIN_API_KEY=""
 LICENSE_PATH=""
 LICENSE_JSON=""
 
-if [ -f "${CONTEXT_FILE}" ] && command -v jq >/dev/null; then
+context_value() {
+    # Read a value from the protected JSON snapshot without requiring jq.
+    # Arguments after the file are object keys; dotted keys are not parsed.
+    node - "$CONTEXT_FILE" "$@" <<'NODE'
+const fs = require('node:fs');
+const file = process.argv[2];
+const keys = process.argv.slice(3);
+let value = JSON.parse(fs.readFileSync(file, 'utf8'));
+for (const key of keys) value = value?.[key];
+if (value === undefined || value === null) process.stdout.write('');
+else if (typeof value === 'object') process.stdout.write(JSON.stringify(value));
+else process.stdout.write(String(value));
+NODE
+}
+
+if [ -f "${CONTEXT_FILE}" ]; then
     echo "    从 context.json 读 inputs (契约 §6.2)"
-    PERMS=$(stat -c '%a' "${CONTEXT_FILE}" 2>/dev/null || echo "")
+    PERMS=$(stat -c '%a' "${CONTEXT_FILE}" 2>/dev/null || stat -f '%Lp' "${CONTEXT_FILE}" 2>/dev/null || echo "")
     if [ "${PERMS}" != "600" ] && [ -n "${PERMS}" ]; then
         echo "WARN: context.json 权限 ${PERMS} 不是 0600, 自动 chmod"
         chmod 600 "${CONTEXT_FILE}"
     fi
-    BAOZI_PERSONA_KEY=$(jq -r '.inputs.baozi_persona_key.value // empty' "${CONTEXT_FILE}" 2>/dev/null || echo "")
-    BAOZI_BUTLER_KEY=$(jq -r '.inputs.baozi_butler_key.value // empty' "${CONTEXT_FILE}" 2>/dev/null || echo "")
-    BAOZI_API_KEY=$(jq -r '.inputs.baozi_api_key.value // empty' "${CONTEXT_FILE}" 2>/dev/null || echo "")
+    BAOZI_PERSONA_KEY=$(context_value inputs baozi_persona_key value)
+    BAOZI_BUTLER_KEY=$(context_value inputs baozi_butler_key value)
+    BAOZI_API_KEY=$(context_value inputs baozi_api_key value)
     # K-261 锁点: 4 场景 baozi_key 从 scene_key_map 读
-    BAOZI_CHAT_KEY=$(jq -r '.inputs.scene_key_map.value."chat-auto" // empty' "${CONTEXT_FILE}" 2>/dev/null | sed 's/{{BAOZI_CHAT_KEY}}//' || echo "")
-    BAOZI_CODING_KEY=$(jq -r '.inputs.scene_key_map.value."coding-auto" // empty' "${CONTEXT_FILE}" 2>/dev/null | sed 's/{{BAOZI_CODING_KEY}}//' || echo "")
-    BAOZI_ASSIST_KEY=$(jq -r '.inputs.scene_key_map.value."assist-auto" // empty' "${CONTEXT_FILE}" 2>/dev/null | sed 's/{{BAOZI_ASSIST_KEY}}//' || echo "")
-    BAOZI_TEAM_KEY=$(jq -r '.inputs.scene_key_map.value."team-auto" // empty' "${CONTEXT_FILE}" 2>/dev/null | sed 's/{{BAOZI_TEAM_KEY}}//' || echo "")
-    ADMIN_API_KEY=$(jq -r '.inputs.omr_admin_api_key.value // empty' "${CONTEXT_FILE}" 2>/dev/null || echo "")
-    LICENSE_PATH=$(jq -r '.inputs.license_path.value // empty' "${CONTEXT_FILE}" 2>/dev/null || echo "")
+    BAOZI_CHAT_KEY=$(context_value inputs scene_key_map value chat-auto | sed 's/{{BAOZI_CHAT_KEY}}//')
+    BAOZI_CODING_KEY=$(context_value inputs scene_key_map value coding-auto | sed 's/{{BAOZI_CODING_KEY}}//')
+    BAOZI_ASSIST_KEY=$(context_value inputs scene_key_map value assist-auto | sed 's/{{BAOZI_ASSIST_KEY}}//')
+    BAOZI_TEAM_KEY=$(context_value inputs scene_key_map value team-auto | sed 's/{{BAOZI_TEAM_KEY}}//')
+    ADMIN_API_KEY=$(context_value inputs omr_admin_api_key value)
+    LICENSE_PATH=$(context_value inputs license_path value)
 fi
 
 # 兼容老调用方式 (环境变量 fallback, 失职 125 铁律: 不打印)
@@ -121,6 +136,11 @@ echo "==> 1) backup 已有 config (契约 §7.2)"
 if [ -f "${CONFIG_DB}" ]; then
     BACKUP="${CONFIG_DB}.bak-$(date +%Y%m%d-%H%M%S)"
     cp "${CONFIG_DB}" "${BACKUP}"
+    # SQLite in WAL mode is a three-file database. Keep sidecars with the
+    # backup so a running/aborted process can be restored consistently.
+    for SIDE in "${CONFIG_DB}-wal" "${CONFIG_DB}-shm"; do
+        [ -f "${SIDE}" ] && cp "${SIDE}" "${BACKUP}$(printf '%s' "${SIDE}" | sed "s#${CONFIG_DB}##")"
+    done
     chmod 600 "${BACKUP}"
     echo "    backup → ${BACKUP}"
 fi

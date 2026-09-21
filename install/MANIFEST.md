@@ -32,7 +32,7 @@ omr-<semver>-fork<base>+p<n>
 | `e2e-test.sh` | 真路由测试 | ✅ | install/e2e-test.sh |
 | `backup.sh` | 备份 config | ✅ | install/backup.sh |
 | `rollback.sh` | 回滚 | ✅ | install/rollback.sh |
-| `uninstall.sh` | §7.4 卸载 (TODO: 复用 rollback) | ⏳ | — |
+| `uninstall.sh` | §7.4 卸载并保留用户数据 | ✅ | install/uninstall.sh |
 | `omr.service` | systemd unit | ✅ | install/omr.service |
 | `config.template.json` | 旧版兼容 | ⏳ deprecated | install/config.template.json |
 | `web-ui.template.html` | Web UI (SSR) | ✅ | install/web-ui.template.html |
@@ -46,7 +46,7 @@ verify.sh 输出 4 状态:
 | 状态 | 检查项 | 123 端当前 |
 |---|---|---|
 | installed | ccr 命令 + 装包目录 + package.json | ✅ |
-| configured | config.sqlite + schema 合法 + providers ≥ 2 + vmodels ≥ 3 | ❌ (没跑 configure) |
+| configured | config.sqlite + 六表 schema + app_config.default.Providers ≥ 1 | ✅ (configure.sh 已验证) |
 | healthy | omr.service active + 3456/3458 端口 | ❌ (失职 215 没装 service) |
 | upstream_ready | POST /v1/chat/completions = 200 | ⏳ (待 3456 起来) |
 
@@ -124,4 +124,3 @@ verify.sh 输出 4 状态:
 - 失职 262: python3 batch edit line 73 assert 失败 (old text 不匹配)
 - 失职 263: omr.service 是 2 行 Environment=, 不是 1 行, batch 失败
 - 失职 264: component.context.json 加 JS // 注释, JSON 不支持
-

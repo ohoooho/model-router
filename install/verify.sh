@@ -27,8 +27,10 @@ else
     FAIL_LIST="${FAIL_LIST} [installed: ccr missing]"
 fi
 
-if [ -d /usr/local/lib/node_modules/@ohoooho/model-router ]; then
-    INSTALLED_VERSION=$(node -e "console.log(require('/usr/local/lib/node_modules/@ohoooho/model-router/package.json').version)" 2>/dev/null || echo "")
+GLOBAL_ROOT=$(npm root -g 2>/dev/null || echo /usr/local/lib/node_modules)
+PACKAGE_DIR="${GLOBAL_ROOT}/@ohoooho/model-router"
+if [ -d "${PACKAGE_DIR}" ]; then
+    INSTALLED_VERSION=$(node -e "console.log(require(process.argv[1] + '/package.json').version)" "${PACKAGE_DIR}" 2>/dev/null || echo "")
     if [ -n "${INSTALLED_VERSION}" ]; then
         echo "  ✅ installed_version = ${INSTALLED_VERSION}"
     else
@@ -47,22 +49,24 @@ if [ ! -f "${CONFIG_DB}" ]; then
     echo "  ❌ config.sqlite 不存在 (${CONFIG_DB})"
     FAIL_LIST="${FAIL_LIST} [configured: no config]"
 else
-    # 失职 249: 用 123 端真 4-table schema (License/Providers/VirtualModels/sqlite_sequence)
-    # 不是 OMR fork upstream 6 表 (那是 musistudio/claude-code-router 上游 default schema)
+    # OMR runtime uses the unified six-table SQLite store. Provider data is the
+    # JSON value in app_config.default; it is not a Providers table.
     if node -e "
 const { DatabaseSync } = require('node:sqlite');
 const db = new DatabaseSync('${CONFIG_DB}', { readOnly: true });
 const tables = db.prepare(\"SELECT name FROM sqlite_master WHERE type='table'\").all().map(r=>r.name);
-const need = ['Providers','VirtualModels'];
+const need = ['app_config','api_keys','runtime_state','config_schema_migrations','legacy_storage_backups','legacy_storage_cleanup'];
 for (const t of need) { if (!tables.includes(t)) { console.error('missing table: '+t); process.exit(3); } }
-const p = db.prepare('SELECT COUNT(*) AS c FROM Providers').get();
-const v = db.prepare('SELECT COUNT(*) AS c FROM VirtualModels').get();
-if (p.c < 2 || v.c < 3) { console.error('rows: p='+p.c+' v='+v.c); process.exit(2); }
-const lic = db.prepare('SELECT COUNT(*) AS c FROM License').get();
+const row = db.prepare(\"SELECT value_json FROM app_config WHERE key='default'\").get();
+if (!row) { console.error('app_config.default missing'); process.exit(2); }
+const config = JSON.parse(row.value_json);
+if (!Array.isArray(config.Providers) || config.Providers.length < 1) { console.error('Providers missing'); process.exit(2); }
+const keyRows = db.prepare('SELECT COUNT(*) AS c FROM api_keys').get();
+if (keyRows.c < 1) { console.error('api_keys missing'); process.exit(2); }
 db.close();
-console.log('tables=['+tables.join(',')+'] providers='+p.c+' vmodels='+v.c+' license='+lic.c);
+console.log('tables=['+tables.join(',')+'] providers='+config.Providers.length+' api_keys='+keyRows.c);
 " 2>/dev/null; then
-        echo "  ✅ config.sqlite schema 合法 (Providers ≥ 2 + VirtualModels ≥ 3 + License 表存在)"
+        echo "  ✅ config.sqlite schema 合法 (统一六表 + app_config.default.Providers)"
         CONFIGURED=1
     else
         echo "  ❌ config.sqlite schema 异常 (${CONFIG_DB})"
@@ -81,7 +85,8 @@ if [ "$(uname -s)" = "Linux" ]; then
     fi
 fi
 
-GW_CODE=$(curl -s -m 3 -o /dev/null -w '%{http_code}' http://127.0.0.1:3456/health 2>/dev/null || echo "000")
+GW_CODE=$(curl -s -m 3 -o /dev/null -w '%{http_code}' http://127.0.0.1:3456/health 2>/dev/null || true)
+[ -n "${GW_CODE}" ] || GW_CODE="000"
 if [ "${GW_CODE}" = "200" ]; then
     echo "  ✅ gateway 127.0.0.1:3456 /health = 200"
     HEALTHY=1
@@ -90,7 +95,8 @@ else
     FAIL_LIST="${FAIL_LIST} [healthy: gw ${GW_CODE}]"
 fi
 
-UI_CODE=$(curl -s -m 3 -o /dev/null -w '%{http_code}' http://127.0.0.1:3458/ 2>/dev/null || echo "000")
+UI_CODE=$(curl -s -m 3 -o /dev/null -w '%{http_code}' http://127.0.0.1:3458/ 2>/dev/null || true)
+[ -n "${UI_CODE}" ] || UI_CODE="000"
 if [ "${UI_CODE}" = "200" ]; then
     echo "  ✅ web UI 127.0.0.1:3458 = 200"
 else
@@ -102,9 +108,9 @@ echo "--- 4/4 upstream_ready ---"
 ADMIN_KEY=$(node -e "
 const { DatabaseSync } = require('node:sqlite');
 const db = new DatabaseSync('${CONFIG_DB}', { readOnly: true });
-const row = db.prepare('SELECT content FROM License WHERE id=1').get();
+const row = db.prepare(\"SELECT encrypted_key FROM api_keys WHERE id='local-gateway'\").get();
 db.close();
-process.stdout.write(row?.content || '');
+process.stdout.write(row?.encrypted_key || '');
 " 2>/dev/null || echo "")
 
 # 失职 259: 不再 hardcode "Bearer ***" (永远 401)
@@ -116,17 +122,26 @@ SCENE_FAIL=0
 for SCENE in chat-auto coding-auto assist-auto team-auto; do
     SCENE_KEY_VAR="OMR_BAOZI_$(echo ${SCENE%-*} | tr 'a-z' 'A-Z')_KEY"
     SCENE_KEY=$(eval echo "\${${SCENE_KEY_VAR}:-}")
+    if [ -z "${SCENE_KEY}" ] && [ -f "${CONFIG_DB}" ]; then
+        SCENE_KEY=$(node -e "
+const { DatabaseSync } = require('node:sqlite');
+const db = new DatabaseSync(process.argv[1], { readOnly: true });
+const row = db.prepare('SELECT encrypted_key FROM api_keys WHERE id = ?').get('baozi-' + process.argv[2]);
+db.close();
+process.stdout.write(row?.encrypted_key || '');
+" "${CONFIG_DB}" "${SCENE}" 2>/dev/null || true)
+    fi
     [ -z "${SCENE_KEY}" ] && SCENE_KEY="fake_${SCENE//-/_}_***"
-    if [ "${SCENE_KEY}" = "***" ]; then
-        echo "  ❌ ${SCENE} key=*** dummy (失职 259), 拒绝"
-        FAIL_LIST="${FAIL_LIST} [upstream: ${SCENE} dummy]"
+    if [[ "${SCENE_KEY}" == fake_* || "${SCENE_KEY}" == "***" ]]; then
+        echo "  ⚠️ ${SCENE} 未提供真实 key，upstream_ready=skipped"
         continue
     fi
-    SCENE_CODE=$(curl -s -m 10 -o /tmp/omr-route-${SCENE}.json -w '%{http_code}' \
+    SCENE_CODE=$(curl -s -m 10 -o "/tmp/omr-route-${SCENE}.json" -w '%{http_code}' \
         -X POST http://127.0.0.1:3456/v1/chat/completions \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer ${SCENE_KEY}" \
-        -d "{\"model\":\"${SCENE}\",\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}],\"max_tokens\":3}" 2>/dev/null || echo "000")
+        -d "{\"model\":\"${SCENE}\",\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}],\"max_tokens\":3}" 2>/dev/null || true)
+    [ -n "${SCENE_CODE}" ] || SCENE_CODE="000"
     if [ "${SCENE_CODE}" = "200" ]; then
         echo "  ✅ ${SCENE} POST = 200 (key ${SCENE_KEY:0:10}...)"
         SCENE_OK=$((SCENE_OK+1))

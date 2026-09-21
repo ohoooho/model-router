@@ -24,10 +24,12 @@ component:
 # 产品默认版本可以随发行清单更新；一次具体安装会解析为 resolved_version。
 release:
   default_channel: stable
-  default_version: 0.1.0-fork3.0.18+p5   # 老板 lockin semver + fork base + patch count (建议 7)
+  # Must match packages/cli/package.json and the published npm package.
+  # Fork/patch provenance belongs in _internal, not in the installable version.
+  default_version: 0.1.0
   channels:
     stable:
-      version: 0.1.0-fork3.0.18+p5
+      version: 0.1.0
     beta:
       version: 0.2.0-fork3.0.18+p6        # 下一版, 占位 (实际未发布)
 
@@ -50,7 +52,6 @@ dependencies:
       version: ">=22.0.0"      # 123 端实测 v22.19.0
     - id: npm
       version: ">=10.0.0"      # 123 端实测 10.9.3
-    - id: systemd              # linux 守护; macos 用 launchd (TODO)
   components: []               # 暂不依赖其他桃仙组件 (OpenClaw 还没装到 taoxian)
 
 # 安装/运行时网络要求。安装物料网络和上游 API 网络分开声明。
@@ -228,7 +229,7 @@ paths:
 
 permissions:
   requires_admin: true             # 写 /usr/local/lib + /etc/systemd/system 需要 root
-  system_write: true               # 写 systemd unit
+  system_write: true               # Linux 写 systemd unit；macOS 仅安装用户可启动的 CLI
   modifies_shell_profile: false
   registers_background_service: true   # omr.service
   creates_user_data_dir: true      # ~/.omr (首次装)
@@ -256,7 +257,7 @@ verification:
   checks:
     - executable_available           # 命令存在
     - version_matches                # 实际版本 = resolved_version
-    - config_valid                   # config.sqlite 结构 + 必填字段
+    - config_valid                   # config.sqlite 结构 + app_config.default
     - runtime_dependency_valid       # node ≥22 + npm ≥10
     - background_service_active      # omr.service active (linux)
     - gateway_port_open              # 127.0.0.1:3456 listening

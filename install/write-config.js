@@ -145,6 +145,47 @@ upsertConfig.run('gateway', JSON.stringify(OMR_CONFIG.gateway));
 upsertConfig.run('baozi', JSON.stringify(OMR_CONFIG.baozi));
 upsertConfig.run('virtual_models', JSON.stringify(OMR_CONFIG.virtual_models));
 
+// 5.1 写运行时真正读取的 default 快照。
+// loadAppConfig() 读取 app_config.default；上面的命名空间记录是 OMR
+// 安装元数据，不能替代运行时 AppConfig。保留用户已有 Providers，只
+// 增量更新/添加桃仙 baozi provider。
+const defaultRow = db.prepare("SELECT value_json FROM app_config WHERE key='default'").get();
+let defaultConfig = {};
+if (defaultRow?.value_json) {
+  try { defaultConfig = JSON.parse(defaultRow.value_json); } catch { defaultConfig = {}; }
+}
+const providerModels = ['MiniMax-M3', 'claude-sonnet-4-5', 'kimi-k2.6', 'kimi-k2.7-code', 'deepseek-v3', 'qwen3-max', 'glm-4.6'];
+const existingProviders = Array.isArray(defaultConfig.Providers) ? defaultConfig.Providers : [];
+const baoziProvider = {
+  ...(existingProviders.find((provider) => provider && provider.name === 'baozi') || {}),
+  name: 'baozi',
+  baseUrl: process.env.BAOZI_API_BASE || 'https://llm.ohoooho.com/v1',
+  apiKey: process.env.BUTLER_BAOZI_KEY || '',
+  models: providerModels,
+};
+const otherProviders = existingProviders.filter((provider) => provider && provider.name !== 'baozi');
+const router = defaultConfig.Router && typeof defaultConfig.Router === 'object' ? defaultConfig.Router : {};
+const fallback = router.fallback && typeof router.fallback === 'object' ? router.fallback : {};
+upsertConfig.run('default', JSON.stringify({
+  ...defaultConfig,
+  Providers: [baoziProvider, ...otherProviders],
+  preferredProvider: defaultConfig.preferredProvider || 'baozi',
+  Router: {
+    ...router,
+    fallback: {
+      ...fallback,
+      models: Array.isArray(fallback.models) && fallback.models.length > 0
+        ? fallback.models
+        : ['baozi,MiniMax-M3'],
+    },
+  },
+  gateway: {
+    ...(defaultConfig.gateway || {}),
+    host: process.env.OMR_GATEWAY_HOST || defaultConfig.gateway?.host || '127.0.0.1',
+    port: parseInt(process.env.OMR_GATEWAY_PORT || defaultConfig.gateway?.port || '3456', 10),
+  },
+}));
+
 // 6. 写 api_keys: 加密存 (OMR fork 默认用 'plain', 失职 232 立刻修: 真加密用 libsodium)
 const upsertApiKey = db.prepare(`
   INSERT INTO api_keys (id, name, encrypted_key, encryption, created_at, expires_at, limits_json)

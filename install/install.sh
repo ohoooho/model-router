@@ -9,7 +9,7 @@
 # 5. online/offline 双轨 (老板 14:29 lockin + 契约 §10)
 #
 # 用法: 见 README.md
-set -uo pipefail
+set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPONENT_YAML="${SCRIPT_DIR}/component.yaml"
@@ -57,8 +57,10 @@ command -v npm >/dev/null || { echo "ERR: npm 未装"; exit 1; }
 ARTIFACT_SHA256=""
 if [ "${OMR_INSTALL_MODE}" = "online" ]; then
     echo "==> 1) online: npm install -g @ohoooho/model-router@${OMR_VERSION} (契约 §3.1: 必须 @version)"
-    if ! curl -m 3 -sf https://npm.ohoooho.com/ -o /dev/null; then
-        echo "WARN: npm 仓不通, 自动转 offline 模式"
+    # Let npm use its configured registry/proxy. A separate curl probe can
+    # disagree with npmrc and incorrectly force an offline install.
+    if ! npm view "@ohoooho/model-router@${OMR_VERSION}" version --fetch-timeout=5000 --fetch-retries=0 >/dev/null 2>&1; then
+        echo "WARN: npm registry 中找不到目标版本, 自动转 offline 模式"
         OMR_INSTALL_MODE="offline"
     else
         # 关键修复: 必须 @版本 (失职 217 立刻修)
@@ -115,14 +117,21 @@ if [ "$(uname -s)" = "Linux" ]; then
     cp "${SCRIPT_DIR}/omr.service" /etc/systemd/system/omr.service
     systemctl daemon-reload
     systemctl enable omr.service
-    # 失职 215 立刻修: 装机后必须立刻启 (K-277 守护进程)
-    systemctl restart omr.service
-    echo "    omr.service enabled + restarted"
+    echo "    omr.service installed + enabled; start deferred until after configure"
 fi
 
 # ===== 6. 配置 (下一步: configure.sh) =====
 echo "==> 4) call configure.sh"
-OMR_VERSION="${INSTALLED_VERSION}" bash "${SCRIPT_DIR}/configure.sh"
+if [ "${OMR_SKIP_CONFIGURE:-0}" = "1" ]; then
+    echo "==> 4) configure deferred to the Installer lifecycle"
+else
+    TX_CONTEXT_FILE="${TX_CONTEXT_FILE:-}" OMR_VERSION="${INSTALLED_VERSION}" bash "${SCRIPT_DIR}/configure.sh"
+fi
+
+if [ "$(uname -s)" = "Linux" ] && [ "${OMR_SKIP_CONFIGURE:-0}" != "1" ]; then
+    systemctl restart omr.service
+    echo "    omr.service restarted after configure"
+fi
 
 # ===== 7. 输出契约 §3.4 安装报告字段 =====
 echo ""
@@ -142,20 +151,5 @@ EOF
 echo ""
 echo "✅ OMR install 完. 跑 verify.sh 4 状态真验证."
 
-# === K-261 锁点: 4 场景 baozi_key fake 占位 (老板 07:51 lockin) ===
-# 装机时如果没传 4 场景 baozi_key, 自动生成 fake_<scene>_*** 占位
-# 写 /etc/taoxian/omr.env (供 configure.sh + write-config.js 读)
-mkdir -p /etc/taoxian
-cat > /etc/taoxian/omr.env <<EOF
-# 4 场景 baozi_key (K-261 锁点, 老板 07:51 lockin: 不同场景不同 key)
-BAOZI_CHAT_KEY="${BAOZI_CHAT_KEY:-fake_chat_***}"
-BAOZI_CODING_KEY="${BAOZI_CODING_KEY:-fake_coding_***}"
-BAOZI_ASSIST_KEY="${BAOZI_ASSIST_KEY:-fake_assist_***}"
-BAOZI_TEAM_KEY="${BAOZI_TEAM_KEY:-fake_team_***}"
-# 双 baozi_key (老板 17:42 lockin: persona + butler)
-PERSONA_BAOZI_KEY="${PERSONA_BAOZI_KEY:-fake_persona_***}"
-BUTLER_BAOZI_KEY="${BUTLER_BAOZI_KEY:-fake_butler_***}"
-EOF
-chmod 0600 /etc/taoxian/omr.env
-echo "✅ 4 场景 baozi_key fake 占位已写 /etc/taoxian/omr.env (K-261 锁点)"
-
+# Secrets are supplied through TX_CONTEXT_FILE. Do not create a second,
+# stale copy under /etc: the next configure must resolve one consistent snapshot.
