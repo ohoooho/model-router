@@ -79,15 +79,18 @@ if [ -f "${INSTALL_DIR}/package.json" ]; then
 fi
 
 if [ "${SKIPPED_EXISTING}" -eq 0 ]; then
-    NPM_WRITE_TARGET="${NPM_ROOT}"
-    while [ ! -e "${NPM_WRITE_TARGET}" ] && [ "${NPM_WRITE_TARGET}" != "/" ]; do
-        NPM_WRITE_TARGET="$(dirname "${NPM_WRITE_TARGET}")"
+    for NPM_WRITE_PATH in "${NPM_ROOT}" "${BIN_DIR}"; do
+        NPM_WRITE_TARGET="${NPM_WRITE_PATH}"
+        while [ ! -e "${NPM_WRITE_TARGET}" ] && [ "${NPM_WRITE_TARGET}" != "/" ]; do
+            NPM_WRITE_TARGET="$(dirname "${NPM_WRITE_TARGET}")"
+        done
+        if [ ! -w "${NPM_WRITE_TARGET}" ]; then
+            echo "ERR: npm 全局路径不可写: ${NPM_WRITE_PATH}"
+            echo "    当前可写检查落点: ${NPM_WRITE_TARGET}"
+            echo "    请修复当前 Node 管理器目录权限，或由用户自行处理权限；安装器不会修改 npm prefix。"
+            exit 7
+        fi
     done
-    if [ ! -w "${NPM_WRITE_TARGET}" ]; then
-        echo "ERR: npm 全局目录不可写: ${NPM_WRITE_TARGET}"
-        echo "    请使用当前 Node 管理器提供的可写 npm prefix，或由用户自行处理权限；安装器不会修改 npm prefix。"
-        exit 7
-    fi
 fi
 
 # ===== 3. 装包 (online/offline) =====
