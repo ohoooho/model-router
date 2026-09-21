@@ -19,12 +19,28 @@ echo "==> OMR 4 状态真验证 (契约 §7.3)"
 
 # === 1. installed 状态 (契约 §7.3) ===
 echo "--- 1/4 installed ---"
-if [ -x /usr/local/bin/ccr ] || command -v ccr >/dev/null; then
-    echo "  ✅ ccr 命令存在"
+OMR_COMMAND=""
+for OMR_NAME in ccr omr model-router; do
+    if command -v "${OMR_NAME}" >/dev/null 2>&1; then
+        OMR_COMMAND="$(command -v "${OMR_NAME}")"
+        break
+    fi
+done
+if [ -z "${OMR_COMMAND}" ] && command -v npm >/dev/null 2>&1; then
+    OMR_PREFIX=$(npm prefix -g 2>/dev/null || true)
+    for OMR_NAME in ccr omr model-router; do
+        if [ -x "${OMR_PREFIX}/bin/${OMR_NAME}" ]; then
+            OMR_COMMAND="${OMR_PREFIX}/bin/${OMR_NAME}"
+            break
+        fi
+    done
+fi
+if [ -n "${OMR_COMMAND}" ]; then
+    echo "  ✅ OMR 命令存在: ${OMR_COMMAND}"
     INSTALLED=1
 else
-    echo "  ❌ ccr 命令不存在"
-    FAIL_LIST="${FAIL_LIST} [installed: ccr missing]"
+    echo "  ❌ OMR 命令不存在"
+    FAIL_LIST="${FAIL_LIST} [installed: omr command missing]"
 fi
 
 GLOBAL_ROOT=$(npm root -g 2>/dev/null || echo /usr/local/lib/node_modules)
