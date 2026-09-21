@@ -28,10 +28,19 @@ export const cliMainOutDir = path.join(cliDistDir, "main");
 export const coreMainOutDir = path.join(coreDistDir, "main");
 export const electronMainOutDir = path.join(electronDistDir, "main");
 export const mainOutDir = electronMainOutDir;
-export const gatewayPackageRoot = path.dirname(requireFromHere.resolve("@the-next-ai/ai-gateway/package.json"));
+// Resolve the package entry instead of its package.json subpath. Newer
+// dependencies may expose package.json through `exports`, while Node still
+// allows resolving the public package entry.
+export const gatewayPackageRoot = path.resolve(
+  path.dirname(requireFromHere.resolve("@the-next-ai/ai-gateway")),
+  "..",
+);
 export const gatewayRuntimeInput = path.join(gatewayPackageRoot, "bin", "next-ai-gateway.js");
 export const electronGatewayRuntimeOutput = path.join(electronMainOutDir, "next-ai-gateway.js");
-export const botGatewaySdkPackageRoot = path.dirname(requireFromHere.resolve("@the-next-ai/bot-gateway-sdk/package.json"));
+export const botGatewaySdkPackageRoot = path.resolve(
+  path.dirname(requireFromHere.resolve("@the-next-ai/bot-gateway-sdk")),
+  "..",
+);
 export const botGatewaySdkEntryInput = path.join(botGatewaySdkPackageRoot, "dist", "index.js");
 export const botGatewaySdkRunnerInput = path.join(botGatewaySdkPackageRoot, "bin", "bot-gateway-stdio.mjs");
 export const electronBotGatewaySdkRootDir = path.join(electronMainOutDir, "bot-gateway-sdk");

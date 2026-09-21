@@ -23,10 +23,8 @@ OMR_REQUESTED_VERSION="${OMR_VERSION:-}"
 OMR_VERSION="${OMR_REQUESTED_VERSION:-${DEFAULT_VERSION}}"
 OMR_VERSION_POLICY="${OMR_VERSION_POLICY:-default}"
 OMR_INSTALL_MODE="${OMR_INSTALL_MODE:-online}"
-OMR_TARBALL="${OMR_TARBALL:-/opt/taoxian/omr/omr-${OMR_VERSION}.tar.gz}"
-OMR_OFFLINE_TARBALL_DIR="${OMR_OFFLINE_TARBALL_DIR:-/opt/taoxian/omr/}"
-INSTALL_DIR="/usr/local/lib/node_modules/@ohoooho/model-router"
-BIN_DIR="/usr/local/bin"
+OMR_OFFLINE_TARBALL_DIR="${OMR_OFFLINE_TARBALL_DIR:-${SCRIPT_DIR}/../artifacts}"
+OMR_TARBALL="${OMR_TARBALL:-${OMR_OFFLINE_TARBALL_DIR}/omr-${OMR_VERSION}.tgz}"
 
 for arg in "$@"; do
     case "$arg" in
@@ -53,9 +51,48 @@ NODE_MAJOR=$(node -e "console.log(process.versions.node.split('.')[0])")
 [ "${NODE_MAJOR}" -ge 22 ] || { echo "ERR: node ≥ 22 要求, 现在 v${NODE_MAJOR}"; exit 1; }
 command -v npm >/dev/null || { echo "ERR: npm 未装"; exit 1; }
 
+# Do not change npm's prefix. Resolve the active installation locations from
+# the user's current Node/npm distribution (Homebrew, nvm, system Node, ...).
+NPM_PREFIX="$(npm prefix -g)"
+NPM_ROOT="$(npm root -g)"
+INSTALL_DIR="${NPM_ROOT}/@ohoooho/model-router"
+BIN_DIR="${NPM_PREFIX}/bin"
+echo "    npm_prefix: ${NPM_PREFIX}"
+echo "    npm_root:   ${NPM_ROOT}"
+
+sha256_file() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    else
+        shasum -a 256 "$1" | awk '{print $1}'
+    fi
+}
+
+# A component script must also be safe when called without the Taoxian
+# detector. Never replace an existing package behind the user's back.
+SKIPPED_EXISTING=0
+INSTALLED_VERSION=""
+if [ -f "${INSTALL_DIR}/package.json" ]; then
+    INSTALLED_VERSION=$(node -e 'console.log(require(process.argv[1]).version)' "${INSTALL_DIR}/package.json")
+    echo "==> OMR 已安装（version=${INSTALLED_VERSION}），跳过覆盖/升级"
+    SKIPPED_EXISTING=1
+fi
+
+if [ "${SKIPPED_EXISTING}" -eq 0 ]; then
+    NPM_WRITE_TARGET="${NPM_ROOT}"
+    while [ ! -e "${NPM_WRITE_TARGET}" ] && [ "${NPM_WRITE_TARGET}" != "/" ]; do
+        NPM_WRITE_TARGET="$(dirname "${NPM_WRITE_TARGET}")"
+    done
+    if [ ! -w "${NPM_WRITE_TARGET}" ]; then
+        echo "ERR: npm 全局目录不可写: ${NPM_WRITE_TARGET}"
+        echo "    请使用当前 Node 管理器提供的可写 npm prefix，或由用户自行处理权限；安装器不会修改 npm prefix。"
+        exit 7
+    fi
+fi
+
 # ===== 3. 装包 (online/offline) =====
 ARTIFACT_SHA256=""
-if [ "${OMR_INSTALL_MODE}" = "online" ]; then
+if [ "${SKIPPED_EXISTING}" -eq 0 ] && [ "${OMR_INSTALL_MODE}" = "online" ]; then
     echo "==> 1) online: npm install -g @ohoooho/model-router@${OMR_VERSION} (契约 §3.1: 必须 @version)"
     # Let npm use its configured registry/proxy. A separate curl probe can
     # disagree with npmrc and incorrectly force an offline install.
@@ -70,16 +107,16 @@ if [ "${OMR_INSTALL_MODE}" = "online" ]; then
     fi
 fi
 
-if [ "${OMR_INSTALL_MODE}" = "offline" ]; then
-    echo "==> 1) offline: tarball 解压 (契约 §10: 必须含 sha256 校验)"
+if [ "${SKIPPED_EXISTING}" -eq 0 ] && [ "${OMR_INSTALL_MODE}" = "offline" ]; then
+    echo "==> 1) offline: npm install 本地 tarball (契约 §10: 必须含 sha256 校验)"
     if [ ! -f "${OMR_TARBALL}" ]; then
         echo "ERR: tarball 不存在: ${OMR_TARBALL}"
-        echo "    把 omr-${OMR_VERSION}.tar.gz 放到 ${OMR_OFFLINE_TARBALL_DIR}"
+        echo "    把 omr-${OMR_VERSION}.tgz 放到 ${OMR_OFFLINE_TARBALL_DIR}，或设置 OMR_TARBALL"
         exit 2
     fi
     # sha256 校验 (契约 §9.2: 物料签名/sha256 必须校验)
-    EXPECTED_SHA=$(grep -A5 "omr-npm-package" "${COMPONENT_YAML}" | grep "sha256:" | head -1 | awk '{print $2}' | tr -d '<>')
-    ACTUAL_SHA=$(sha256sum "${OMR_TARBALL}" | awk '{print $1}')
+    EXPECTED_SHA=$(grep -A5 "omr-npm-package" "${COMPONENT_YAML}" 2>/dev/null | grep "sha256:" | head -1 | awk '{print $2}' | tr -d '<>' || true)
+    ACTUAL_SHA=$(sha256_file "${OMR_TARBALL}")
     if [ -n "${EXPECTED_SHA}" ] && [ "${EXPECTED_SHA}" != "<generated-sha256-by-build>" ]; then
         if [ "${EXPECTED_SHA}" != "${ACTUAL_SHA}" ]; then
             echo "ERR: tarball sha256 不匹配"
@@ -89,8 +126,7 @@ if [ "${OMR_INSTALL_MODE}" = "offline" ]; then
         fi
         ARTIFACT_SHA256="${ACTUAL_SHA}"
     fi
-    mkdir -p "$(dirname "${INSTALL_DIR}")"
-    tar -xzf "${OMR_TARBALL}" -C /usr/local/lib/node_modules/
+    npm install -g "${OMR_TARBALL}" --offline --no-audit --no-fund
 fi
 
 # ===== 4. 验证装好 + 回显 installed_version (契约 §3.4) =====
@@ -99,14 +135,13 @@ NODE_BIN="${INSTALL_DIR}/dist/main/cli.js"
 [ -f "${NODE_BIN}" ] || { echo "ERR: ${NODE_BIN} 不存在"; exit 4; }
 node "${NODE_BIN}" --help >/dev/null || { echo "ERR: OMR CLI 不可执行"; exit 5; }
 
-INSTALLED_VERSION=$(node -e "
-  const pkg = require('${INSTALL_DIR}/package.json');
-  console.log(pkg.version);
-" 2>/dev/null || echo "${OMR_VERSION}")
+if [ -z "${INSTALLED_VERSION}" ]; then
+    INSTALLED_VERSION=$(node -e 'console.log(require(process.argv[1]).version)' "${INSTALL_DIR}/package.json" 2>/dev/null || echo "${OMR_VERSION}")
+fi
 echo "    installed_version: ${INSTALLED_VERSION}"
 
 # resolved_version vs installed_version 必须一致 (契约 §3.4 死规)
-if [ "${OMR_VERSION}" != "${INSTALLED_VERSION}" ]; then
+if [ "${SKIPPED_EXISTING}" -eq 0 ] && [ "${OMR_VERSION}" != "${INSTALLED_VERSION}" ]; then
     echo "ERR: resolved_version (${OMR_VERSION}) 与 installed_version (${INSTALLED_VERSION}) 不一致"
     exit 6
 fi

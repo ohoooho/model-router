@@ -10,6 +10,15 @@
 ./verify.sh
 ```
 
+安装位置由当前 Node/npm 环境决定，脚本不会修改用户的 npm prefix：
+
+```bash
+npm prefix -g
+npm root -g
+```
+
+已有 OMR 时，脚本会跳过覆盖和升级。
+
 正式发布时 `component.yaml` 的 `release.default_version` 必须和
 `packages/cli/package.json` 以及已发布 npm 包一致，不能使用 `latest`。
 
@@ -26,6 +35,9 @@
 ```bash
 OMR_INSTALL_MODE=offline OMR_TARBALL=./omr-package.tgz ./install.sh --offline
 ```
+
+离线 npm tarball 仍可能需要本机已有依赖缓存；发行流程如果要做到完全断网，必须同时
+交付依赖缓存，或将运行时依赖随物料打包。
 
 离线物料打包和跨平台验证仍是发行前工作，不由本脚本临时下载。
 
