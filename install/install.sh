@@ -149,6 +149,46 @@ if [ "${SKIPPED_EXISTING}" -eq 0 ] && [ "${OMR_VERSION}" != "${INSTALLED_VERSION
     exit 6
 fi
 
+# better-sqlite3 是 OMR 的运行时必需原生依赖。npm 可能复用由另一
+# Node ABI 构建的 .node 文件：npm install 会成功，但 OMR 启动时才失败。
+# 新安装和已有安装都必须在“当前 node”下验证，失败时只重建这个组件，
+# 不改 npm prefix，也不覆盖用户的其他全局包。
+verify_native_sqlite() {
+    node - "${INSTALL_DIR}" <<'NODE'
+const installDir = process.argv[2];
+try {
+  const modulePath = require.resolve("better-sqlite3", { paths: [installDir] });
+  const Database = require(modulePath);
+  const db = new Database(":memory:");
+  db.prepare("select 1 as ok").get();
+  db.close();
+  console.log(`    better-sqlite3: ${modulePath} (Node ABI ${process.versions.modules})`);
+} catch (error) {
+  console.error(`    better-sqlite3 load failed: ${error && error.message ? error.message : error}`);
+  process.exit(1);
+}
+NODE
+}
+
+NODE_MODULES_VERSION=$(node -p 'process.versions.modules')
+echo "==> 2a) verify native dependency (better-sqlite3, Node ABI ${NODE_MODULES_VERSION})"
+if ! verify_native_sqlite; then
+    echo "WARN: better-sqlite3 不是当前 Node ABI，尝试在 OMR 安装目录重建"
+    if ! npm rebuild --prefix "${INSTALL_DIR}" better-sqlite3 --foreground-scripts --no-audit --no-fund; then
+        echo "ERR: better-sqlite3 重建失败"
+        echo "    请手动执行: npm rebuild --prefix '${INSTALL_DIR}' better-sqlite3 --foreground-scripts --no-audit --no-fund"
+        exit 8
+    fi
+    if ! verify_native_sqlite; then
+        echo "ERR: better-sqlite3 重建后仍无法被当前 Node 加载"
+        echo "    请手动执行: npm rebuild --prefix '${INSTALL_DIR}' better-sqlite3 --foreground-scripts --no-audit --no-fund"
+        exit 8
+    fi
+    echo "    better-sqlite3 已按当前 Node ABI 重建"
+else
+    echo "    better-sqlite3 已可用，无需重建"
+fi
+
 # ===== 5. 装 systemd unit (linux, macos 跳过) =====
 if [ "$(uname -s)" = "Linux" ]; then
     echo "==> 3) install systemd unit"

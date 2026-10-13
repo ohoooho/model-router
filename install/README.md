@@ -22,6 +22,25 @@ npm root -g
 正式发布时 `component.yaml` 的 `release.default_version` 必须和
 `packages/cli/package.json` 以及已发布 npm 包一致，不能使用 `latest`。
 
+## Node 原生依赖
+
+OMR 使用 `better-sqlite3` 保存本地配置和运行数据。它包含按 Node ABI
+编译的原生模块，因此“npm 安装成功”不等于“当前 Node 可以运行”。
+`install.sh` 会在新安装和已有安装上都执行一次真实的内存数据库加载检查；
+如果发现模块是由其他 Node 版本编译的，会在 OMR 的实际安装目录自动执行
+`npm rebuild`，不会修改 npm prefix，也不会覆盖用户已有的 OMR 版本。
+
+如果自动重建仍失败，按安装器输出的实际路径手动执行：
+
+```bash
+npm rebuild --prefix "$(npm root -g)/@ohoooho/model-router" \
+  better-sqlite3 --foreground-scripts --no-audit --no-fund
+```
+
+重建后再运行 `./verify.sh`，确认 `installed`、`configured` 和 `healthy`
+状态均通过。升级 Node 后也应重新运行一次 OMR 安装脚本，让这项 ABI 检查
+自动修复依赖。
+
 ## 配置输入
 
 组件从 `TX_CONTEXT_FILE` 读取输入；密钥文件应为 0600，不能放入命令行。
