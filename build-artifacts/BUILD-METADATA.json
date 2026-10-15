@@ -1,0 +1,17 @@
+{
+  "component": "omr",
+  "package": "@ohoooho/model-router",
+  "version": "0.1.0",
+  "source_commit": "a1c1436c7eba231f60685056af5d08ca8983792d",
+  "builder": "mb",
+  "node": "v24.16.0",
+  "npm": "11.13.0",
+  "command": "npm run build:assets && npm pack --workspace=@ohoooho/model-router",
+  "artifact": "omr-0.1.0.tgz",
+  "sha256": "a2b1e82b1962e1022c19ff43f6b965202d8ed5a7f9a553bec3c65975bd407db9",
+  "size_bytes": 4547159,
+  "tests": {
+    "cli_build": "passed",
+    "electron_dependent_suite": "blocked: Electron binary download failed in build environment"
+  }
+}
