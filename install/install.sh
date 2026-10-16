@@ -13,6 +13,8 @@ set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPONENT_YAML="${SCRIPT_DIR}/component.yaml"
+NPM_COMMAND="${NPM_COMMAND:-npm}"
+NODE_COMMAND="${NODE_COMMAND:-node}"
 
 # ===== 1. 读 default_version 从 component.yaml =====
 DEFAULT_VERSION=$(grep -A1 "default_version:" "${COMPONENT_YAML}" | head -1 | sed 's/.*default_version:[[:space:]]*//')
@@ -46,19 +48,23 @@ echo "    resolved_version:  ${OMR_VERSION}"
 echo "    default_version:   ${DEFAULT_VERSION}"
 
 # ===== 2. 前置依赖检查 =====
-command -v node >/dev/null || { echo "ERR: node 未装"; exit 1; }
-NODE_MAJOR=$(node -e "console.log(process.versions.node.split('.')[0])")
+command -v "${NODE_COMMAND}" >/dev/null || { echo "ERR: node 未装"; exit 1; }
+NODE_MAJOR=$("${NODE_COMMAND}" -e "console.log(process.versions.node.split('.')[0])")
 [ "${NODE_MAJOR}" -ge 22 ] || { echo "ERR: node ≥ 22 要求, 现在 v${NODE_MAJOR}"; exit 1; }
-command -v npm >/dev/null || { echo "ERR: npm 未装"; exit 1; }
+command -v "${NPM_COMMAND}" >/dev/null || { echo "ERR: npm 未装"; exit 1; }
 
 # Do not change npm's prefix. Resolve the active installation locations from
 # the user's current Node/npm distribution (Homebrew, nvm, system Node, ...).
-NPM_PREFIX="$(npm prefix -g)"
-NPM_ROOT="$(npm root -g)"
+NPM_PREFIX="$("${NPM_COMMAND}" prefix -g)"
+NPM_ROOT="$("${NPM_COMMAND}" root -g)"
+NPM_REGISTRY="${OMR_NPM_REGISTRY:-$("${NPM_COMMAND}" config get registry)}"
 INSTALL_DIR="${NPM_ROOT}/@ohoooho/model-router"
 BIN_DIR="${NPM_PREFIX}/bin"
 echo "    npm_prefix: ${NPM_PREFIX}"
 echo "    npm_root:   ${NPM_ROOT}"
+echo "    npm_registry: ${NPM_REGISTRY}"
+echo "    npm_offline: $("${NPM_COMMAND}" config get offline)"
+echo "    proxy: ${HTTPS_PROXY:-${HTTP_PROXY:-<not set>}}"
 
 sha256_file() {
     if command -v sha256sum >/dev/null 2>&1; then
@@ -73,7 +79,7 @@ sha256_file() {
 SKIPPED_EXISTING=0
 INSTALLED_VERSION=""
 if [ -f "${INSTALL_DIR}/package.json" ]; then
-    INSTALLED_VERSION=$(node -e 'console.log(require(process.argv[1]).version)' "${INSTALL_DIR}/package.json")
+    INSTALLED_VERSION=$("${NODE_COMMAND}" -e 'console.log(require(process.argv[1]).version)' "${INSTALL_DIR}/package.json")
     echo "==> OMR 已安装（version=${INSTALLED_VERSION}），跳过覆盖/升级"
     SKIPPED_EXISTING=1
 fi
@@ -97,16 +103,24 @@ fi
 ARTIFACT_SHA256=""
 if [ "${SKIPPED_EXISTING}" -eq 0 ] && [ "${OMR_INSTALL_MODE}" = "online" ]; then
     echo "==> 1) online: npm install -g @ohoooho/model-router@${OMR_VERSION} (契约 §3.1: 必须 @version)"
-    # Let npm use its configured registry/proxy. A separate curl probe can
-    # disagree with npmrc and incorrectly force an offline install.
-    if ! npm view "@ohoooho/model-router@${OMR_VERSION}" version --fetch-timeout=5000 --fetch-retries=0 >/dev/null 2>&1; then
-        echo "WARN: npm registry 中找不到目标版本, 自动转 offline 模式"
-        OMR_INSTALL_MODE="offline"
+    if "${NPM_COMMAND}" view "@ohoooho/model-router@${OMR_VERSION}" version \
+        --registry="${NPM_REGISTRY}" --fetch-timeout=5000 --fetch-retries=0 >/dev/null 2>&1; then
+        "${NPM_COMMAND}" install -g "@ohoooho/model-router@${OMR_VERSION}" \
+            --registry="${NPM_REGISTRY}" --offline=false --no-audit --no-fund
+        ARTIFACT_SHA256=$("${NPM_COMMAND}" view "@ohoooho/model-router@${OMR_VERSION}" dist.integrity \
+            --registry="${NPM_REGISTRY}" 2>/dev/null | tr -d '\n' || echo "")
+    elif [ -f "${OMR_TARBALL}" ]; then
+        echo "WARN: npm registry 未能查询目标版本；不据此判断版本不存在或强制离线。"
+        echo "      使用本地 OMR tarball，并通过 registry 在线解析/下载依赖。"
+        ACTUAL_SHA=$(sha256_file "${OMR_TARBALL}")
+        ARTIFACT_SHA256="${ACTUAL_SHA}"
+        "${NPM_COMMAND}" install -g "${OMR_TARBALL}" \
+            --registry="${NPM_REGISTRY}" --offline=false --no-audit --no-fund
     else
-        # 关键修复: 必须 @版本 (失职 217 立刻修)
-        npm install -g "@ohoooho/model-router@${OMR_VERSION}" --silent
-        # 算 sha256 (从 npm pack)
-        ARTIFACT_SHA256=$(npm view "@ohoooho/model-router@${OMR_VERSION}" dist.integrity 2>/dev/null | tr -d '\n' || echo "")
+        echo "ERR: 无法从 npm registry 查询 @ohoooho/model-router@${OMR_VERSION}，且没有本地 tarball。"
+        echo "    registry: ${NPM_REGISTRY}"
+        echo "    请检查 npm registry/代理，或提供 ${OMR_TARBALL}"
+        exit 9
     fi
 fi
 
@@ -129,17 +143,20 @@ if [ "${SKIPPED_EXISTING}" -eq 0 ] && [ "${OMR_INSTALL_MODE}" = "offline" ]; the
         fi
         ARTIFACT_SHA256="${ACTUAL_SHA}"
     fi
-    npm install -g "${OMR_TARBALL}" --offline --no-audit --no-fund
+    # Explicit offline mode: only succeed when every transitive dependency is
+    # already present in the configured npm cache.
+    echo "    npm cache: $("${NPM_COMMAND}" config get cache)"
+    "${NPM_COMMAND}" install -g "${OMR_TARBALL}" --offline --no-audit --no-fund
 fi
 
 # ===== 4. 验证装好 + 回显 installed_version (契约 §3.4) =====
 echo "==> 2) verify install (契约 §7.3: installed 状态)"
 NODE_BIN="${INSTALL_DIR}/dist/main/cli.js"
 [ -f "${NODE_BIN}" ] || { echo "ERR: ${NODE_BIN} 不存在"; exit 4; }
-node "${NODE_BIN}" --help >/dev/null || { echo "ERR: OMR CLI 不可执行"; exit 5; }
+"${NODE_COMMAND}" "${NODE_BIN}" --help >/dev/null || { echo "ERR: OMR CLI 不可执行"; exit 5; }
 
 if [ -z "${INSTALLED_VERSION}" ]; then
-    INSTALLED_VERSION=$(node -e 'console.log(require(process.argv[1]).version)' "${INSTALL_DIR}/package.json" 2>/dev/null || echo "${OMR_VERSION}")
+    INSTALLED_VERSION=$("${NODE_COMMAND}" -e 'console.log(require(process.argv[1]).version)' "${INSTALL_DIR}/package.json" 2>/dev/null || echo "${OMR_VERSION}")
 fi
 echo "    installed_version: ${INSTALLED_VERSION}"
 
@@ -154,7 +171,7 @@ fi
 # 新安装和已有安装都必须在“当前 node”下验证，失败时只重建这个组件，
 # 不改 npm prefix，也不覆盖用户的其他全局包。
 verify_native_sqlite() {
-    node - "${INSTALL_DIR}" <<'NODE'
+    "${NODE_COMMAND}" - "${INSTALL_DIR}" <<'NODE'
 const installDir = process.argv[2];
 try {
   const modulePath = require.resolve("better-sqlite3", { paths: [installDir] });
@@ -170,18 +187,18 @@ try {
 NODE
 }
 
-NODE_MODULES_VERSION=$(node -p 'process.versions.modules')
+NODE_MODULES_VERSION=$("${NODE_COMMAND}" -p 'process.versions.modules')
 echo "==> 2a) verify native dependency (better-sqlite3, Node ABI ${NODE_MODULES_VERSION})"
 if ! verify_native_sqlite; then
     echo "WARN: better-sqlite3 不是当前 Node ABI，尝试在 OMR 安装目录重建"
-    if ! npm rebuild --prefix "${INSTALL_DIR}" better-sqlite3 --foreground-scripts --no-audit --no-fund; then
+    if ! "${NPM_COMMAND}" rebuild --prefix "${INSTALL_DIR}" better-sqlite3 --foreground-scripts --no-audit --no-fund; then
         echo "ERR: better-sqlite3 重建失败"
-        echo "    请手动执行: npm rebuild --prefix '${INSTALL_DIR}' better-sqlite3 --foreground-scripts --no-audit --no-fund"
+        echo "    请手动执行: ${NPM_COMMAND} rebuild --prefix '${INSTALL_DIR}' better-sqlite3 --foreground-scripts --no-audit --no-fund"
         exit 8
     fi
     if ! verify_native_sqlite; then
         echo "ERR: better-sqlite3 重建后仍无法被当前 Node 加载"
-        echo "    请手动执行: npm rebuild --prefix '${INSTALL_DIR}' better-sqlite3 --foreground-scripts --no-audit --no-fund"
+        echo "    请手动执行: ${NPM_COMMAND} rebuild --prefix '${INSTALL_DIR}' better-sqlite3 --foreground-scripts --no-audit --no-fund"
         exit 8
     fi
     echo "    better-sqlite3 已按当前 Node ABI 重建"

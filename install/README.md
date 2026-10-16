@@ -1,5 +1,10 @@
 # OMR component installer
 
+在线安装模式优先使用当前 npm registry 安装指定版本。若 registry 元数据查询失败但本地
+OMR tarball 存在，脚本不会把在线安装误切成 `--offline`；它会对本地 tarball执行在线安装，
+由 npm 按当前 registry/proxy 获取缺失依赖。只有显式指定 `--offline` 时才使用 npm cache-only
+模式；离线安装必须预先缓存完整的传递依赖，否则会返回明确的 `ENOTCACHED`。
+
 这些脚本是 OMR 组件自己的生命周期实现。桃仙 Installer 只提供受保护的
 `TX_CONTEXT_FILE`，并依次调用 `install.sh`、`configure.sh` 和 `verify.sh`。
 
