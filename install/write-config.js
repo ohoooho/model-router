@@ -198,13 +198,16 @@ const upsertApiKey = db.prepare(`
 `);
 
 // 双 baozi_key (老板 17:42 lockin)
+// 不再写任何 rpm/tpm：这两个值原本是 2026-09-20 一次性拍下的默认值，
+// 没有对照上游配额；网关只听 127.0.0.1，真正的额度由上游 provider 管。
+// 限流只在用户自己在 UI 里给某把 key 显式配置时才生效。
 upsertApiKey.run(
   'baozi-persona',
   'Baozi Persona Agent Key (分身调用)',
   PERSONA_BAOZI_KEY,
   process.env.BAOZI_ENCRYPTION || 'plain',
   process.env.BAOZI_PERSONA_EXPIRES || '',
-  JSON.stringify({ rpm: 60, tpm: 100000 })
+  JSON.stringify({})
 );
 upsertApiKey.run(
   'baozi-butler',
@@ -212,9 +215,10 @@ upsertApiKey.run(
   BUTLER_BAOZI_KEY,
   process.env.BAOZI_ENCRYPTION || 'plain',
   process.env.BAOZI_BUTLER_EXPIRES || '',
-  JSON.stringify({ rpm: 30, tpm: 50000 })
+  JSON.stringify({})
 );
 // 4 场景 baozi_key (K-261 锁点) — 写入 api_keys 表
+// scene/fake 只是给库和 UI 看的元数据，不参与限流。
 for (const [scene, key] of Object.entries(SCENE_KEYS)) {
   const isFake = key.indexOf('fake_') === 0;
   upsertApiKey.run(
@@ -223,7 +227,7 @@ for (const [scene, key] of Object.entries(SCENE_KEYS)) {
     key,
     'plain',
     '',
-    JSON.stringify({ rpm: 60, tpm: 100000, scene: scene, fake: isFake })
+    JSON.stringify({ scene: scene, fake: isFake })
   );
 }
 
