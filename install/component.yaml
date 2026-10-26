@@ -199,7 +199,7 @@ artifacts:
     kind: npm-tarball
     package: "@ohoooho/model-router"
     path: npm/@ohoooho-model-router-0.1.0.tgz
-    sha256: <generated-sha256-by-build>
+    sha256: 554d55fa4c4d7960d5085e977c227ea9326ec343d5b0e30ca85a2fbd77d19e16
     size_bytes: <generated-by-wc>
     npm_integrity: <generated-by-npm-pack-dist.integrity>
 
@@ -208,7 +208,7 @@ artifacts:
     platform: any
     kind: archive
     path: install.tar.gz          # 本仓 install/ 整个目录打的 tar.gz (含 manifest + 8 脚本 + template)
-    sha256: <generated-sha256-by-build>
+    sha256: 531a663a96d448cb671ac74264cd016a3943383628f5eba533d51baebf0e314c
     size_bytes: <generated-by-wc>
 
 # 用户目录、配置和系统权限边界。
