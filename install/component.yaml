@@ -200,17 +200,24 @@ artifacts:
     package: "@ohoooho/model-router"
     path: npm/@ohoooho-model-router-0.1.0.tgz
     sha256: 9881e22dba928e1ffdafeb43e3b854f0a52fa5a461c79c929265eb92410614ad
-    size_bytes: <generated-by-wc>
+    size_bytes: 5017167
     npm_integrity: <generated-by-npm-pack-dist.integrity>
 
   - id: omr-component-scripts
     version: 0.1.0-fork3.0.18+p5
     platform: any
     kind: archive
-    path: install.tar.gz          # 本仓 install/ 整个目录打的 tar.gz (含 manifest + 8 脚本 + template)
+    path: install.tar.gz
     sha256: 6725684f1e566743e431d427036ab751f5f9903d07fb7953497bb4be995792ab
-    size_bytes: <generated-by-wc>
+    size_bytes: 34338
 
+  - id: omr-offline-package
+    version: 0.1.0-fork3.0.18+p5
+    platform: any
+    kind: archive
+    path: omr-0.1.0-fork3.0.18+p5.tar.gz
+    sha256: 02865b9dcc710776629420c1afca7644a1b60f8bfbe56c277e63af19e4f6202e
+    size_bytes: 5120195
 # 用户目录、配置和系统权限边界。
 # 失职 243 闭环 (K-302 边界修正): OMR fork 仓是我的项目, 路径品牌化由我负责.
 # OMR fork 源码加 OMR_DATA_DIR env (cli.js getOMRDataDir() helper), 优先级最高.
