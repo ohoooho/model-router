@@ -47,18 +47,23 @@ npm rebuild --prefix "$(npm root -g)/@ohoooho/model-router" \
 没有订单密钥时，脚本可以写入 fake 占位，但 doctor 必须把上游能力标为
 `skipped`，不能把占位符当成真实成功。
 
-## 离线安装
+## 本地 tarball 安装
 
-离线包必须由发行流程先校验 SHA-256，再通过 `OMR_TARBALL` 传入：
+发行流程先校验 SHA-256，再通过 `OMR_TARBALL` 传入本地包：
 
 ```bash
-OMR_INSTALL_MODE=offline OMR_TARBALL=./omr-package.tgz ./install.sh --offline
+OMR_INSTALL_MODE=offline OMR_TARBALL=./omr-0.1.0.tgz ./install.sh --offline
 ```
 
-离线 npm tarball 仍可能需要本机已有依赖缓存；发行流程如果要做到完全断网，必须同时
-交付依赖缓存，或将运行时依赖随物料打包。
+默认只固定包体（包本身从 tarball 安装），npm 依赖仍从 registry 解析。需要完全断网时，
+先把依赖预热到 npm cache，再设置 `OMR_STRICT_OFFLINE=1`：
 
-离线物料打包和跨平台验证仍是发行前工作，不由本脚本临时下载。
+```bash
+OMR_STRICT_OFFLINE=1 OMR_INSTALL_MODE=offline OMR_TARBALL=./omr-0.1.0.tgz ./install.sh --offline
+```
+
+完全离线物料（含跨平台依赖缓存）仍是发行前工作；未预热 cache 时脚本会明确失败，不会
+静默改成在线安装。
 
 ## 备份与回滚
 

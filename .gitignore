@@ -20,3 +20,6 @@ playwright-report
 blob-report
 .tmp
 .test-dist
+
+# 本地构建的离线安装物料（由发行流程生成，不入库）
+artifacts/

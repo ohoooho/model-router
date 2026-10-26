@@ -194,14 +194,14 @@ scene_keys:
 # 实际安装物料。正式发布时必须有真实哈希和大小。
 artifacts:
   - id: omr-npm-package
-    version: 0.1.0-fork3.0.18+p5
-    platform: linux-x64
+    version: 0.1.0
+    platform: any
     kind: npm-tarball
     package: "@ohoooho/model-router"
-    path: npm/@ohoooho-model-router-0.1.0.tgz
-    sha256: <generated-sha256-by-build>
-    size_bytes: <generated-by-wc>
-    npm_integrity: <generated-by-npm-pack-dist.integrity>
+    path: omr-0.1.0.tgz
+    sha256: 9e216f5182c3bfc78ada3602ba0e036b97405ec085a338fbc657fe627d048691
+    size_bytes: 5041986
+    npm_integrity: sha512-OnPce0WixZo1rX/a7AON53t65oiDQpwI0rx1tstEyaiJHw5do2ZU/KrsaSwGNWZ/x1PhvpQQFAPdctTUGWa6kQ==
 
   - id: omr-component-scripts
     version: 0.1.0-fork3.0.18+p5

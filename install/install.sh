@@ -111,16 +111,19 @@ if [ "${SKIPPED_EXISTING}" -eq 0 ] && [ "${OMR_INSTALL_MODE}" = "online" ]; then
 fi
 
 if [ "${SKIPPED_EXISTING}" -eq 0 ] && [ "${OMR_INSTALL_MODE}" = "offline" ]; then
-    echo "==> 1) offline: npm install 本地 tarball (契约 §10: 必须含 sha256 校验)"
+    echo "==> 1) local tarball: npm install (契约 §10: 必须含 sha256 校验)"
     if [ ! -f "${OMR_TARBALL}" ]; then
         echo "ERR: tarball 不存在: ${OMR_TARBALL}"
         echo "    把 omr-${OMR_VERSION}.tgz 放到 ${OMR_OFFLINE_TARBALL_DIR}，或设置 OMR_TARBALL"
         exit 2
     fi
     # sha256 校验 (契约 §9.2: 物料签名/sha256 必须校验)
-    EXPECTED_SHA=$(grep -A5 "omr-npm-package" "${COMPONENT_YAML}" 2>/dev/null | grep "sha256:" | head -1 | awk '{print $2}' | tr -d '<>' || true)
+    EXPECTED_SHA=$(awk '
+        /^[[:space:]]*- id: omr-npm-package/ { found = 1; next }
+        found && /^[[:space:]]*sha256:/ { print $2; exit }
+    ' "${COMPONENT_YAML}" 2>/dev/null | tr -d '<>"' || true)
     ACTUAL_SHA=$(sha256_file "${OMR_TARBALL}")
-    if [ -n "${EXPECTED_SHA}" ] && [ "${EXPECTED_SHA}" != "<generated-sha256-by-build>" ]; then
+    if [ -n "${EXPECTED_SHA}" ] && [ "${EXPECTED_SHA}" != "generated-sha256-by-build" ]; then
         if [ "${EXPECTED_SHA}" != "${ACTUAL_SHA}" ]; then
             echo "ERR: tarball sha256 不匹配"
             echo "    expected: ${EXPECTED_SHA}"
@@ -129,7 +132,14 @@ if [ "${SKIPPED_EXISTING}" -eq 0 ] && [ "${OMR_INSTALL_MODE}" = "offline" ]; the
         fi
         ARTIFACT_SHA256="${ACTUAL_SHA}"
     fi
-    npm install -g "${OMR_TARBALL}" --offline --no-audit --no-fund
+    # 包体固定为本地 tarball；依赖默认从 registry 解析。
+    # 完全断网需要预热 npm cache，并设置 OMR_STRICT_OFFLINE=1。
+    if [ "${OMR_STRICT_OFFLINE:-0}" = "1" ]; then
+        echo "    strict_offline: 1（依赖必须已在 npm cache 中）"
+        npm install -g "${OMR_TARBALL}" --offline --no-audit --no-fund
+    else
+        npm install -g "${OMR_TARBALL}" --no-audit --no-fund
+    fi
 fi
 
 # ===== 4. 验证装好 + 回显 installed_version (契约 §3.4) =====
