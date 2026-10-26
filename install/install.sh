@@ -132,7 +132,7 @@ if [ "${SKIPPED_EXISTING}" -eq 0 ] && [ "${OMR_INSTALL_MODE}" = "offline" ]; the
         exit 2
     fi
     # sha256 校验 (契约 §9.2: 物料签名/sha256 必须校验)
-    EXPECTED_SHA=$(grep -A5 "omr-npm-package" "${COMPONENT_YAML}" 2>/dev/null | grep "sha256:" | head -1 | awk '{print $2}' | tr -d '<>' || true)
+    EXPECTED_SHA=$(grep -A8 "omr-offline-package" "${COMPONENT_YAML}" 2>/dev/null | grep "sha256:" | head -1 | awk '{print $2}' | tr -d '<>' || true)
     ACTUAL_SHA=$(sha256_file "${OMR_TARBALL}")
     if [ -n "${EXPECTED_SHA}" ] && [ "${EXPECTED_SHA}" != "<generated-sha256-by-build>" ]; then
         if [ "${EXPECTED_SHA}" != "${ACTUAL_SHA}" ]; then

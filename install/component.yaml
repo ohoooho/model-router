@@ -208,7 +208,7 @@ artifacts:
     platform: any
     kind: archive
     path: install.tar.gz          # 本仓 install/ 整个目录打的 tar.gz (含 manifest + 8 脚本 + template)
-    sha256: 531a663a96d448cb671ac74264cd016a3943383628f5eba533d51baebf0e314c
+    sha256: 6725684f1e566743e431d427036ab751f5f9903d07fb7953497bb4be995792ab
     size_bytes: <generated-by-wc>
 
 # 用户目录、配置和系统权限边界。
