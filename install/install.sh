@@ -16,6 +16,38 @@ COMPONENT_YAML="${SCRIPT_DIR}/component.yaml"
 NPM_COMMAND="${NPM_COMMAND:-npm}"
 NODE_COMMAND="${NODE_COMMAND:-node}"
 
+# 从 component.yaml 的 artifacts 段按 artifact id 读一个字段.
+#
+# 修 bug: 旧写法 `grep -A5 "<id>" component.yaml | grep "sha256:"` 是空转 ——
+# sha256 字段在 "- id:" 之后第 7 行, 落在 -A5 窗口外, 永远取不到,
+# 契约 §9.2 "物料 sha256 必须校验" 实际从来没生效过.
+# 现在按 block 解析: 命中 "- id: <id>" 之后, 只在该 block 内找目标字段.
+#
+# 用法: artifact_field <component.yaml> <artifact-id> <field>
+artifact_field() {
+    local yaml="$1" artifact_id="$2" field="$3"
+    awk -v want="${artifact_id}" -v field="${field}" '
+        /^[ \t]*-[ \t]*id:[ \t]*/ {
+            id = $0
+            sub(/^[ \t]*-[ \t]*id:[ \t]*/, "", id)
+            gsub(/"/, "", id)
+            gsub(/[ \t\r]+$/, "", id)
+            inblock = (id == want)
+            next
+        }
+        inblock && $0 ~ ("^[ \t]*" field "[ \t]*:") {
+            val = $0
+            sub("^[ \t]*" field "[ \t]*:[ \t]*", "", val)
+            sub(/[ \t]*#.*$/, "", val)     # 去掉行尾注释
+            gsub(/"/, "", val)
+            gsub(/[ \t\r]+$/, "", val)
+            print val
+            exit
+        }
+        inblock && /^[A-Za-z_][A-Za-z0-9_]*[ \t]*:/ { inblock = 0 }
+    ' "${yaml}"
+}
+
 # ===== 1. 读 default_version 从 component.yaml =====
 DEFAULT_VERSION=$(grep -A1 "default_version:" "${COMPONENT_YAML}" | head -1 | sed 's/.*default_version:[[:space:]]*//')
 [ -z "${DEFAULT_VERSION}" ] && { echo "ERR: component.yaml default_version 缺失"; exit 1; }
@@ -26,7 +58,12 @@ OMR_VERSION="${OMR_REQUESTED_VERSION:-${DEFAULT_VERSION}}"
 OMR_VERSION_POLICY="${OMR_VERSION_POLICY:-default}"
 OMR_INSTALL_MODE="${OMR_INSTALL_MODE:-online}"
 OMR_OFFLINE_TARBALL_DIR="${OMR_OFFLINE_TARBALL_DIR:-${SCRIPT_DIR}/../artifacts}"
-OMR_TARBALL="${OMR_TARBALL:-${OMR_OFFLINE_TARBALL_DIR}/omr-${OMR_VERSION}.tgz}"
+# 两份物料结构不同, 哈希各归各的, 不能互相替代 (契约 §5 artifacts / §9.2):
+#   omr-npm-package     -> ohoooho-model-router-0.1.0.tgz  (package/ 根, npm install -g 用)
+#   omr-offline-package -> omr-<version>.tar.gz              (ohoooho/model-router/ 前缀目录树, 离线解包用)
+# 文件名以 component.yaml 的 artifacts[].path 为准, 不在脚本里拼版本号.
+OMR_NPM_TARBALL="${OMR_NPM_TARBALL:-${OMR_OFFLINE_TARBALL_DIR}/$(artifact_field "${COMPONENT_YAML}" "omr-npm-package" "path")}"
+OMR_TARBALL="${OMR_TARBALL:-${OMR_OFFLINE_TARBALL_DIR}/$(artifact_field "${COMPONENT_YAML}" "omr-offline-package" "path")}"
 
 for arg in "$@"; do
     case "$arg" in
@@ -109,44 +146,75 @@ if [ "${SKIPPED_EXISTING}" -eq 0 ] && [ "${OMR_INSTALL_MODE}" = "online" ]; then
             --registry="${NPM_REGISTRY}" --offline=false --no-audit --no-fund
         ARTIFACT_SHA256=$("${NPM_COMMAND}" view "@ohoooho/model-router@${OMR_VERSION}" dist.integrity \
             --registry="${NPM_REGISTRY}" 2>/dev/null | tr -d '\n' || echo "")
-    elif [ -f "${OMR_TARBALL}" ]; then
+    elif [ -f "${OMR_NPM_TARBALL}" ]; then
         echo "WARN: npm registry 未能查询目标版本；不据此判断版本不存在或强制离线。"
-        echo "      使用本地 OMR tarball，并通过 registry 在线解析/下载依赖。"
-        ACTUAL_SHA=$(sha256_file "${OMR_TARBALL}")
+        echo "      使用本地 OMR npm tarball，并通过 registry 在线解析/下载依赖。"
+        # npm 物料用 omr-npm-package 的哈希 (契约 §9.2)
+        EXPECTED_NPM_SHA=$(artifact_field "${COMPONENT_YAML}" "omr-npm-package" "sha256")
+        ACTUAL_SHA=$(sha256_file "${OMR_NPM_TARBALL}")
+        if [ -n "${EXPECTED_NPM_SHA}" ] && [ "${EXPECTED_NPM_SHA}" != "<generated-sha256-by-build>" ] && [ "${EXPECTED_NPM_SHA}" != "${ACTUAL_SHA}" ]; then
+            echo "ERR: npm tarball sha256 不匹配"
+            echo "    expected: ${EXPECTED_NPM_SHA}"
+            echo "    actual:   ${ACTUAL_SHA}"
+            exit 3
+        fi
         ARTIFACT_SHA256="${ACTUAL_SHA}"
-        "${NPM_COMMAND}" install -g "${OMR_TARBALL}" \
+        "${NPM_COMMAND}" install -g "${OMR_NPM_TARBALL}" \
             --registry="${NPM_REGISTRY}" --offline=false --no-audit --no-fund
     else
         echo "ERR: 无法从 npm registry 查询 @ohoooho/model-router@${OMR_VERSION}，且没有本地 tarball。"
         echo "    registry: ${NPM_REGISTRY}"
-        echo "    请检查 npm registry/代理，或提供 ${OMR_TARBALL}"
+        echo "    请检查 npm registry/代理，或提供 ${OMR_NPM_TARBALL}"
         exit 9
     fi
 fi
 
 if [ "${SKIPPED_EXISTING}" -eq 0 ] && [ "${OMR_INSTALL_MODE}" = "offline" ]; then
-    echo "==> 1) offline: npm install 本地 tarball (契约 §10: 必须含 sha256 校验)"
+    echo "==> 1) offline: 本地离线包安装 (契约 §10: 必须含 sha256 校验)"
     if [ ! -f "${OMR_TARBALL}" ]; then
-        echo "ERR: tarball 不存在: ${OMR_TARBALL}"
-        echo "    把 omr-${OMR_VERSION}.tgz 放到 ${OMR_OFFLINE_TARBALL_DIR}，或设置 OMR_TARBALL"
+        echo "ERR: 离线包不存在: ${OMR_TARBALL}"
+        echo "    把 $(basename "${OMR_TARBALL}") 放到 ${OMR_OFFLINE_TARBALL_DIR}，或设置 OMR_TARBALL"
         exit 2
     fi
-    # sha256 校验 (契约 §9.2: 物料签名/sha256 必须校验)
-    EXPECTED_SHA=$(grep -A8 "omr-offline-package" "${COMPONENT_YAML}" 2>/dev/null | grep "sha256:" | head -1 | awk '{print $2}' | tr -d '<>' || true)
+    # sha256 校验 (契约 §9.2): 离线物料用 omr-offline-package 自己的哈希.
+    # 不能拿 omr-npm-package 的哈希比 —— 两份物料结构不同, 哈希各归各的.
+    EXPECTED_SHA=$(artifact_field "${COMPONENT_YAML}" "omr-offline-package" "sha256")
+    if [ -z "${EXPECTED_SHA}" ]; then
+        echo "ERR: component.yaml 里找不到 omr-offline-package.sha256"
+        exit 3
+    fi
     ACTUAL_SHA=$(sha256_file "${OMR_TARBALL}")
-    if [ -n "${EXPECTED_SHA}" ] && [ "${EXPECTED_SHA}" != "<generated-sha256-by-build>" ]; then
+    if [ "${EXPECTED_SHA}" != "<generated-sha256-by-build>" ]; then
         if [ "${EXPECTED_SHA}" != "${ACTUAL_SHA}" ]; then
-            echo "ERR: tarball sha256 不匹配"
+            echo "ERR: 离线包 sha256 不匹配"
             echo "    expected: ${EXPECTED_SHA}"
             echo "    actual:   ${ACTUAL_SHA}"
             exit 3
         fi
         ARTIFACT_SHA256="${ACTUAL_SHA}"
+    else
+        echo "WARN: component.yaml 里 omr-offline-package.sha256 还是占位符, 跳过校验"
     fi
-    # Explicit offline mode: only succeed when every transitive dependency is
-    # already present in the configured npm cache.
-    echo "    npm cache: $("${NPM_COMMAND}" config get cache)"
-    "${NPM_COMMAND}" install -g "${OMR_TARBALL}" --offline --no-audit --no-fund
+    # 离线物料是 ohoooho/model-router/ 前缀的目录树 (自带运行时依赖),
+    # 直接解到 npm root, 不走 npm —— 离线机器没有 registry.
+    STAGE_DIR=$(mktemp -d)
+    tar -xzf "${OMR_TARBALL}" -C "${STAGE_DIR}"
+    if [ ! -d "${STAGE_DIR}/ohoooho/model-router" ]; then
+        echo "ERR: 离线包结构不对: 期望 ohoooho/model-router/ 前缀"
+        exit 3
+    fi
+    mkdir -p "$(dirname "${INSTALL_DIR}")"
+    if [ -e "${INSTALL_DIR}" ]; then
+        BACKUP_DIR="${INSTALL_DIR}.bak-$(date +%Y%m%d-%H%M%S)"
+        echo "WARN: ${INSTALL_DIR} 已存在但不是标准安装, 备份为 ${BACKUP_DIR}"
+        mv "${INSTALL_DIR}" "${BACKUP_DIR}"
+    fi
+    mv "${STAGE_DIR}/ohoooho/model-router" "${INSTALL_DIR}"
+    rm -rf "${STAGE_DIR}"
+    for BIN_NAME in ccr omr model-router; do
+        ln -sf "${INSTALL_DIR}/dist/main/cli.js" "${BIN_DIR}/${BIN_NAME}"
+    done
+    echo "    offline package installed: ${INSTALL_DIR}"
 fi
 
 # ===== 4. 验证装好 + 回显 installed_version (契约 §3.4) =====

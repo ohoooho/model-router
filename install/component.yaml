@@ -24,12 +24,13 @@ component:
 # 产品默认版本可以随发行清单更新；一次具体安装会解析为 resolved_version。
 release:
   default_channel: stable
-  # Must match packages/cli/package.json and the published npm package.
-  # Fork/patch provenance belongs in _internal, not in the installable version.
-  default_version: 0.1.0
+  # Must match packages/cli/package.json and the published npm package:
+  # 安装器 §3.4 死规要求 resolved_version == installed_version, 版本号对不上直接 exit 6.
+  # component.context.json / write-config.js / MANIFEST.md 都是 0.1.0-fork3.0.18+p5.
+  default_version: 0.1.0-fork3.0.18+p5
   channels:
     stable:
-      version: 0.1.0
+      version: 0.1.0-fork3.0.18+p5
     beta:
       version: 0.2.0-fork3.0.18+p6        # 下一版, 占位 (实际未发布)
 
@@ -198,8 +199,8 @@ artifacts:
     platform: linux-x64
     kind: npm-tarball
     package: "@ohoooho/model-router"
-    path: npm/@ohoooho-model-router-0.1.0.tgz
-    sha256: 9881e22dba928e1ffdafeb43e3b854f0a52fa5a461c79c929265eb92410614ad
+    path: ohoooho-model-router-0.1.0.tgz   # 发布目录扁平命名, 与 get-omr.sh 路 A 一致
+    sha256: 554d55fa4c4d7960d5085e977c227ea9326ec343d5b0e30ca85a2fbd77d19e16
     size_bytes: 5017167
     npm_integrity: <generated-by-npm-pack-dist.integrity>
 
@@ -208,16 +209,17 @@ artifacts:
     platform: any
     kind: archive
     path: install.tar.gz
-    sha256: 6725684f1e566743e431d427036ab751f5f9903d07fb7953497bb4be995792ab
-    size_bytes: 34338
+    sha256: cb7b3f55e72e39f7d9c1df8412209b316e8d1cbf696dd3cfbb838187da4a5adc
+    size_bytes: 36776
 
   - id: omr-offline-package
     version: 0.1.0-fork3.0.18+p5
     platform: any
     kind: archive
-    path: omr-0.1.0-fork3.0.18+p5.tar.gz
-    sha256: 02865b9dcc710776629420c1afca7644a1b60f8bfbe56c277e63af19e4f6202e
-    size_bytes: 5120195
+    path: omr-0.1.0-fork3.0.18+p5.tar.gz   # ohoooho/model-router/ 前缀目录树, 自带运行时依赖
+    sha256: 26e72c0bb93d7307c44022ba4a89de07bd0205a2f992626ba0d6d17d3357eca3
+    size_bytes: 17126308
+
 # 用户目录、配置和系统权限边界。
 # 失职 243 闭环 (K-302 边界修正): OMR fork 仓是我的项目, 路径品牌化由我负责.
 # OMR fork 源码加 OMR_DATA_DIR env (cli.js getOMRDataDir() helper), 优先级最高.
