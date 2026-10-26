@@ -199,7 +199,7 @@ artifacts:
     kind: npm-tarball
     package: "@ohoooho/model-router"
     path: npm/@ohoooho-model-router-0.1.0.tgz
-    sha256: 554d55fa4c4d7960d5085e977c227ea9326ec343d5b0e30ca85a2fbd77d19e16
+    sha256: 9881e22dba928e1ffdafeb43e3b854f0a52fa5a461c79c929265eb92410614ad
     size_bytes: <generated-by-wc>
     npm_integrity: <generated-by-npm-pack-dist.integrity>
 
