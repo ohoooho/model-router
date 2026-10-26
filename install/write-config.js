@@ -187,15 +187,44 @@ upsertConfig.run('default', JSON.stringify({
 }));
 
 // 6. 写 api_keys: 加密存 (OMR fork 默认用 'plain', 失职 232 立刻修: 真加密用 libsodium)
+// 只在新行写入默认 limits；已有行的 limits_json 保持不动，避免安装器覆盖用户配置。
 const upsertApiKey = db.prepare(`
   INSERT INTO api_keys (id, name, encrypted_key, encryption, created_at, expires_at, limits_json)
   VALUES (?, ?, ?, ?, datetime('now'), ?, ?)
   ON CONFLICT(id) DO UPDATE SET
     encrypted_key=excluded.encrypted_key,
     encryption=excluded.encryption,
-    expires_at=excluded.expires_at,
-    limits_json=excluded.limits_json
+    expires_at=excluded.expires_at
 `);
+
+// 一次性迁移：旧安装器在 2026-09-20 给内置 key 写死了 rpm/tpm。
+// 只清理与旧种子值完全一致的行，用户自定义的限流不会被误删。
+const legacySeededLimits = {
+  'baozi-persona': { rpm: 60, tpm: 100000 },
+  'baozi-butler': { rpm: 30, tpm: 50000 },
+  'baozi-chat-auto': { rpm: 60, tpm: 100000 },
+  'baozi-coding-auto': { rpm: 60, tpm: 100000 },
+  'baozi-assist-auto': { rpm: 60, tpm: 100000 },
+  'baozi-team-auto': { rpm: 60, tpm: 100000 },
+};
+const selectLimits = db.prepare('SELECT limits_json FROM api_keys WHERE id = ?');
+const updateLimits = db.prepare('UPDATE api_keys SET limits_json = ? WHERE id = ?');
+for (const [id, seed] of Object.entries(legacySeededLimits)) {
+  const row = selectLimits.get(id);
+  if (!row) continue;
+  let limits;
+  try {
+    limits = JSON.parse(row.limits_json || '{}');
+  } catch {
+    continue;
+  }
+  if (!limits || typeof limits !== 'object' || Array.isArray(limits)) continue;
+  if (limits.rpm !== seed.rpm || limits.tpm !== seed.tpm) continue;
+  delete limits.rpm;
+  delete limits.tpm;
+  updateLimits.run(JSON.stringify(limits), id);
+  console.log(`  🔧 清理旧限流种子: ${id}`);
+}
 
 // 双 baozi_key (老板 17:42 lockin)
 // 不再写任何 rpm/tpm：这两个值原本是 2026-09-20 一次性拍下的默认值，
