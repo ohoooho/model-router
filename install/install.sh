@@ -142,10 +142,25 @@ if [ "${SKIPPED_EXISTING}" -eq 0 ] && [ "${OMR_INSTALL_MODE}" = "online" ]; then
     echo "==> 1) online: npm install -g @ohoooho/model-router@${OMR_VERSION} (契约 §3.1: 必须 @version)"
     if "${NPM_COMMAND}" view "@ohoooho/model-router@${OMR_VERSION}" version \
         --registry="${NPM_REGISTRY}" --fetch-timeout=5000 --fetch-retries=0 >/dev/null 2>&1; then
+        # 在线装的物料也要按声明的 hex sha256 校验, 且**先校验后安装**。
+        # npm view dist.integrity 是 base64 SRI, 与 component.yaml 声明的
+        # hex sha256 编码不同, 不能拿来比 —— 取 dist.shasum。
+        EXPECTED_NPM_SHA=$(artifact_field "${COMPONENT_YAML}" "omr-npm-package" "sha256")
+        ACTUAL_SHA=$("${NPM_COMMAND}" view "@ohoooho/model-router@${OMR_VERSION}" dist.shasum \
+            --registry="${NPM_REGISTRY}" 2>/dev/null | tr -d '\n' || echo "")
+        if [ -z "${ACTUAL_SHA}" ]; then
+            echo "ERR: 拿不到 registry 上的 dist.shasum, 物料无法校验, 拒绝安装"
+            exit 3
+        fi
+        if [ -n "${EXPECTED_NPM_SHA}" ] && [ "${EXPECTED_NPM_SHA}" != "<generated-sha256-by-build>" ] && [ "${EXPECTED_NPM_SHA}" != "${ACTUAL_SHA}" ]; then
+            echo "ERR: npm tarball sha256 不匹配"
+            echo "    expected: ${EXPECTED_NPM_SHA}"
+            echo "    actual:   ${ACTUAL_SHA}"
+            exit 3
+        fi
+        ARTIFACT_SHA256="${ACTUAL_SHA}"
         "${NPM_COMMAND}" install -g "@ohoooho/model-router@${OMR_VERSION}" \
             --registry="${NPM_REGISTRY}" --offline=false --no-audit --no-fund
-        ARTIFACT_SHA256=$("${NPM_COMMAND}" view "@ohoooho/model-router@${OMR_VERSION}" dist.integrity \
-            --registry="${NPM_REGISTRY}" 2>/dev/null | tr -d '\n' || echo "")
     elif [ -f "${OMR_NPM_TARBALL}" ]; then
         echo "WARN: npm registry 未能查询目标版本；不据此判断版本不存在或强制离线。"
         echo "      使用本地 OMR npm tarball，并通过 registry 在线解析/下载依赖。"

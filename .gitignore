@@ -20,3 +20,13 @@ playwright-report
 blob-report
 .tmp
 .test-dist
+
+# npm pack 产物不进版本库：本地构建的 tarball 与 dopple 上真正发布的物料
+# 哈希不同（本地构建 ≠ 发布件），留在仓里会让人拿错文件。
+# 发布物料见 install/component.yaml 的 artifacts 段（唯一真源）。
+packages/cli/*.tgz
+*.tgz
+
+# python 脚本的字节码
+__pycache__/
+*.pyc

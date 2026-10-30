@@ -194,15 +194,18 @@ scene_keys:
 
 # 实际安装物料。正式发布时必须有真实哈希和大小。
 artifacts:
+  # 版本的唯一真源是上面的 release.default_version。
+  # 这里的 version 必须与它一致 (scripts/build-release-materials.sh 会校验),
+  # path 是发布目录里的扁平文件名, 不带版本号 —— 装机的 get-omr.sh 按 path 取文件,
+  # 不在脚本里拼版本号, 所以改了版本号不必改文件名。
   - id: omr-npm-package
     version: 0.1.0-fork3.0.18+p5
     platform: linux-x64
     kind: npm-tarball
     package: "@ohoooho/model-router"
-    path: ohoooho-model-router-0.1.0.tgz   # 发布目录扁平命名, 与 get-omr.sh 路 A 一致
+    path: ohoooho-model-router-0.1.0.tgz   # 发布目录扁平命名, 与 get-omr.sh 取料一致
     sha256: 554d55fa4c4d7960d5085e977c227ea9326ec343d5b0e30ca85a2fbd77d19e16
     size_bytes: 5017167
-    npm_integrity: <generated-by-npm-pack-dist.integrity>
 
   - id: omr-component-scripts
     version: 0.1.0-fork3.0.18+p5
