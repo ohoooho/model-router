@@ -522,7 +522,45 @@ OpenCodex 作为第二梯队；CliGate/CliRelay 作为观察。
 
 ---
 
-## 14. 变更日志
+## 14. 下一版候选：OMR + Magpie 双引擎（待验证）
+
+**结论：可以试，但只作为“高级/实验性”选项，不做首屏默认，也不把 Magpie 当生产内核。**
+
+### 14.1 为什么值得试
+
+- Magpie 的本机体验、4 协议互转、60+ Agent 配置，确实是 OMR 当前最明显的体验差距；
+- MIT、Go、单机运行，许可上不像 AGPL 那样直接卡住商业分发；
+- 和 OMR 的 API Key/多 Key 池化互补：Magpie 偏“订阅/多 Agent 入口”，OMR 偏“国产 API Key + 多 Key 池化”；
+- 用户自己选，比我们替用户决定更符合“人人可用”。
+
+### 14.2 前置条件（缺一不可）
+
+1. **许可审计**：Magpie core 是 MIT，但要审依赖、打包的 Agent/插件许可；订阅 OAuth 复用有 Provider ToS 风险，商业版默认只走 API Key。
+2. **可控的 headless 接口**：Magpie 目前是完整 App（菜单栏/TUI/Web/CLI），不是 headless engine；必须有稳定的 CLI/HTTP 管理接口，否则只能“接入已有 Magpie”，不能由我们托管生命周期。
+3. **协议 Conformance**：四协议互转、streaming、tool calls、reasoning 必须跑同一套测试；不能只看 README。
+4. **数据隔离**：`~/.omr` 与 Magpie 数据目录/端口/配置完全分离；两个引擎不要共享配置或凭据。
+5. **版本固定**：托管模式必须 pin 版本、关闭 Magpie 自动更新、保留回滚；它的发版节奏太快。
+6. **支持边界**：OMR 默认/推荐；Magpie 标注实验性；不承诺跨引擎配置迁移。
+
+### 14.3 产品形态
+
+- 首版只做 **“安装两个引擎，同一时间启用一个”**，不做同时运行；
+- 高级设置里提供 `Engine: OMR / Magpie`，默认 OMR；
+- OMR 用 `3456`，Magpie 用 `3425`，各自写 Agent 配置；不要先加一层前置代理；
+- 检测到用户已装 Magpie 时，优先“接入现有实例”，不要强制重装；
+- 如果 Magpie 没有稳定管理接口，就只提供“连接已有 Magpie”文档，不把它做成可托管内核。
+
+### 14.4 3–5 天 POC
+
+- 3 个 Agent（Claude Code / Codex / OpenCode）× 3 个 Provider；
+- 协议矩阵 + p95 开销 + 首次跑通时间；
+- 许可/ToS 一页结论；
+- 通过则进下一版实验开关；不通过就保留“Magpie 接入文档”，不进入安装器。
+
+---
+
+## 15. 变更日志
 
 - 2026-10-30：首版。按“人人可用、简单易用、协议多样性/转换、内核可替换”的目标重做单机对比；独立核对 Magpie/CLIProxyAPI/OpenCodex/Bifrost/LiteLLM 的 GitHub 数据与 README；给出 CLIProxyAPI 当前内核建议、Bifrost 性能备选、Magpie 体验对标、OMR/CCR 控制面定位，以及两周实测计划。
 - 2026-10-30：追加 §11“有界面的本地代理 + 可选内核”。记录“也许不需要 OMR，只需要一个有界面的本地代理”的产品假设；推荐 A（单内核 + 自研 UI）+ B（OMR 可选适配器），C（多内核选择器）只放高级设置。
+- 2026-10-30：追加 §14“OMR + Magpie 双引擎（待验证）”。结论：可做实验性高级选项，但需先过许可/ToS、headless 管理接口、协议 Conformance、数据隔离、版本固定五道门；首版不同时运行。
