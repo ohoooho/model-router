@@ -212,8 +212,8 @@ artifacts:
     platform: any
     kind: archive
     path: install.tar.gz
-    sha256: 26f098fb99ebbfe8b32014c9e18f98f8c5c09ad43faab2b3ef11a9985eec7ea8
-    size_bytes: 36884
+    sha256: e86bb35b54b3c6c29205e87dce3af3de4dafd8cd16e8d1bf3fdd92f017aa3de3
+    size_bytes: 36872
 
   - id: omr-offline-package
     version: 0.1.0-fork3.0.18+p5
