@@ -12,7 +12,7 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COMPONENT_YAML="${SCRIPT_DIR}/component.yaml"
+COMPONENT_YAML="${COMPONENT_YAML:-${SCRIPT_DIR}/component.yaml}"
 NPM_COMMAND="${NPM_COMMAND:-npm}"
 NODE_COMMAND="${NODE_COMMAND:-node}"
 
