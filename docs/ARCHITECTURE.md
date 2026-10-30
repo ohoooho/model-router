@@ -330,6 +330,7 @@ OMR 工具脚本（omr-health.sh / omr-rebuild.sh / omr-verify.sh）放 OMR 仓 
 
 - [`HEADERS.md`](./HEADERS.md) — HTTP 协议头体系（dual-read 详情）
 - [`ROUTING.md`](./ROUTING.md) — 4 策略 + effective_weight 公式
+- [`LOCAL-GATEWAY-COMPARISON.md`](./LOCAL-GATEWAY-COMPARISON.md) — 单机本地网关对比与内核替换策略
 - [`CHANGELOG.md`](./CHANGELOG.md) — commit 时间线
 - [`PATCHES.md`](./PATCHES.md) — 6 个 patch 索引
 - [`DECISIONS.md`](./DECISIONS.md) — 设计决策日志
