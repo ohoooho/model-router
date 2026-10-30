@@ -77,6 +77,16 @@ OMR_STRICT_OFFLINE=1 OMR_INSTALL_MODE=offline OMR_TARBALL=./omr-0.1.0.tgz ./inst
 完全离线物料（含跨平台依赖缓存）仍是发行前工作；未预热 cache 时脚本会明确失败，不会
 静默改成在线安装。
 
+## 回归测试
+
+重复部署保护有独立回归：
+
+```bash
+bash install/test-reinstall-preserves-config.sh
+```
+
+覆盖：已有真实 Key/自定义 Provider/自定义模型/自定义 `virtual_models` 在重复 configure 后不变；旧 `60/100000` 限流只清理一次。
+
 ## 备份与回滚
 
 配置写入前会备份 `config.sqlite` 以及存在的 `-wal`/`-shm` sidecar：
