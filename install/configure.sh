@@ -132,6 +132,15 @@ echo "      license:       ${LICENSE_PATH}"
 
 # ===== 4. backup 已有 config (契约 §7.2: 写前必 backup) =====
 CONFIG_DB="${OMR_DATA_DIR}/config.sqlite"
+
+# 已有配置默认不重写：重复部署/重装不应把 Provider、Key、模型路由覆盖成
+# 默认值或 fake 占位。需要重配时显式设置 OMR_RECONFIGURE_EXISTING=1。
+if [ -f "${CONFIG_DB}" ] && [ "${OMR_RECONFIGURE_EXISTING:-0}" != "1" ]; then
+    echo "==> 检测到已有 OMR 配置：跳过 configure，保留现有 Provider/Key/模型"
+    echo "    需要重配请设置 OMR_RECONFIGURE_EXISTING=1 后重跑"
+    exit 0
+fi
+
 echo "==> 1) backup 已有 config (契约 §7.2)"
 if [ -f "${CONFIG_DB}" ]; then
     BACKUP="${CONFIG_DB}.bak-$(date +%Y%m%d-%H%M%S)"
@@ -147,6 +156,27 @@ fi
 
 # ===== 5. 用 node 写 SQLite (契约 §6.2.4: TX_CONTEXT_FILE 0600, 不进命令行) =====
 echo "==> 2) 写 config (node + node:sqlite, Key 走 env 不进参数)"
+
+# 模板占位 / fake 值不能当真实 admin key。
+case "${ADMIN_API_KEY}" in
+    ""|"***"|fake_*|"<"*">") ADMIN_API_KEY="" ;;
+esac
+
+# 已有配置里如果已有 local-gateway admin key，重配时不要换掉它，
+# 否则正在使用旧 key 的本地客户端会全部 401。
+if [ -z "${ADMIN_API_KEY}" ] && [ -f "${CONFIG_DB}" ]; then
+    ADMIN_API_KEY=$(node - "${CONFIG_DB}" <<'NODE' 2>/dev/null || true
+const { DatabaseSync } = require('node:sqlite');
+const db = new DatabaseSync(process.argv[2], { readOnly: true });
+const row = db.prepare("SELECT encrypted_key FROM api_keys WHERE id='local-gateway' AND encryption='plain'").get();
+db.close();
+process.stdout.write(row?.encrypted_key || '');
+NODE
+)
+    case "${ADMIN_API_KEY}" in
+        ""|"***"|fake_*|"<"*">") ADMIN_API_KEY="" ;;
+    esac
+fi
 
 # 生成 admin api key (如果没给, 用 openssl 随机)
 if [ -z "${ADMIN_API_KEY}" ]; then

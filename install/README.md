@@ -17,7 +17,19 @@ npm prefix -g
 npm root -g
 ```
 
-已有 OMR 时，脚本会跳过覆盖和升级。
+已有 OMR 时，脚本会跳过覆盖和升级，并且**默认不再执行 configure**，
+以免重复部署覆盖现有 Provider、Key、`virtual_models` 或用户手写的模型列表。
+需要显式重配时加 `--reconfigure`：
+
+```bash
+./install.sh --reconfigure
+# 或
+OMR_RECONFIGURE_EXISTING=1 ./install.sh
+```
+
+重配时如果某些 Key 没提供，安装器不会用空值/fake 占位覆盖已有 Key；
+内置 key 也不再写默认 `rpm/tpm`。旧安装器写入的 `60/100000`、`30/50000`
+只会在首次 configure 时一次性清理，之后用户自己在 UI 里设置的限流会被保留。
 
 正式发布时 `component.yaml` 的 `release.default_version` 必须和
 `packages/cli/package.json` 以及已发布 npm 包一致，不能使用 `latest`。

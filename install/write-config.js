@@ -28,8 +28,20 @@ const CONFIG_DB = path.join(OMR_DATA_DIR, 'config.sqlite');
 // 2. inputs (TX_CONTEXT_FILE 0600 受保护, 契约 §6.2.4)
 // 4 场景 baozi_key (K-261 锁点, 老板 07:51 lockin)
 // 模板表达式 {{BAOZI_<SCENE>_KEY}} + fake_<scene>_*** 占位
+function isPlaceholderSecret(value) {
+  if (!value) return true;
+  const text = String(value).trim();
+  return (
+    text === '' ||
+    text === '***' ||
+    text.startsWith('fake_') ||
+    text.includes('{{') ||
+    (text.startsWith('<') && text.endsWith('>'))
+  );
+}
+
 function resolveSceneKey(envVal, fakeName) {
-  if (envVal && envVal.trim() && envVal.indexOf('{{') === -1) return envVal.trim();
+  if (envVal && !isPlaceholderSecret(envVal)) return envVal.trim();
   return 'fake_' + fakeName + '_***';
 }
 const SCENE_KEYS = {
@@ -143,7 +155,27 @@ const OMR_CONFIG = {
 upsertConfig.run('omr', JSON.stringify(OMR_CONFIG));
 upsertConfig.run('gateway', JSON.stringify(OMR_CONFIG.gateway));
 upsertConfig.run('baozi', JSON.stringify(OMR_CONFIG.baozi));
-upsertConfig.run('virtual_models', JSON.stringify(OMR_CONFIG.virtual_models));
+
+// virtual_models 是用户可改的路由资产：保留已有条目，只补默认缺失项。
+// 不能直接用安装器默认值覆盖，否则重配一次用户自定义虚拟模型就没了。
+const virtualModelsRow = db
+  .prepare("SELECT value_json FROM app_config WHERE key='virtual_models'")
+  .get();
+let existingVirtualModels = {};
+if (virtualModelsRow?.value_json) {
+  try {
+    const parsed = JSON.parse(virtualModelsRow.value_json);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      existingVirtualModels = parsed;
+    }
+  } catch {
+    existingVirtualModels = {};
+  }
+}
+upsertConfig.run(
+  'virtual_models',
+  JSON.stringify({ ...OMR_CONFIG.virtual_models, ...existingVirtualModels })
+);
 
 // 5.1 写运行时真正读取的 default 快照。
 // loadAppConfig() 读取 app_config.default；上面的命名空间记录是 OMR
@@ -156,12 +188,20 @@ if (defaultRow?.value_json) {
 }
 const providerModels = ['MiniMax-M3', 'claude-sonnet-4-5', 'kimi-k2.6', 'kimi-k2.7-code', 'deepseek-v3', 'qwen3-max', 'glm-4.6'];
 const existingProviders = Array.isArray(defaultConfig.Providers) ? defaultConfig.Providers : [];
+const existingBaoziProvider = existingProviders.find((provider) => provider && provider.name === 'baozi') || {};
+const incomingBaoziKey = process.env.BUTLER_BAOZI_KEY || '';
+const existingBaoziModels = Array.isArray(existingBaoziProvider.models)
+  ? existingBaoziProvider.models.filter((model) => typeof model === 'string' && model.trim())
+  : [];
+const existingBaoziKey = typeof existingBaoziProvider.apiKey === 'string' ? existingBaoziProvider.apiKey : '';
 const baoziProvider = {
-  ...(existingProviders.find((provider) => provider && provider.name === 'baozi') || {}),
+  ...existingBaoziProvider,
   name: 'baozi',
-  baseUrl: process.env.BAOZI_API_BASE || 'https://llm.ohoooho.com/v1',
-  apiKey: process.env.BUTLER_BAOZI_KEY || '',
-  models: providerModels,
+  // 重配时如果没给真 key，不要用空串/fake 覆盖现有 key，否则模型立即失效。
+  baseUrl: process.env.BAOZI_API_BASE || existingBaoziProvider.baseUrl || 'https://llm.ohoooho.com/v1',
+  apiKey: isPlaceholderSecret(incomingBaoziKey) && existingBaoziKey ? existingBaoziKey : incomingBaoziKey,
+  // 保留用户手写的模型，并补上安装器默认模型；不要整表覆盖。
+  models: Array.from(new Set([...existingBaoziModels, ...providerModels])),
 };
 const otherProviders = existingProviders.filter((provider) => provider && provider.name !== 'baozi');
 const router = defaultConfig.Router && typeof defaultConfig.Router === 'object' ? defaultConfig.Router : {};
@@ -192,38 +232,89 @@ const upsertApiKey = db.prepare(`
   INSERT INTO api_keys (id, name, encrypted_key, encryption, created_at, expires_at, limits_json)
   VALUES (?, ?, ?, ?, datetime('now'), ?, ?)
   ON CONFLICT(id) DO UPDATE SET
-    encrypted_key=excluded.encrypted_key,
-    encryption=excluded.encryption,
-    expires_at=excluded.expires_at
+    encrypted_key=CASE
+      WHEN excluded.encrypted_key = ''
+        OR excluded.encrypted_key = '***'
+        OR excluded.encrypted_key GLOB 'fake_*'
+        OR excluded.encrypted_key GLOB '<*>'
+        OR instr(excluded.encrypted_key, '{{') > 0
+      THEN api_keys.encrypted_key
+      ELSE excluded.encrypted_key
+    END,
+    encryption=CASE
+      WHEN excluded.encrypted_key = ''
+        OR excluded.encrypted_key = '***'
+        OR excluded.encrypted_key GLOB 'fake_*'
+        OR excluded.encrypted_key GLOB '<*>'
+        OR instr(excluded.encrypted_key, '{{') > 0
+      THEN api_keys.encryption
+      ELSE excluded.encryption
+    END,
+    expires_at=CASE
+      WHEN excluded.encrypted_key = ''
+        OR excluded.encrypted_key = '***'
+        OR excluded.encrypted_key GLOB 'fake_*'
+        OR excluded.encrypted_key GLOB '<*>'
+        OR instr(excluded.encrypted_key, '{{') > 0
+      THEN api_keys.expires_at
+      ELSE excluded.expires_at
+    END
 `);
 
-// 一次性迁移：旧安装器在 2026-09-20 给内置 key 写死了 rpm/tpm。
-// 只清理与旧种子值完全一致的行，用户自定义的限流不会被误删。
-const legacySeededLimits = {
-  'baozi-persona': { rpm: 60, tpm: 100000 },
-  'baozi-butler': { rpm: 30, tpm: 50000 },
-  'baozi-chat-auto': { rpm: 60, tpm: 100000 },
-  'baozi-coding-auto': { rpm: 60, tpm: 100000 },
-  'baozi-assist-auto': { rpm: 60, tpm: 100000 },
-  'baozi-team-auto': { rpm: 60, tpm: 100000 },
-};
-const selectLimits = db.prepare('SELECT limits_json FROM api_keys WHERE id = ?');
-const updateLimits = db.prepare('UPDATE api_keys SET limits_json = ? WHERE id = ?');
-for (const [id, seed] of Object.entries(legacySeededLimits)) {
-  const row = selectLimits.get(id);
-  if (!row) continue;
-  let limits;
+// 一次性清理旧安装器在 2026-09-20 写死的垃圾限流值。
+// 60/100000、30/50000 不是产品默认值，只是当时的错误种子；
+// 清理后不再写入任何默认 rpm/tpm。用户要限流，自己在 UI 里设。
+//
+// 关键：用 config_schema_migrations 标记只跑一次。否则每次 configure
+// 都会重新检查，用户后来显式设置的 60/100000 也会被再次清掉。
+const limitsSeedCleanupMigrationId = 'limits-seed-cleanup-v1';
+const limitsCleanupApplied = db.prepare(
+  'SELECT 1 FROM config_schema_migrations WHERE id = ?'
+).get(limitsSeedCleanupMigrationId);
+
+if (!limitsCleanupApplied) {
+  const legacySeededLimits = {
+    'baozi-persona': { rpm: 60, tpm: 100000 },
+    'baozi-butler': { rpm: 30, tpm: 50000 },
+    'baozi-chat-auto': { rpm: 60, tpm: 100000 },
+    'baozi-coding-auto': { rpm: 60, tpm: 100000 },
+    'baozi-assist-auto': { rpm: 60, tpm: 100000 },
+    'baozi-team-auto': { rpm: 60, tpm: 100000 },
+  };
+  const selectLimits = db.prepare('SELECT limits_json FROM api_keys WHERE id = ?');
+  const updateLimits = db.prepare('UPDATE api_keys SET limits_json = ? WHERE id = ?');
+
+  db.exec('BEGIN IMMEDIATE');
   try {
-    limits = JSON.parse(row.limits_json || '{}');
-  } catch {
-    continue;
+    for (const [id, seed] of Object.entries(legacySeededLimits)) {
+      const row = selectLimits.get(id);
+      if (!row) continue;
+      let limits;
+      try {
+        limits = JSON.parse(row.limits_json || '{}');
+      } catch {
+        continue;
+      }
+      if (!limits || typeof limits !== 'object' || Array.isArray(limits)) continue;
+      if (limits.rpm !== seed.rpm || limits.tpm !== seed.tpm) continue;
+      delete limits.rpm;
+      delete limits.tpm;
+      updateLimits.run(JSON.stringify(limits), id);
+      console.log(`  🔧 清理旧限流种子: ${id}`);
+    }
+    db.prepare(`
+      INSERT INTO config_schema_migrations (id, applied_at, details_json)
+      VALUES (?, datetime('now'), ?)
+      ON CONFLICT(id) DO NOTHING
+    `).run(limitsSeedCleanupMigrationId, JSON.stringify({
+      applied_by: 'omr-installer',
+      reason: 'remove legacy seeded rpm/tpm; no default limits are written',
+    }));
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
   }
-  if (!limits || typeof limits !== 'object' || Array.isArray(limits)) continue;
-  if (limits.rpm !== seed.rpm || limits.tpm !== seed.tpm) continue;
-  delete limits.rpm;
-  delete limits.tpm;
-  updateLimits.run(JSON.stringify(limits), id);
-  console.log(`  🔧 清理旧限流种子: ${id}`);
 }
 
 // 双 baozi_key (老板 17:42 lockin)

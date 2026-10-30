@@ -23,6 +23,8 @@ OMR_REQUESTED_VERSION="${OMR_VERSION:-}"
 OMR_VERSION="${OMR_REQUESTED_VERSION:-${DEFAULT_VERSION}}"
 OMR_VERSION_POLICY="${OMR_VERSION_POLICY:-default}"
 OMR_INSTALL_MODE="${OMR_INSTALL_MODE:-online}"
+OMR_RECONFIGURE_EXISTING="${OMR_RECONFIGURE_EXISTING:-0}"
+export OMR_RECONFIGURE_EXISTING
 OMR_OFFLINE_TARBALL_DIR="${OMR_OFFLINE_TARBALL_DIR:-${SCRIPT_DIR}/../artifacts}"
 OMR_TARBALL="${OMR_TARBALL:-${OMR_OFFLINE_TARBALL_DIR}/omr-${OMR_VERSION}.tgz}"
 
@@ -30,11 +32,13 @@ for arg in "$@"; do
     case "$arg" in
         --offline) OMR_INSTALL_MODE="offline" ;;
         --online)  OMR_INSTALL_MODE="online" ;;
+        --reconfigure) OMR_RECONFIGURE_EXISTING=1 ;;
         --version=*) OMR_VERSION="${arg#--version=}"; OMR_VERSION_POLICY="explicit" ;;
         --channel=*) OMR_VERSION_POLICY="channel" ;;
         --help|-h)
-            echo "用法: OMR_VERSION=<ver> $0 [--online|--offline|--version=<ver>|--channel=<name>]"
+            echo "用法: OMR_VERSION=<ver> $0 [--online|--offline|--reconfigure|--version=<ver>|--channel=<name>]"
             echo "  default_version (从 component.yaml): ${DEFAULT_VERSION}"
+            echo "  --reconfigure: 已安装时也重新写配置（默认跳过，保护现有 Provider/Key/模型）"
             exit 0
             ;;
     esac
@@ -76,6 +80,13 @@ if [ -f "${INSTALL_DIR}/package.json" ]; then
     INSTALLED_VERSION=$(node -e 'console.log(require(process.argv[1]).version)' "${INSTALL_DIR}/package.json")
     echo "==> OMR 已安装（version=${INSTALLED_VERSION}），跳过覆盖/升级"
     SKIPPED_EXISTING=1
+fi
+
+# 已安装时默认不跑 configure：重装/重复部署不应覆盖现有 Provider、Key、
+# virtual_models 或用户手写的模型列表。需要改配置时显式 --reconfigure。
+if [ "${SKIPPED_EXISTING}" -eq 1 ] && [ "${OMR_RECONFIGURE_EXISTING}" != "1" ]; then
+    echo "==> 保护现有配置：跳过 configure（需要重配请加 --reconfigure 或 OMR_RECONFIGURE_EXISTING=1）"
+    OMR_SKIP_CONFIGURE=1
 fi
 
 if [ "${SKIPPED_EXISTING}" -eq 0 ]; then
