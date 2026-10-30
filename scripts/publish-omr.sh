@@ -48,8 +48,8 @@ trap 'rm -rf "${STAGE_DIR}"' EXIT
 echo "==> 1) 构建物料 (ref=${REF:-HEAD})"
 "${SCRIPT_DIR}/build-release-materials.sh" ${REF:+--ref "${REF}"} --out "${STAGE_DIR}"
 
-ARCHIVE_SHA=$(grep -E "^install\.tar\.gz" "${STAGE_DIR}/materials.sha256" | awk '{print $2}')
-YAML_SHA=$(grep -E "^component\.yaml" "${STAGE_DIR}/materials.sha256" | awk '{print $2}')
+ARCHIVE_SHA=$(grep -E "^install\.tar\.gz" "${STAGE_DIR}/materials.sha256" | awk '{print $2}' | sed 's/^sha256=//')
+YAML_SHA=$(grep -E "^component\.yaml" "${STAGE_DIR}/materials.sha256" | awk '{print $2}' | sed 's/^sha256=//')
 echo "    install.tar.gz  ${ARCHIVE_SHA}"
 echo "    component.yaml  ${YAML_SHA}"
 

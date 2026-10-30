@@ -55,7 +55,6 @@ cd "${REPO_ROOT}"
 REF="${REF:-$(git rev-parse HEAD)}"
 COMMIT_SHA=$(git rev-parse "${REF}")
 COMMIT_SHORT=$(git rev-parse --short "${REF}")
-COMMIT_TIME=$(git log -1 --format=%ct "${REF}")
 
 if ! git cat-file -e "${COMMIT_SHA}^{commit}" 2>/dev/null; then
   echo "ERR: ref 不存在或不是 commit: ${REF}" >&2
@@ -93,6 +92,17 @@ git archive --format=tar "${COMMIT_SHA}" install/ | tar -xf - -C "${WORK_DIR}"
   exit 1
 }
 
+# 权限归一 —— 归档字节只能取决于内容, 不能取决于"这棵树是怎么落到磁盘上的"。
+# git archive 带出来的是 664/775, 而 cp -R 会按 umask 变成 644/755,
+# 同一份内容打出两个不同哈希, 声明与物料就对不上号。
+normalize_modes() {
+  local root="$1"
+  find "${root}" -type d -exec chmod 755 {} +
+  find "${root}" -type f -exec chmod 644 {} +
+  find "${root}" -type f -perm -u+x -exec chmod 755 {} +
+}
+normalize_modes "${WORK_DIR}/install"
+
 COMPONENT_YAML="${WORK_DIR}/component.yaml.pristine"
 cp "${WORK_DIR}/install/component.yaml" "${COMPONENT_YAML}"
 
@@ -108,12 +118,20 @@ python3 "${SCRIPT_DIR}/component-manifest.py" placeholder "${ARCHIVE_YAML}"
 
 # ---------------------------------------------------------------------------
 # 3. 确定性打包 install.tar.gz
-#    --sort=name / --mtime / --owner=0 / gzip -n ⇒ 同一个 ref 永远同一份字节
+#
+#    mtime 必须是**固定值**, 不能用 commit 时间 —— 归档里的 component.yaml
+#    虽然把自己的哈希换成了占位符 (内容与声明值无关), 但打包时刻若跟着
+#    commit 时间走, 归档字节就会跟着变, 于是:
+#      "仓里声明的哈希 = 刚构建的归档哈希" 这条关系永远对不上
+#      (改一次清单 → 提交 → 重新构建 → 哈希又变了 → 无限回归)。
+#    固定 mtime 之后, 归档字节只取决于**内容**, 上面那个关系才成立。
+#    SOURCE_DATE_EPOCH 可以覆盖 (可复现构建的惯例)。
 # ---------------------------------------------------------------------------
-echo "==> 打包 install.tar.gz (确定性)"
+echo "==> 打包 install.tar.gz (确定性, mtime 固定)"
 mkdir -p "${OUT_DIR}"
 ARCHIVE="${OUT_DIR}/install.tar.gz"
-tar --sort=name --mtime="@${COMMIT_TIME}" --owner=0 --group=0 --numeric-owner \
+MATERIALS_EPOCH="${SOURCE_DATE_EPOCH:-0}"
+tar --sort=name --mtime="@${MATERIALS_EPOCH}" --owner=0 --group=0 --numeric-owner \
     -cf - -C "${WORK_DIR}" install/ | gzip -n -9 > "${ARCHIVE}"
 
 ARCHIVE_SHA=$(sha256_file "${ARCHIVE}")
@@ -131,6 +149,32 @@ python3 "${SCRIPT_DIR}/component-manifest.py" fill \
 YAML_SHA=$(sha256_file "${PUBLISHED_YAML}")
 YAML_SIZE=$(file_size "${PUBLISHED_YAML}")
 echo "    component.yaml  sha256=${YAML_SHA}  size=${YAML_SIZE}"
+
+# ---------------------------------------------------------------------------
+# 4b. 不动点自检
+#
+#     把刚生成的独立清单写回仓里 (它声明的就是上面那份归档的哈希), 再重建一次,
+#     归档哈希必须不变。不变 ⇒ 仓里的声明与已发布物料能互相自洽;
+#     变了 ⇒ 归档字节还依赖别的东西 (mtime? 顺序?), 声明与物料永远对不上号。
+# ---------------------------------------------------------------------------
+echo "==> 不动点自检 (写回声明后重建, 归档哈希应不变)"
+FP_DIR="${WORK_DIR}/fixedpoint"
+mkdir -p "${FP_DIR}"
+cp -R "${WORK_DIR}/install" "${FP_DIR}/install"
+cp "${PUBLISHED_YAML}" "${FP_DIR}/install/component.yaml"
+python3 "${SCRIPT_DIR}/component-manifest.py" placeholder "${FP_DIR}/install/component.yaml"
+normalize_modes "${FP_DIR}/install"
+tar --sort=name --mtime="@${MATERIALS_EPOCH}" --owner=0 --group=0 --numeric-owner \
+    -cf - -C "${FP_DIR}" install/ | gzip -n -9 > "${FP_DIR}/install.tar.gz"
+FP_SHA=$(sha256_file "${FP_DIR}/install.tar.gz")
+if [ "${FP_SHA}" != "${ARCHIVE_SHA}" ]; then
+  echo "ERR: 不动点不成立 —— 写回声明后重建的归档哈希变了" >&2
+  echo "    首次构建: ${ARCHIVE_SHA}" >&2
+  echo "    写回后重建: ${FP_SHA}" >&2
+  echo "    说明归档字节还依赖归档哈希以外的东西, 声明与物料永远对不上号。" >&2
+  exit 1
+fi
+echo "    ✅ 归档哈希不变 (${ARCHIVE_SHA})"
 
 # ---------------------------------------------------------------------------
 # 5. 物料对照表 —— 写清每份物料来自哪个 commit
