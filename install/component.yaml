@@ -199,9 +199,9 @@ artifacts:
     kind: npm-tarball
     package: "@ohoooho/model-router"
     path: omr-0.1.0.tgz
-    sha256: 9e216f5182c3bfc78ada3602ba0e036b97405ec085a338fbc657fe627d048691
-    size_bytes: 5041986
-    npm_integrity: sha512-OnPce0WixZo1rX/a7AON53t65oiDQpwI0rx1tstEyaiJHw5do2ZU/KrsaSwGNWZ/x1PhvpQQFAPdctTUGWa6kQ==
+    sha256: 99b210dc066d81846db91762de07d1c59fda23141b6458f9efd9f4f3a311da85
+    size_bytes: 4849354
+    npm_integrity: sha512-GGMGLvH0vkQu56D0KBedwP1qcgyIKiQDy3WHHlVdQVdq/cv49aTbUE5MTkWoRnDtY/xhnJ64B+ZjNkckknjGJw==
 
   - id: omr-component-scripts
     version: 0.1.0-fork3.0.18+p5
