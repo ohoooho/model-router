@@ -203,14 +203,6 @@ artifacts:
     size_bytes: 4849354
     npm_integrity: sha512-GGMGLvH0vkQu56D0KBedwP1qcgyIKiQDy3WHHlVdQVdq/cv49aTbUE5MTkWoRnDtY/xhnJ64B+ZjNkckknjGJw==
 
-  - id: omr-component-scripts
-    version: 0.1.0-fork3.0.18+p5
-    platform: any
-    kind: archive
-    path: install.tar.gz          # 本仓 install/ 整个目录打的 tar.gz (含 manifest + 8 脚本 + template)
-    sha256: <generated-sha256-by-build>
-    size_bytes: <generated-by-wc>
-
 # 用户目录、配置和系统权限边界。
 # 失职 243 闭环 (K-302 边界修正): OMR fork 仓是我的项目, 路径品牌化由我负责.
 # OMR fork 源码加 OMR_DATA_DIR env (cli.js getOMRDataDir() helper), 优先级最高.
