@@ -12,6 +12,9 @@ Environment=NODE_ENV=production
 # 删 OMR_CONFIG_PATH=/root/.omr/config.json (错的, OMR fork 不读 JSON)
 # 加 OMR_DATA_DIR=/root/.omr (对, OMR fork cli.js 加了 helper 读这个 env, 默认 ~/.omr)
 Environment=OMR_DATA_DIR=/root/.omr BAOZI_CHAT_KEY= BAOZI_CODING_KEY= BAOZI_ASSIST_KEY= BAOZI_TEAM_KEY= PERSONA_BAOZI_KEY= BUTLER_BAOZI_KEY=
+
+# Web 管理面固定 token：不设则每次重启随机 → 浏览器 localStorage 失效
+EnvironmentFile=-/root/.omr/web-auth.env
 ExecStart=/usr/local/bin/node /usr/local/lib/node_modules/@ohoooho/model-router/dist/main/cli.js serve --no-open
 Restart=always
 RestartSec=5
