@@ -213,7 +213,14 @@ fi
 # ===== 5. 装 systemd unit (linux, macos 跳过) =====
 if [ "$(uname -s)" = "Linux" ]; then
     echo "==> 3) install systemd unit"
-    cp "${SCRIPT_DIR}/omr.service" /etc/systemd/system/omr.service
+    # OMR_DATA_DIR 可被品牌化 (configure.sh 支持), 而 omr.service 里
+    # EnvironmentFile / OMR_DATA_DIR 写死 /root/.omr => 两者会错位,
+    # token 文件读不到 => 每次重启 token 随机 => 浏览器 localStorage 失效。
+    # 这里按实际 OMR_DATA_DIR 对齐 (默认值与原来一致, 不改变既有行为)。
+    OMR_DATA_DIR="${OMR_DATA_DIR:-/root/.omr}"
+    sed -e "s#^Environment=OMR_DATA_DIR=/root/.omr#Environment=OMR_DATA_DIR=${OMR_DATA_DIR}#" \
+        -e "s#^EnvironmentFile=-/root/.omr/web-auth.env#EnvironmentFile=-${OMR_DATA_DIR}/web-auth.env#" \
+        "${SCRIPT_DIR}/omr.service" > /etc/systemd/system/omr.service
     systemctl daemon-reload
     systemctl enable omr.service
     echo "    omr.service installed + enabled; start deferred until after configure"

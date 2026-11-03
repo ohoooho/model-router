@@ -45,7 +45,14 @@ type StopCliOptions = {
   help: boolean;
 };
 
-type CliOptions = ProfileCliOptions | StopCliOptions | WebCliOptions;
+type ConsoleCliOptions = {
+  command: "console";
+  help: boolean;
+  open: boolean;
+  port?: number;
+};
+
+type CliOptions = ConsoleCliOptions | ProfileCliOptions | StopCliOptions | WebCliOptions;
 
 type ServiceState = {
   host?: string;
@@ -125,6 +132,14 @@ async function main(): Promise<void> {
       return;
     }
     await stopService();
+    return;
+  }
+  if (options.command === "console") {
+    if (options.help) {
+      printConsoleHelp(0);
+      return;
+    }
+    await runConsole(options);
     return;
   }
   if (options.command === "web") {
@@ -272,6 +287,9 @@ function parseArgs(args: string[]): CliOptions {
   if (args[0] === "stop") {
     return parseStopArgs(args.slice(1));
   }
+  if (args[0] === "console") {
+    return parseConsoleArgs(args.slice(1));
+  }
   if (args[0] === "serve" || args[0] === "web") {
     return parseWebArgs(args.slice(1), "web");
   }
@@ -324,6 +342,153 @@ function profileAppName(profile: Pick<ProfileConfig, "agent">): string {
     return "Claude Design";
   }
   return codexDesktopAppName;
+}
+
+type ConsoleProbeResult = {
+  alive: boolean;
+  authenticated: boolean;
+};
+
+function parseConsoleArgs(args: string[]): ConsoleCliOptions {
+  const options: ConsoleCliOptions = {
+    command: "console",
+    help: false,
+    open: false
+  };
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--help" || arg === "-h") {
+      options.help = true;
+      continue;
+    }
+    if (arg === "--open") {
+      options.open = true;
+      continue;
+    }
+    if (arg === "--no-open") {
+      options.open = false;
+      continue;
+    }
+    if (arg === "--port") {
+      index += 1;
+      options.port = parsePort(requiredArg(args[index], "--port"));
+      continue;
+    }
+    if (arg.startsWith("--port=")) {
+      options.port = parsePort(arg.slice("--port=".length));
+      continue;
+    }
+    throw new Error(`Unknown console option: ${arg}`);
+  }
+  return options;
+}
+
+function consoleDataDir(): string {
+  const configured = process.env.OMR_DATA_DIR?.trim();
+  if (configured) {
+    return configured;
+  }
+  return CONFIGDIR;
+}
+
+function readEnvPort(name: string): number | undefined {
+  const raw = process.env[name]?.trim();
+  if (!raw) {
+    return undefined;
+  }
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed > 0 && parsed <= 65535 ? parsed : undefined;
+}
+
+/**
+ * 解析 Web 管理面的鉴权 token。
+ * 顺序: 进程 env → <dataDir>/web-auth.env (systemd EnvironmentFile 同款)。
+ * 两者都没有 ⇒ 服务端每次启动随机生成, 浏览器存的 token 会失效, 管理操作 401。
+ */
+function resolveConsoleAuthToken(dataDir: string): string | undefined {
+  const fromEnv = process.env.OMR_WEB_AUTH_TOKEN?.trim();
+  if (fromEnv) {
+    return fromEnv;
+  }
+  const envFile = path.join(dataDir, "web-auth.env");
+  if (!existsSync(envFile)) {
+    return undefined;
+  }
+  try {
+    const content = readFileSync(envFile, "utf8");
+    for (const rawLine of content.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#")) {
+        continue;
+      }
+      const separator = line.indexOf("=");
+      if (separator < 0) {
+        continue;
+      }
+      const key = line.slice(0, separator).trim();
+      if (key !== "OMR_WEB_AUTH_TOKEN") {
+        continue;
+      }
+      const value = line.slice(separator + 1).trim().replace(/^["']|["']$/g, "");
+      return value || undefined;
+    }
+  } catch (error) {
+    process.stderr.write(`Failed to read ${envFile}: ${formatError(error)}\n`);
+  }
+  return undefined;
+}
+
+async function probeConsoleEndpoint(baseUrl: string, token: string | undefined): Promise<ConsoleProbeResult> {
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (token) {
+    headers["x-omr-web-auth"] = token;
+  }
+  try {
+    const response = await fetch(`${baseUrl}api/omr/rpc`, {
+      body: JSON.stringify({ args: [], method: "getAppInfo" }),
+      headers,
+      method: "POST",
+      signal: AbortSignal.timeout(4000)
+    });
+    if (response.status === 401) {
+      return { alive: true, authenticated: false };
+    }
+    return { alive: response.ok, authenticated: response.ok };
+  } catch {
+    return { alive: false, authenticated: false };
+  }
+}
+
+async function runConsole(options: ConsoleCliOptions): Promise<void> {
+  await verifyTaoxianLicenseOrExit();
+  const dataDir = consoleDataDir();
+  const port = options.port ?? readEnvPort("OMR_WEB_PORT") ?? readEnvPort("CCR_WEB_PORT") ?? 3458;
+  const baseUrl = `http://127.0.0.1:${port}/`;
+  const token = resolveConsoleAuthToken(dataDir);
+
+  const probe = await probeConsoleEndpoint(baseUrl, token);
+  if (!probe.alive) {
+    process.stderr.write(`OMR 管理服务没在跑 (${baseUrl})。先把它拉起来:\n`);
+    process.stderr.write(`  systemctl start omr\n`);
+    process.stderr.write(`  或者 ${cliCommandName()} start\n`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const url = token ? baseUrl + "?omr_web_token=" + encodeURIComponent(token) : baseUrl;
+  process.stdout.write(`OMR 控制台: ${url}\n`);
+  if (token) {
+    process.stdout.write(`链接带 token, 打开一次浏览器就记住了, 之后直接开 ${baseUrl} 即可。\n`);
+  } else {
+    process.stderr.write(`⚠️ 没找到 OMR_WEB_AUTH_TOKEN, 管理操作会 401。\n`);
+    process.stderr.write(`   修法: omr.service 里加 EnvironmentFile=-${path.join(dataDir, "web-auth.env")}\n`);
+  }
+  if (!probe.authenticated) {
+    process.stderr.write(`⚠️ 这个 token 服务端不认 (可能服务端重启时随机换过), 管理操作仍会 401。\n`);
+  }
+  if (options.open) {
+    await openManagementUrl(url);
+  }
 }
 
 function parseStopArgs(args: string[]): StopCliOptions {
@@ -606,6 +771,7 @@ function printHelp(exitCode: number): void {
     `  ${command} ui [--host <host>] [--port <port>] [--open|--no-open] [--gateway|--no-gateway]`,
     `  ${command} serve [--host <host>] [--port <port>] [--open|--no-open] [--gateway|--no-gateway]`,
     `  ${command} stop`,
+    `  ${command} console [--port <port>] [--open|--no-open]`,
     `  ${command} <profile-name-or-id> [cli|app] [-- <agent args>]`,
     "",
     "Notes:",
@@ -618,6 +784,7 @@ function printHelp(exitCode: number): void {
     `  ${command} ui`,
     `  ${command} serve --no-open`,
     `  ${command} stop`,
+    `  ${command} console`,
     `  ${command} Codex`,
     `  ${command} default-codex -- --model gpt-5-codex`,
     `  ${command} default-codex app`
@@ -671,6 +838,29 @@ function printUiHelp(exitCode: number): void {
     "  CCR_WEB_HOST        Default management server host.",
     "  CCR_WEB_PORT        Default management server port.",
     "  CCR_WEB_AUTH_TOKEN  Use this token for management UI and RPC authentication."
+  ].join("\n");
+  const stream = exitCode === 0 ? process.stdout : process.stderr;
+  stream.write(`${output}\n`);
+  process.exitCode = exitCode;
+}
+
+function printConsoleHelp(exitCode: number): void {
+  const command = cliCommandName();
+  const output = [
+    "Usage:",
+    `  ${command} console [--port <port>] [--open|--no-open]`,
+    "",
+    "Prints the OMR management console URL for an already-running OMR service.",
+    "Reuses the service's fixed auth token when one is configured, so the link works in a browser.",
+    "",
+    "Options:",
+    "  --port <port>    Management server port. Defaults to OMR_WEB_PORT / CCR_WEB_PORT or 3458.",
+    "  --open           Also open the URL in the default browser.",
+    "  --no-open        Only print the URL (default).",
+    "",
+    "Environment:",
+    "  OMR_WEB_AUTH_TOKEN  Token used for management UI and RPC authentication.",
+    "  OMR_DATA_DIR        Data directory. Defaults to the runtime config dir."
   ].join("\n");
   const stream = exitCode === 0 ? process.stdout : process.stderr;
   stream.write(`${output}\n`);
