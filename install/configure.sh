@@ -19,6 +19,33 @@ OMR_DATA_DIR="${OMR_DATA_DIR:-${HOME}/.omr}"
 mkdir -p "${OMR_DATA_DIR}"
 chmod 700 "${OMR_DATA_DIR}"
 
+# ===== 1.1 Web 管理面固定 token =====
+# 不设 OMR_WEB_AUTH_TOKEN 时, 服务每次重启都随机生成 => 浏览器 localStorage 里的
+# token 立刻失效, 用户每次都要重新拿链接 => 谈不上「一劳永逸」。
+# 这里在装机时生成一次并固定下来 (omr.service 用 EnvironmentFile=- 读它)。
+WEB_AUTH_ENV="${OMR_DATA_DIR}/web-auth.env"
+if [ ! -s "${WEB_AUTH_ENV}" ]; then
+    if command -v openssl >/dev/null 2>&1; then
+        WEB_AUTH_TOKEN="$(openssl rand -hex 32)"
+    else
+        WEB_AUTH_TOKEN="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+    fi
+    printf 'OMR_WEB_AUTH_TOKEN=%s\n' "${WEB_AUTH_TOKEN}" > "${WEB_AUTH_ENV}"
+    echo "    Web 管理 token 已生成: ${WEB_AUTH_ENV}"
+else
+    # 沿用已有 token: 必须把它读回变量, 否则 set -u 下后面的 web-console-url
+    # 写入会撞 "unbound variable" 直接中断整个装机 (重装/再 configure 必踩)。
+    WEB_AUTH_TOKEN="$(sed -n 's/^OMR_WEB_AUTH_TOKEN=//p' "${WEB_AUTH_ENV}" | head -1)"
+    echo "    Web 管理 token 已存在, 沿用: ${WEB_AUTH_ENV}"
+fi
+chmod 600 "${WEB_AUTH_ENV}"
+
+# 控制台入口 (含 token), 供用户直接打开; 权限同样收紧, 不进任何日志/回显
+WEB_CONSOLE_URL_FILE="${OMR_DATA_DIR}/web-console-url"
+printf 'http://127.0.0.1:3458/?omr_web_token=%s\n' "${WEB_AUTH_TOKEN}" > "${WEB_CONSOLE_URL_FILE}"
+chmod 600 "${WEB_CONSOLE_URL_FILE}"
+unset WEB_AUTH_TOKEN
+
 echo "==> OMR configure v3 (契约 §6.2 + OMR fork 真 6 表 schema + OMR_DATA_DIR 品牌化)"
 echo "    OMR_DATA_DIR = ${OMR_DATA_DIR}"
 
