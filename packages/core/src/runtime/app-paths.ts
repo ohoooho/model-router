@@ -8,6 +8,7 @@ export const APP_STORAGE_NAME = "omr";
 const homeDirEnv = "CCR_INTERNAL_HOME_DIR";
 const appDataDirEnv = "CCR_INTERNAL_APP_DATA_DIR";
 const userDataDirEnv = "CCR_INTERNAL_USER_DATA_DIR";
+const omrDataDirEnv = "OMR_DATA_DIR";
 
 type RuntimePathName = "appData" | "home" | "userData";
 
@@ -17,6 +18,20 @@ export function setRuntimeAppPaths(paths: RuntimeAppPaths): void {
   setPathEnv(homeDirEnv, paths.home);
   setPathEnv(appDataDirEnv, paths.appData);
   setPathEnv(userDataDirEnv, paths.userData);
+}
+
+/**
+ * Explicit data-dir override (OMR_DATA_DIR).
+ *
+ * When set, it becomes the single root for every runtime-owned path:
+ * config dir, data dir, config.sqlite, gateway runtime marker and service state.
+ * That is what makes an isolated instance (a second OMR on the same host)
+ * truly isolated: without it the instance shares the production CONFIGDIR and
+ * can stop the production managed gateway.
+ */
+export function resolveOmrDataDirOverride(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const value = env[omrDataDirEnv]?.trim();
+  return value || undefined;
 }
 
 export function resolveRuntimeAppPath(name: RuntimePathName): string {
@@ -37,7 +52,20 @@ export const LEGACY_CONFIGDIR = path.join(resolveRuntimeAppPath("home"), ".claud
 
 let configDir: string | undefined;
 
+function defaultRuntimeConfigDir(): string {
+  if (process.platform === "win32") {
+    return path.join(resolveRuntimeAppPath("appData"), APP_STORAGE_NAME);
+  }
+  return path.join(resolveRuntimeAppPath("home"), `.${APP_STORAGE_NAME}`);
+}
+
 export function resolveRuntimeConfigDir(): string {
+  // An explicit OMR_DATA_DIR is authoritative and re-read every call, so a
+  // process that changes it (tests, installers) never keeps a stale directory.
+  const explicitDataDir = resolveOmrDataDirOverride();
+  if (explicitDataDir) {
+    return explicitDataDir;
+  }
   if (configDir) {
     return configDir;
   }
@@ -57,6 +85,15 @@ export function resolveRuntimeConfigDir(): string {
 export function migrateLegacyConfigDir(): boolean {
   const newDir = resolveRuntimeConfigDir();
   const legacyDir = LEGACY_CONFIGDIR;
+
+  // An explicit OMR_DATA_DIR that points somewhere else than the default home
+  // directory is a deliberate choice of directory: never move the legacy
+  // directory into it, that would steal another instance's state.
+  // When it matches the default home directory the normal migration still runs.
+  const explicitDataDir = resolveOmrDataDirOverride();
+  if (explicitDataDir && path.resolve(explicitDataDir) !== path.resolve(defaultRuntimeConfigDir())) {
+    return false;
+  }
 
   // Normalize to avoid false positives from path differences
   if (path.resolve(newDir) === path.resolve(legacyDir)) {
@@ -80,6 +117,16 @@ export function migrateLegacyConfigDir(): boolean {
 }
 
 export function resolveRuntimeDataDir(): string {
+  // An explicit OMR_DATA_DIR owns the whole runtime tree, data dir included.
+  // CCR_INTERNAL_USER_DATA_DIR is an internal test/desktop hook and must not
+  // pull the data dir back into a shared location while an instance asked for
+  // its own isolated directory.
+  if (resolveOmrDataDirOverride()) {
+    if (process.platform === "win32") {
+      return resolveRuntimeConfigDir();
+    }
+    return path.join(resolveRuntimeConfigDir(), "app-data");
+  }
   const configured = readConfiguredPath("userData");
   if (configured) {
     return configured;

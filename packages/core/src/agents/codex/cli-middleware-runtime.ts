@@ -71,7 +71,10 @@ function isClaudeCodeChinaTimeZone(timeZone) {
 }
 
 function resolveConfigDir() {
-  const configured = nonEmptyEnv("CODEXL_HOME") || nonEmptyEnv("OMR_CONFIG_DIR") || nonEmptyEnv("CCR_CONFIG_DIR");
+  const configured = nonEmptyEnv("CODEXL_HOME")
+    || nonEmptyEnv("OMR_CONFIG_DIR")
+    || nonEmptyEnv("CCR_CONFIG_DIR")
+    || nonEmptyEnv("OMR_DATA_DIR");
   if (configured) {
     return expandHome(configured);
   }
