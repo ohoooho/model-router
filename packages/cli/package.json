@@ -1,6 +1,6 @@
 {
   "name": "@ohoooho/model-router",
-  "version": "0.1.0",
+  "version": "0.1.0-fork3.0.18+p5",
   "license": "MIT",
   "description": "桃仙模型路由网关 OMR — local model router gateway (fork of claude-code-router)",
   "repository": {

@@ -26,10 +26,10 @@ release:
   default_channel: stable
   # Must match packages/cli/package.json and the published npm package.
   # Fork/patch provenance belongs in _internal, not in the installable version.
-  default_version: 0.1.0
+  default_version: 0.1.0-fork3.0.18+p5
   channels:
     stable:
-      version: 0.1.0
+      version: 0.1.0-fork3.0.18+p5
     beta:
       version: 0.2.0-fork3.0.18+p6        # 下一版, 占位 (实际未发布)
 
@@ -194,14 +194,14 @@ scene_keys:
 # 实际安装物料。正式发布时必须有真实哈希和大小。
 artifacts:
   - id: omr-npm-package
-    version: 0.1.0
+    version: 0.1.0-fork3.0.18+p5
     platform: any
     kind: npm-tarball
     package: "@ohoooho/model-router"
-    path: omr-0.1.0.tgz
-    sha256: 99b210dc066d81846db91762de07d1c59fda23141b6458f9efd9f4f3a311da85
-    size_bytes: 4849354
-    npm_integrity: sha512-GGMGLvH0vkQu56D0KBedwP1qcgyIKiQDy3WHHlVdQVdq/cv49aTbUE5MTkWoRnDtY/xhnJ64B+ZjNkckknjGJw==
+    path: omr-0.1.0-fork3.0.18+p5.tgz
+    sha256: 49188f6003c37f976bdfd67931e9e2aef98a44493b516a007c7542d996a59421
+    size_bytes: 4850767
+    npm_integrity: sha512-edxurONz3VJCwg9+ttLOMN0NFMW2ETZwZ9bB2cRpTS0XcUp7IVy81asz8G5ei2Ir8V3rjnm9V9XJXD8AU0DmWg==
 
 # 用户目录、配置和系统权限边界。
 # 失职 243 闭环 (K-302 边界修正): OMR fork 仓是我的项目, 路径品牌化由我负责.
