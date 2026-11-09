@@ -206,9 +206,65 @@ const baoziProvider = {
 const otherProviders = existingProviders.filter((provider) => provider && provider.name !== 'baozi');
 const router = defaultConfig.Router && typeof defaultConfig.Router === 'object' ? defaultConfig.Router : {};
 const fallback = router.fallback && typeof router.fallback === 'object' ? router.fallback : {};
+
+// Runtime virtual models are read from default.virtualModelProfiles, not from
+// the legacy app_config.virtual_models metadata. Build profiles for the four
+// Taoxian scenes and give each a concrete fixed base model from the enabled
+// providers. Existing profiles win; we only fill missing ids/baseModel.
+function providerModelName(model) {
+  if (typeof model === 'string') return model.trim();
+  if (model && typeof model === 'object') return String(model.id || model.name || '').trim();
+  return '';
+}
+const textModelSelectors = [baoziProvider, ...otherProviders]
+  .filter((provider) => provider && provider.enabled !== false && provider.name)
+  .flatMap((provider) => (Array.isArray(provider.models) ? provider.models : [])
+    .map(providerModelName)
+    .filter((model) => model && !/image|video|seedance|seedream|wan|vision|embed|rerank/i.test(model))
+    .map((model) => `${provider.name}/${model}`));
+const pickBaseModel = (patterns) => textModelSelectors.find((selector) =>
+  patterns.some((pattern) => pattern.test(selector))) || textModelSelectors[0] || 'baozi/MiniMax-M3';
+const sceneBaseModels = {
+  'coding-auto': pickBaseModel([/deepseek/i, /kimi/i, /claude/i, /code/i]),
+  'chat-auto': pickBaseModel([/doubao/i, /qwen/i, /glm/i, /minimax/i]),
+  'assist-auto': pickBaseModel([/qwen/i, /glm/i, /doubao/i, /minimax/i]),
+  'team-auto': pickBaseModel([/claude/i, /gpt/i, /qwen/i, /doubao/i]),
+};
+const existingProfiles = Array.isArray(defaultConfig.virtualModelProfiles)
+  ? defaultConfig.virtualModelProfiles
+  : [];
+const profileById = new Map(existingProfiles
+  .filter((profile) => profile && typeof profile === 'object' && profile.id)
+  .map((profile) => [profile.id, profile]));
+for (const [id, scene] of Object.entries(OMR_CONFIG.virtual_models)) {
+  const generated = {
+    id,
+    name: scene.display_name,
+    displayName: scene.display_name,
+    enabled: true,
+    baseModel: { mode: 'fixed', fixedModel: sceneBaseModels[id] },
+    strategy: scene.strategy,
+    key: scene.key_id,
+    match: scene.match,
+    tools: [],
+    execution: { mode: 'tool_loop', clientToolsPolicy: 'allow', streamMode: 'optimistic' },
+    materialization: { enabled: true, includeInGatewayModels: true },
+  };
+  const existing = profileById.get(id);
+  if (!existing) {
+    existingProfiles.push(generated);
+    profileById.set(id, generated);
+  } else if (!existing.baseModel) {
+    // Old installs may have a profile without a fixed base model. Repair only
+    // the missing field; keep every user-owned setting intact.
+    existing.baseModel = generated.baseModel;
+  }
+}
+
 upsertConfig.run('default', JSON.stringify({
   ...defaultConfig,
   Providers: [baoziProvider, ...otherProviders],
+  virtualModelProfiles: existingProfiles,
   preferredProvider: defaultConfig.preferredProvider || 'baozi',
   Router: {
     ...router,
