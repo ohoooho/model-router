@@ -18,7 +18,11 @@ const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { TAOXIAN_VIRTUAL_MODELS, mergeVirtualModelProfiles } = require('./runtime-profiles');
+const {
+  TAOXIAN_VIRTUAL_MODELS,
+  applyManagedProviderVisibility,
+  mergeVirtualModelProfiles,
+} = require('./runtime-profiles');
 
 // 1. 路径品牌化: OMR_DATA_DIR env 优先, 默认 ~/.omr (跟 cli.js getOMRDataDir() 对齐)
 const OMR_DATA_DIR = (process.env.OMR_DATA_DIR && process.env.OMR_DATA_DIR.trim())
@@ -193,6 +197,8 @@ const existingBaoziKey = typeof existingBaoziProvider.apiKey === 'string' ? exis
 const baoziProvider = {
   ...existingBaoziProvider,
   name: 'baozi',
+  // Taoxian aliases always route to Baozi, even when its key is a placeholder.
+  enabled: true,
   // 重配时如果没给真 key，不要用空串/fake 覆盖现有 key，否则模型立即失效。
   baseUrl: process.env.BAOZI_API_BASE || existingBaoziProvider.baseUrl || 'https://llm.ohoooho.com/v1',
   apiKey: isPlaceholderSecret(incomingBaoziKey) && existingBaoziKey ? existingBaoziKey : incomingBaoziKey,
@@ -200,30 +206,33 @@ const baoziProvider = {
   models: Array.from(new Set([...existingBaoziModels, ...providerModels])),
 };
 const otherProviders = existingProviders.filter((provider) => provider && provider.name !== 'baozi');
+// 对客户端只暴露虚拟别名：启用 baozi，隐藏 tai。
+const managedProviders = applyManagedProviderVisibility([baoziProvider, ...otherProviders]);
 const router = defaultConfig.Router && typeof defaultConfig.Router === 'object' ? defaultConfig.Router : {};
 const fallback = router.fallback && typeof router.fallback === 'object' ? router.fallback : {};
+const fallbackModels = Array.isArray(fallback.models)
+  ? fallback.models.filter((model) => typeof model === 'string' && !model.startsWith('tai/'))
+  : [];
 
 // Runtime virtual models are read from default.virtualModelProfiles, not from
 // the legacy app_config.virtual_models metadata. Build profiles for the four
-// Taoxian scenes and give each a concrete fixed base model from the enabled
-// providers. Existing profiles win; we only fill missing ids/baseModel.
+// Taoxian scenes and give each a concrete fixed Baozi base model. Existing
+// profiles win; we only fill missing ids/baseModel and repair non-Baozi routes.
 const { profiles: existingProfiles } = mergeVirtualModelProfiles({
   ...defaultConfig,
-  Providers: [baoziProvider, ...otherProviders],
+  Providers: managedProviders,
 }, OMR_CONFIG.virtual_models);
 
 upsertConfig.run('default', JSON.stringify({
   ...defaultConfig,
-  Providers: [baoziProvider, ...otherProviders],
+  Providers: managedProviders,
   virtualModelProfiles: existingProfiles,
-  preferredProvider: defaultConfig.preferredProvider || 'baozi',
+  preferredProvider: 'baozi',
   Router: {
     ...router,
     fallback: {
       ...fallback,
-      models: Array.isArray(fallback.models) && fallback.models.length > 0
-        ? fallback.models
-        : ['baozi,MiniMax-M3'],
+      models: fallbackModels.length > 0 ? fallbackModels : ['baozi/MiniMax-M3'],
     },
   },
   gateway: {

@@ -3,6 +3,13 @@
 // `app_config.virtual_models` is legacy metadata. The gateway reads
 // `default.virtualModelProfiles`, so every install (fresh or existing) needs
 // concrete profiles with a fixed base model.
+//
+// Taoxian deliberately routes the four public aliases through Baozi. The
+// upstream provider name (tai) must not be exposed to clients, and the aliases
+// stay configured even when Baozi has no usable key yet.
+
+const MANAGED_PROVIDER = 'baozi';
+const HIDDEN_PROVIDER = 'tai';
 
 const TAOXIAN_VIRTUAL_MODELS = {
   'coding-auto': {
@@ -41,13 +48,22 @@ function providerIsTextModel(model) {
   return model && !/image|video|seedance|seedream|wan|vision|embed|rerank/i.test(model);
 }
 
+function providerModelSelectors(provider) {
+  return (Array.isArray(provider?.models) ? provider.models : [])
+    .map(providerModelName)
+    .filter(providerIsTextModel)
+    .map((model) => `${provider.name}/${model}`);
+}
+
 function buildBaseModelSelectors(providers) {
-  return (Array.isArray(providers) ? providers : [])
-    .filter((provider) => provider && provider.enabled !== false && provider.name)
-    .flatMap((provider) => (Array.isArray(provider.models) ? provider.models : [])
-      .map(providerModelName)
-      .filter(providerIsTextModel)
-      .map((model) => `${provider.name}/${model}`));
+  const list = Array.isArray(providers) ? providers : [];
+  const baozi = list.filter((provider) => provider && provider.name === MANAGED_PROVIDER);
+  // Baozi wins even when the user disabled it or its key is a placeholder.
+  // Only fall back to enabled providers when no Baozi provider exists at all.
+  const source = baozi.length > 0
+    ? baozi
+    : list.filter((provider) => provider && provider.enabled !== false && provider.name);
+  return source.flatMap(providerModelSelectors);
 }
 
 function pickBaseModel(selectors, patterns) {
@@ -57,12 +73,30 @@ function pickBaseModel(selectors, patterns) {
 }
 
 /**
+ * Enforce Taoxian's provider visibility: Baozi is enabled, tai is hidden.
+ * Other providers are left alone. Returns a new providers array.
+ */
+function applyManagedProviderVisibility(providers) {
+  return (Array.isArray(providers) ? providers : []).map((provider) => {
+    if (!provider || typeof provider !== 'object') return provider;
+    if (provider.name === MANAGED_PROVIDER && provider.enabled === false) {
+      return { ...provider, enabled: true };
+    }
+    if (provider.name === HIDDEN_PROVIDER && provider.enabled !== false) {
+      return { ...provider, enabled: false };
+    }
+    return provider;
+  });
+}
+
+/**
  * Merge the four Taoxian scene profiles into `defaultConfig` without touching
- * user-owned fields. Existing profiles win; only a missing fixed base model is
- * repaired. Returns a new profiles array and whether anything changed.
+ * user-owned fields. Existing profiles win, except that their fixed base model
+ * is forced back to Baozi so a previous tai route cannot leak the provider
+ * name. Returns a new profiles array and whether anything changed.
  */
 function mergeVirtualModelProfiles(defaultConfig, virtualModels = TAOXIAN_VIRTUAL_MODELS) {
-  const providers = Array.isArray(defaultConfig?.Providers) ? defaultConfig.Providers : [];
+  const providers = applyManagedProviderVisibility(defaultConfig?.Providers);
   const selectors = buildBaseModelSelectors(providers);
   const sceneBaseModels = {
     'coding-auto': pickBaseModel(selectors, [/deepseek/i, /kimi/i, /claude/i, /code/i]),
@@ -100,10 +134,16 @@ function mergeVirtualModelProfiles(defaultConfig, virtualModels = TAOXIAN_VIRTUA
       existingProfiles.push(generated);
       profileById.set(id, generated);
       changed = true;
-    } else if (!existing.baseModel || (existing.baseModel.mode === 'fixed' && !existing.baseModel.fixedModel)) {
-      // Old installs may have a profile without a fixed base model. Repair only
-      // the missing field; keep every user-owned setting intact.
+    } else if (!existing.baseModel) {
       existing.baseModel = generated.baseModel;
+      changed = true;
+    } else if (
+      existing.baseModel.mode === 'fixed'
+      && !String(existing.baseModel.fixedModel || '').startsWith(`${MANAGED_PROVIDER}/`)
+    ) {
+      // Repair tai/* and other fixed routes. The alias table is Taoxian-owned;
+      // user-owned fields on the profile are preserved.
+      existing.baseModel = { ...existing.baseModel, fixedModel: generated.baseModel.fixedModel };
       changed = true;
     }
   }
@@ -112,6 +152,9 @@ function mergeVirtualModelProfiles(defaultConfig, virtualModels = TAOXIAN_VIRTUA
 }
 
 module.exports = {
+  MANAGED_PROVIDER,
+  HIDDEN_PROVIDER,
   TAOXIAN_VIRTUAL_MODELS,
+  applyManagedProviderVisibility,
   mergeVirtualModelProfiles,
 };
