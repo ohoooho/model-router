@@ -322,10 +322,10 @@ const rpcHandlers: Record<string, RpcHandler> = {
     const config = await loadAppConfig();
     const gatewayStatus = gatewayService.getStatus();
     return {
-      providers: (Array.isArray(config.Providers) ? config.Providers : []).map((p: { name?: string; models?: unknown[]; disabled?: boolean; baseUrl?: string; baseurl?: string; api_base_url?: string }) => ({
+      providers: (Array.isArray(config.Providers) ? config.Providers : []).map((p: { name?: string; models?: unknown[]; enabled?: boolean; baseUrl?: string; baseurl?: string; api_base_url?: string }) => ({
         name: typeof p.name === "string" ? p.name : "",
         modelCount: Array.isArray(p.models) ? p.models.length : 0,
-        enabled: p.disabled !== true,
+        enabled: p.enabled !== false,
         baseUrl: p.baseUrl || p.baseurl || p.api_base_url || "",
       })),
       virtualModelProfile: (config as Record<string, unknown>).virtualModelProfile || {},
