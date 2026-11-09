@@ -67,7 +67,7 @@ type ServiceState = {
 const serviceStateFileName = "service.json";
 const serviceStartLockFileName = "service-start.lock";
 const profileGatewayLeaseDirName = "profile-gateway-leases";
-const serviceInstanceTokenEnv = "CCR_SERVICE_INSTANCE_TOKEN";
+const serviceInstanceTokenEnv = "OMR_SERVICE_INSTANCE_TOKEN";
 const serviceRpcTimeoutMs = 2_000;
 const serviceStartTimeoutMs = 30_000;
 const serviceStopTimeoutMs = 10_000;
@@ -104,7 +104,7 @@ async function verifyTaoxianLicenseOrExit(): Promise<TaoxianLicense> {
   );
   process.exit(2);
 }
-const webAuthQueryParam = "ccr_web_token";
+const webAuthQueryParam = "omr_web_token";
 const defaultCliCommandName = "omr";
 const prepareProfileOnlyEnv = "CCR_CLI_PREPARE_PROFILE_ONLY";
 
@@ -1190,7 +1190,7 @@ async function callServiceRpc<T>(state: ServiceState, method: string, args: unkn
     });
     const payload = await response.json().catch(() => undefined) as { ok?: boolean; value?: T } | undefined;
     if (!response.ok || !payload?.ok) {
-      throw new Error(`CCR service RPC ${method} failed with HTTP ${response.status}`);
+      throw new Error(`OMR service RPC ${method} failed with HTTP ${response.status}`);
     }
     return payload.value as T;
   } finally {
@@ -1201,7 +1201,7 @@ async function callServiceRpc<T>(state: ServiceState, method: string, args: unkn
 function serviceRpcEndpoint(url: string): string | undefined {
   try {
     const parsed = new URL(url);
-    return `${parsed.origin}/api/ccr/rpc`;
+    return `${parsed.origin}/api/omr/rpc`;
   } catch {
     return undefined;
   }
