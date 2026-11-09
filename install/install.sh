@@ -159,6 +159,14 @@ NODE_BIN="${INSTALL_DIR}/dist/main/cli.js"
 [ -f "${NODE_BIN}" ] || { echo "ERR: ${NODE_BIN} 不存在"; exit 4; }
 node "${NODE_BIN}" --help >/dev/null || { echo "ERR: OMR CLI 不可执行"; exit 5; }
 
+# p5 stopgap: keep older offline tarballs usable until the next OMR artifact
+# contains the CLI/web naming fixes. Idempotent; unknown builds are untouched.
+if [ -f "${SCRIPT_DIR}/compat-cli.mjs" ]; then
+    OMR_CLI_FILE="${NODE_BIN}" node "${SCRIPT_DIR}/compat-cli.mjs" || {
+        echo "WARN: OMR CLI compatibility patch failed; omr start may report a false readiness error" >&2
+    }
+fi
+
 if [ -z "${INSTALLED_VERSION}" ]; then
     INSTALLED_VERSION=$(node -e 'console.log(require(process.argv[1]).version)' "${INSTALL_DIR}/package.json" 2>/dev/null || echo "${OMR_VERSION}")
 fi
@@ -256,6 +264,21 @@ cat <<EOF
 EOF
 echo ""
 echo "✅ OMR install 完. 跑 verify.sh 4 状态真验证."
+
+# The npm global bin is often not in the user's shell PATH on macOS. Do not
+# edit shell profiles automatically; print the exact line so the user can
+# decide. The absolute command path always works.
+case ":${PATH:-}:" in
+    *":${BIN_DIR}:"*) ;;
+    *)
+        echo ""
+        echo "⚠️  OMR 命令目录不在当前 shell PATH: ${BIN_DIR}"
+        echo "    当前 shell 临时启用:"
+        echo "      export PATH=\"${BIN_DIR}:\$PATH\""
+        echo "    永久启用: 把上面一行加入 ~/.zshrc（zsh）或 ~/.bashrc（bash）"
+        echo "    不修改 PATH 也可以直接运行: ${BIN_DIR}/omr"
+        ;;
+esac
 
 # Secrets are supplied through TX_CONTEXT_FILE. Do not create a second,
 # stale copy under /etc: the next configure must resolve one consistent snapshot.
