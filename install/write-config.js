@@ -18,6 +18,7 @@ const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const { TAOXIAN_VIRTUAL_MODELS, mergeVirtualModelProfiles } = require('./runtime-profiles');
 
 // 1. 路径品牌化: OMR_DATA_DIR env 优先, 默认 ~/.omr (跟 cli.js getOMRDataDir() 对齐)
 const OMR_DATA_DIR = (process.env.OMR_DATA_DIR && process.env.OMR_DATA_DIR.trim())
@@ -137,12 +138,7 @@ const OMR_CONFIG = {
     butler_key_id: 'baozi-butler',
   },
   // v-models (老板 10:15 lockin + K-310 加 team-auto)
-  virtual_models: {
-    'coding-auto':  { display_name: 'Coding Auto (编程通用)', strategy: 'manual',       match: { exactAliases: ['coding-auto'] }, key_id: 'baozi-coding-auto' },
-    'assist-auto':  { display_name: 'Assist Auto (通用助手)', strategy: 'auto-balance', match: { exactAliases: ['assist-auto'] }, key_id: 'baozi-assist-auto' },
-    'chat-auto':    { display_name: 'Chat Auto (日常聊天)',   strategy: 'auto-balance', match: { exactAliases: ['chat-auto'] }, key_id: 'baozi-chat-auto' },
-    'team-auto':    { display_name: 'Team Auto (团队协作)',   strategy: 'priority',      match: { exactAliases: ['team-auto'] }, key_id: 'baozi-team-auto' },
-  },
+  virtual_models: TAOXIAN_VIRTUAL_MODELS,
   // 网关
   gateway: {
     host: process.env.OMR_GATEWAY_HOST || '127.0.0.1',
@@ -211,55 +207,10 @@ const fallback = router.fallback && typeof router.fallback === 'object' ? router
 // the legacy app_config.virtual_models metadata. Build profiles for the four
 // Taoxian scenes and give each a concrete fixed base model from the enabled
 // providers. Existing profiles win; we only fill missing ids/baseModel.
-function providerModelName(model) {
-  if (typeof model === 'string') return model.trim();
-  if (model && typeof model === 'object') return String(model.id || model.name || '').trim();
-  return '';
-}
-const textModelSelectors = [baoziProvider, ...otherProviders]
-  .filter((provider) => provider && provider.enabled !== false && provider.name)
-  .flatMap((provider) => (Array.isArray(provider.models) ? provider.models : [])
-    .map(providerModelName)
-    .filter((model) => model && !/image|video|seedance|seedream|wan|vision|embed|rerank/i.test(model))
-    .map((model) => `${provider.name}/${model}`));
-const pickBaseModel = (patterns) => textModelSelectors.find((selector) =>
-  patterns.some((pattern) => pattern.test(selector))) || textModelSelectors[0] || 'baozi/MiniMax-M3';
-const sceneBaseModels = {
-  'coding-auto': pickBaseModel([/deepseek/i, /kimi/i, /claude/i, /code/i]),
-  'chat-auto': pickBaseModel([/doubao/i, /qwen/i, /glm/i, /minimax/i]),
-  'assist-auto': pickBaseModel([/qwen/i, /glm/i, /doubao/i, /minimax/i]),
-  'team-auto': pickBaseModel([/claude/i, /gpt/i, /qwen/i, /doubao/i]),
-};
-const existingProfiles = Array.isArray(defaultConfig.virtualModelProfiles)
-  ? defaultConfig.virtualModelProfiles
-  : [];
-const profileById = new Map(existingProfiles
-  .filter((profile) => profile && typeof profile === 'object' && profile.id)
-  .map((profile) => [profile.id, profile]));
-for (const [id, scene] of Object.entries(OMR_CONFIG.virtual_models)) {
-  const generated = {
-    id,
-    name: scene.display_name,
-    displayName: scene.display_name,
-    enabled: true,
-    baseModel: { mode: 'fixed', fixedModel: sceneBaseModels[id] },
-    strategy: scene.strategy,
-    key: scene.key_id,
-    match: scene.match,
-    tools: [],
-    execution: { mode: 'tool_loop', clientToolsPolicy: 'allow', streamMode: 'optimistic' },
-    materialization: { enabled: true, includeInGatewayModels: true },
-  };
-  const existing = profileById.get(id);
-  if (!existing) {
-    existingProfiles.push(generated);
-    profileById.set(id, generated);
-  } else if (!existing.baseModel) {
-    // Old installs may have a profile without a fixed base model. Repair only
-    // the missing field; keep every user-owned setting intact.
-    existing.baseModel = generated.baseModel;
-  }
-}
+const { profiles: existingProfiles } = mergeVirtualModelProfiles({
+  ...defaultConfig,
+  Providers: [baoziProvider, ...otherProviders],
+}, OMR_CONFIG.virtual_models);
 
 upsertConfig.run('default', JSON.stringify({
   ...defaultConfig,

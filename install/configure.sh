@@ -163,8 +163,14 @@ CONFIG_DB="${OMR_DATA_DIR}/config.sqlite"
 # 已有配置默认不重写：重复部署/重装不应把 Provider、Key、模型路由覆盖成
 # 默认值或 fake 占位。需要重配时显式设置 OMR_RECONFIGURE_EXISTING=1。
 if [ -f "${CONFIG_DB}" ] && [ "${OMR_RECONFIGURE_EXISTING:-0}" != "1" ]; then
-    echo "==> 检测到已有 OMR 配置：跳过 configure，保留现有 Provider/Key/模型"
-    echo "    需要重配请设置 OMR_RECONFIGURE_EXISTING=1 后重跑"
+    echo "==> 检测到已有 OMR 配置：保留现有 Provider/Key/模型"
+    # Runtime aliases live in default.virtualModelProfiles, which older Taoxian
+    # installs never materialized. Add only the missing profiles; do not rewrite
+    # providers, keys, router settings or user-owned profile fields.
+    if ! node "${SCRIPT_DIR}/migrate-runtime-config.js"; then
+        echo "WARN: 运行时虚拟模型迁移失败；OMR 现有配置未改动，Codex/Hermes 的 *-auto 别名可能不可用" >&2
+    fi
+    echo "    需要完整重配请设置 OMR_RECONFIGURE_EXISTING=1 后重跑"
     exit 0
 fi
 
