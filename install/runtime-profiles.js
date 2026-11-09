@@ -5,11 +5,12 @@
 // concrete profiles with a fixed base model.
 //
 // Taoxian deliberately routes the four public aliases through Baozi. The
-// upstream provider name (tai) must not be exposed to clients, and the aliases
-// stay configured even when Baozi has no usable key yet.
+// upstream provider name must not be added by the default installer, and the
+// aliases stay configured even when Baozi has no usable key yet. User-added
+// providers (including tai) are preserved: this file only manages Baozi and
+// the four Taoxian aliases.
 
 const MANAGED_PROVIDER = 'baozi';
-const HIDDEN_PROVIDER = 'tai';
 
 const TAOXIAN_VIRTUAL_MODELS = {
   'coding-auto': {
@@ -73,17 +74,14 @@ function pickBaseModel(selectors, patterns) {
 }
 
 /**
- * Enforce Taoxian's provider visibility: Baozi is enabled, tai is hidden.
- * Other providers are left alone. Returns a new providers array.
+ * Enable Taoxian's managed Baozi provider when it exists. User-owned providers
+ * are left exactly as the user configured them.
  */
 function applyManagedProviderVisibility(providers) {
   return (Array.isArray(providers) ? providers : []).map((provider) => {
     if (!provider || typeof provider !== 'object') return provider;
     if (provider.name === MANAGED_PROVIDER && provider.enabled === false) {
       return { ...provider, enabled: true };
-    }
-    if (provider.name === HIDDEN_PROVIDER && provider.enabled !== false) {
-      return { ...provider, enabled: false };
     }
     return provider;
   });
@@ -92,8 +90,8 @@ function applyManagedProviderVisibility(providers) {
 /**
  * Merge the four Taoxian scene profiles into `defaultConfig` without touching
  * user-owned fields. Existing profiles win, except that their fixed base model
- * is forced back to Baozi so a previous tai route cannot leak the provider
- * name. Returns a new profiles array and whether anything changed.
+ * is forced back to Baozi so the Taoxian aliases keep the default route.
+ * Returns a new profiles array and whether anything changed.
  */
 function mergeVirtualModelProfiles(defaultConfig, virtualModels = TAOXIAN_VIRTUAL_MODELS) {
   const providers = applyManagedProviderVisibility(defaultConfig?.Providers);
@@ -153,7 +151,6 @@ function mergeVirtualModelProfiles(defaultConfig, virtualModels = TAOXIAN_VIRTUA
 
 module.exports = {
   MANAGED_PROVIDER,
-  HIDDEN_PROVIDER,
   TAOXIAN_VIRTUAL_MODELS,
   applyManagedProviderVisibility,
   mergeVirtualModelProfiles,

@@ -74,13 +74,15 @@ try {
   const router = config.Router && typeof config.Router === 'object' ? config.Router : {};
   const fallback = router.fallback && typeof router.fallback === 'object' ? router.fallback : {};
   const fallbackModels = Array.isArray(fallback.models)
-    ? fallback.models.filter((model) => typeof model === 'string' && !model.startsWith('tai/'))
+    ? fallback.models.filter((model) => typeof model === 'string' && model.trim())
     : [];
-  const nextFallbackModels = hasBaozi
-    ? (fallbackModels.length > 0 ? fallbackModels : ['baozi/MiniMax-M3'])
+  const nextFallbackModels = hasBaozi && fallbackModels.length === 0
+    ? ['baozi/MiniMax-M3']
     : fallbackModels;
   const routerChanged = JSON.stringify(nextFallbackModels) !== JSON.stringify(fallback.models ?? []);
-  const preferredProvider = hasBaozi ? 'baozi' : config.preferredProvider;
+  // Preserve a user-selected preferred provider; only seed Baozi when the
+  // default is unset.
+  const preferredProvider = config.preferredProvider || (hasBaozi ? 'baozi' : config.preferredProvider);
   const preferredChanged = preferredProvider !== config.preferredProvider;
 
   if (!changed && !providersChanged && !routerChanged && !preferredChanged) {

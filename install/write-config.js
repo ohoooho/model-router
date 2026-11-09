@@ -211,7 +211,7 @@ const managedProviders = applyManagedProviderVisibility([baoziProvider, ...other
 const router = defaultConfig.Router && typeof defaultConfig.Router === 'object' ? defaultConfig.Router : {};
 const fallback = router.fallback && typeof router.fallback === 'object' ? router.fallback : {};
 const fallbackModels = Array.isArray(fallback.models)
-  ? fallback.models.filter((model) => typeof model === 'string' && !model.startsWith('tai/'))
+  ? fallback.models.filter((model) => typeof model === 'string' && model.trim())
   : [];
 
 // Runtime virtual models are read from default.virtualModelProfiles, not from
@@ -227,7 +227,7 @@ upsertConfig.run('default', JSON.stringify({
   ...defaultConfig,
   Providers: managedProviders,
   virtualModelProfiles: existingProfiles,
-  preferredProvider: 'baozi',
+  preferredProvider: defaultConfig.preferredProvider || 'baozi',
   Router: {
     ...router,
     fallback: {

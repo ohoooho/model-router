@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Regression: existing OMR configs must move the four public aliases to Baozi,
-# enable Baozi, hide tai, and stay idempotent even when Baozi has no real key.
+# Regression: existing OMR configs must move the four public aliases to Baozi
+# and enable Baozi, while preserving user-added providers (including tai) and
+# user-selected preferred/fallback routes. Migration must stay idempotent even
+# when Baozi has no real key.
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -63,10 +65,10 @@ db.close();
 const baozi = config.Providers.find((provider) => provider.name === 'baozi');
 const tai = config.Providers.find((provider) => provider.name === 'tai');
 if (!baozi || baozi.enabled !== true) throw new Error('baozi was not enabled');
-if (!tai || tai.enabled !== false) throw new Error('tai was not hidden');
-if (config.preferredProvider !== 'baozi') throw new Error(`preferredProvider is ${config.preferredProvider}`);
-if (JSON.stringify(config.Router.fallback.models) !== JSON.stringify(['baozi/MiniMax-M3'])) {
-  throw new Error(`fallback is ${JSON.stringify(config.Router.fallback.models)}`);
+if (!tai || tai.enabled !== true) throw new Error('user-added tai provider was changed');
+if (config.preferredProvider !== 'tai') throw new Error(`user preferredProvider was changed to ${config.preferredProvider}`);
+if (JSON.stringify(config.Router.fallback.models) !== JSON.stringify(['tai/glm-5.3-flash'])) {
+  throw new Error(`user fallback was changed to ${JSON.stringify(config.Router.fallback.models)}`);
 }
 const aliases = ['coding-auto', 'chat-auto', 'assist-auto', 'team-auto'];
 for (const id of aliases) {
@@ -87,4 +89,4 @@ after="$(sha_file "${DATA_DIR}/config.sqlite")"
   exit 1
 }
 
-echo "PASS: aliases use Baozi, tai is hidden, and migration is idempotent"
+echo "PASS: aliases use Baozi; user-added tai and user routes are preserved"
