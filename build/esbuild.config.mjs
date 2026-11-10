@@ -31,7 +31,10 @@ export const mainOutDir = electronMainOutDir;
 export const gatewayPackageRoot = resolveGatewayPackageRoot();
 export const gatewayRuntimeInput = resolveGatewayRuntimeInput(gatewayPackageRoot);
 export const electronGatewayRuntimeOutput = path.join(electronMainOutDir, "next-ai-gateway.js");
-export const botGatewaySdkPackageRoot = path.dirname(requireFromHere.resolve("@the-next-ai/bot-gateway-sdk/package.json"));
+export const botGatewaySdkPackageRoot = path.resolve(
+  path.dirname(requireFromHere.resolve("@the-next-ai/bot-gateway-sdk")),
+  "..",
+);
 export const botGatewaySdkEntryInput = path.join(botGatewaySdkPackageRoot, "dist", "index.js");
 export const botGatewaySdkRunnerInput = path.join(botGatewaySdkPackageRoot, "bin", "bot-gateway-stdio.mjs");
 export const electronBotGatewaySdkRootDir = path.join(electronMainOutDir, "bot-gateway-sdk");

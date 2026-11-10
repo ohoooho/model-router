@@ -53,7 +53,7 @@ export function writeZcodeGatewayConfig(
 ): ZcodeProfileConfigWriteResult {
   const file = resolveZcodeConfigFile(profile);
   const model = normalizeClientModel(profile.model) || defaultClientModel(config);
-  const providerId = sanitizeZcodeProviderId(profile.providerId || "") || "claude-code-router";
+  const providerId = sanitizeZcodeProviderId(profile.providerId || "") || "omr";
   const modelCatalog = buildZcodeModelCatalog(config, model, { allowedModels: profileAllowedModels({ ...profile, model }) });
   const values: ZcodeGatewayConfigValues = {
     baseUrl: gatewayEndpoint(config),
@@ -64,7 +64,7 @@ export function writeZcodeGatewayConfig(
     ])),
     models: modelCatalog.models.map((item) => item.slug),
     providerId,
-    providerName: profile.providerName?.trim() || "Claude Code Router",
+    providerName: profile.providerName?.trim() || "OMR",
     token
   };
   const cliResult = writeJsonFile(file, buildZcodeGatewayConfig(readJsonObject(file), values), options);

@@ -124,8 +124,9 @@ type WebManagementSecurityContext = {
 const defaultWebHost = "127.0.0.1";
 const defaultWebPort = 3458;
 const maxRpcBodyBytes = 8 * 1024 * 1024;
-const webAuthHeader = "x-ccr-web-auth";
-const webAuthQueryParam = "ccr_web_token";
+const webAuthHeader = "x-omr-web-auth";
+const webAuthHeaderCompat = "x-ccr-web-auth";
+const webAuthQueryParam = "omr_web_token";
 const staticRoot = path.resolve(__dirname, "..", "renderer");
 const homeHtmlFile = path.join(staticRoot, "pages", "home", "index.html");
 const rendererAssetsRoot = path.join(staticRoot, "assets");
@@ -134,13 +135,13 @@ const webBridgeScriptTag = '    <script src="../../assets/web-client-bridge.js">
 
 export async function startWebManagementServer(options: WebManagementServerOptions = {}): Promise<WebManagementServerRuntime> {
   await refreshModelCatalog();
-  const host = options.host?.trim() || readEnvString("CCR_WEB_HOST") || defaultWebHost;
-  const requestedPort = options.port ?? readEnvPort("CCR_WEB_PORT") ?? defaultWebPort;
-  const authToken = options.authToken?.trim() || readEnvString("CCR_WEB_AUTH_TOKEN") || randomBytes(32).toString("base64url");
+  const host = options.host?.trim() || readEnvString("OMR_WEB_HOST") || readEnvString("CCR_WEB_HOST") || defaultWebHost;
+  const requestedPort = options.port ?? readEnvPort("OMR_WEB_PORT") ?? readEnvPort("CCR_WEB_PORT") ?? defaultWebPort;
+  const authToken = options.authToken?.trim() || readEnvString("OMR_WEB_AUTH_TOKEN") || readEnvString("CCR_WEB_AUTH_TOKEN") || randomBytes(32).toString("base64url");
   let security: WebManagementSecurityContext | undefined;
   const server = createServer((request, response) => {
     if (!security) {
-      sendJson(response, 503, { error: { message: "CCR web management server is not ready." }, ok: false });
+      sendJson(response, 503, { error: { message: "OMR web management server is not ready." }, ok: false });
       return;
     }
     void handleRequest(request, response, security).catch((error) => {
@@ -196,7 +197,7 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
   }
 
   const url = requestUrl(request);
-  if (url.pathname === "/api/ccr/rpc") {
+  if (url.pathname === "/api/omr/rpc" || url.pathname === "/api/ccr/rpc") {
     await handleRpcRequest(request, response, security);
     return;
   }
@@ -225,7 +226,7 @@ async function handleRpcRequest(request: IncomingMessage, response: ServerRespon
     return;
   }
   if (!hasValidWebAuthToken(request, security)) {
-    sendJson(response, 401, { error: { message: "CCR web authentication token is missing or invalid." }, ok: false });
+    sendJson(response, 401, { error: { message: "OMR web authentication token is missing or invalid." }, ok: false });
     return;
   }
 
@@ -240,7 +241,7 @@ async function handleRpcRequest(request: IncomingMessage, response: ServerRespon
   const method = typeof payload.method === "string" ? payload.method.trim() : "";
   const handler = rpcHandlers[method];
   if (!method || !handler) {
-    sendJson(response, 404, { error: { message: `Unknown CCR web RPC method: ${method || "(empty)"}` }, ok: false });
+    sendJson(response, 404, { error: { message: `Unknown OMR web RPC method: ${method || "(empty)"}` }, ok: false });
     return;
   }
 
@@ -288,9 +289,9 @@ const rpcHandlers: Record<string, RpcHandler> = {
       invalidateProviderAccountSnapshotCache();
     }
     const gatewayDetail = runtimeStatus.state === "running"
-      ? "CCR gateway is running."
-      : `CCR gateway did not start: ${runtimeStatus.lastError || "unknown error"}`;
-    const apiKeyDetail = synced.result.apiKeyGenerated ? "Generated a Claude App API key." : "Reused an existing CCR API key.";
+      ? "OMR gateway is running."
+      : `OMR gateway did not start: ${runtimeStatus.lastError || "unknown error"}`;
+    const apiKeyDetail = synced.result.apiKeyGenerated ? "Generated a Claude App API key." : "Reused an existing OMR API key.";
     return {
       ...synced.result,
       message: `${synced.result.message}\n${gatewayDetail}\n${apiKeyDetail}`
@@ -318,13 +319,60 @@ const rpcHandlers: Record<string, RpcHandler> = {
   getAgentTracePayload: (request) => getAgentTracePayload(request as AgentAnalysisTracePayloadRequest),
   getAppInfo: () => getCliAppInfo(),
   getConfig: () => loadAppConfig(),
+  // ─── OMR UI v2 (老板 09-14 00:12 lockin) ─────────────────────────────
+  // 热重载 config: 改 config.json 不重启 gateway daemon (除非 runtime 必须)
+  reloadConfig: async () => {
+    const previousConfig = await loadAppConfig();
+    const syncedClaudeAppConfig = await syncClaudeAppGatewayConfig(previousConfig);
+    const nextConfig = syncedClaudeAppConfig.config;
+    let runtimeStatus = gatewayService.getStatus();
+    const needsRestart = syncedClaudeAppConfig.configChanged || shouldRestartGatewayForRuntimeConfigChange(previousConfig, nextConfig) || runtimeStatus.state !== "running";
+    if (needsRestart) {
+      runtimeStatus = await gatewayService.start(nextConfig);
+    } else {
+      await gatewayService.updateConfig(nextConfig);
+      runtimeStatus = gatewayService.getStatus();
+    }
+    await applyProfileIfServiceRunning(nextConfig, runtimeStatus);
+    return {
+      reloaded: runtimeStatus.state === "running",
+      gatewayState: runtimeStatus.state,
+      hotReload: !needsRestart,
+      mtime: Date.now(),
+      message: runtimeStatus.state === "running"
+        ? needsRestart
+          ? "OMR config applied; gateway restarted to apply changes."
+          : "OMR config hot-reloaded; gateway kept running."
+        : `Reload failed: ${runtimeStatus.lastError || "unknown error"}`
+    };
+  },
+  // 新 UI v2 主页用: 拿全 state (providers + 4 档虚拟路由 + gateway 健康)
+  getConfigState: async () => {
+    const config = await loadAppConfig();
+    const gatewayStatus = gatewayService.getStatus();
+    return {
+      providers: (Array.isArray(config.Providers) ? config.Providers : []).map((p: { name?: string; models?: unknown[]; enabled?: boolean; baseUrl?: string; baseurl?: string; api_base_url?: string }) => ({
+        name: typeof p.name === "string" ? p.name : "",
+        modelCount: Array.isArray(p.models) ? p.models.length : 0,
+        enabled: p.enabled !== false,
+        baseUrl: p.baseUrl || p.baseurl || p.api_base_url || "",
+      })),
+      virtualModelProfile: (config as Record<string, unknown>).virtualModelProfile || {},
+      gateway: {
+        state: gatewayStatus.state,
+        host: config.gateway?.host || "127.0.0.1",
+        port: config.gateway?.port || 3456,
+      },
+      timestamp: Date.now(),
+    };
+  },
   getGatewayStatus: () => gatewayService.getStatus(),
   getServiceIdentity: (serviceToken) => ({
     pid: process.pid,
-    serviceTokenConfigured: Boolean(process.env.CCR_SERVICE_INSTANCE_TOKEN?.trim()),
+    serviceTokenConfigured: Boolean(process.env.OMR_SERVICE_INSTANCE_TOKEN?.trim()),
     serviceTokenMatches: typeof serviceToken === "string" &&
       Boolean(serviceToken.trim()) &&
-      serviceToken === process.env.CCR_SERVICE_INSTANCE_TOKEN
+      serviceToken === process.env.OMR_SERVICE_INSTANCE_TOKEN
   }),
   getLocalAgentProviderCandidates: () => getLocalAgentProviderCandidates(),
   getOnboardingFinished: () => loadOnboardingFinished(),
@@ -384,7 +432,7 @@ const rpcHandlers: Record<string, RpcHandler> = {
     const config = syncedClaudeAppConfig.config;
     const status = await gatewayService.ensureStarted(config);
     if (status.state !== "running") {
-      throw new Error(status.lastError || "CCR gateway did not start.");
+      throw new Error(status.lastError || "OMR gateway did not start.");
     }
     logProfileApplyResult(await applyProfileConfig(config));
     return openProfileFromCcr(config, request as ProfileOpenRequest);
@@ -575,7 +623,7 @@ function getCliAppInfo(): AppInfo {
 
 function sendHomeHtml(response: ServerResponse, headOnly: boolean): void {
   if (!existsSync(homeHtmlFile)) {
-    sendText(response, 500, "CCR renderer assets were not found. Run npm run build:assets first.");
+    sendText(response, 500, "OMR renderer assets were not found. Run npm run build:assets first.");
     return;
   }
   let html = readFileSync(homeHtmlFile, "utf8");
@@ -719,7 +767,7 @@ function isJsonRequest(request: IncomingMessage): boolean {
 }
 
 function hasValidWebAuthToken(request: IncomingMessage, security: WebManagementSecurityContext): boolean {
-  const token = readHeaderValue(request.headers[webAuthHeader]);
+  const token = readHeaderValue(request.headers[webAuthHeader]) ?? readHeaderValue(request.headers[webAuthHeaderCompat]);
   return constantTimeEquals(token, security.authToken);
 }
 
@@ -778,7 +826,7 @@ async function listenWithFallback(server: Server, port: number, host: string): P
       candidate += 1;
     }
   }
-  throw new Error(`No available CCR web management port found starting at ${port}.`);
+  throw new Error(`No available OMR web management port found starting at ${port}.`);
 }
 
 function listen(server: Server, port: number, host: string): Promise<void> {
@@ -807,7 +855,7 @@ async function exportAppData(): Promise<AppDataExportResult> {
   const exportedAt = new Date().toISOString();
   const exportDir = defaultExportDir();
   mkdirSync(exportDir, { recursive: true });
-  const file = path.join(exportDir, `claude-code-router-data-${fileSafeTimestamp(exportedAt)}.json`);
+  const file = path.join(exportDir, `omr-data-${fileSafeTimestamp(exportedAt)}.json`);
   assertExportTargetIsNotInternalDataFile(file);
   const payload = {
     app: {
@@ -821,7 +869,7 @@ async function exportAppData(): Promise<AppDataExportResult> {
     config: await loadAppConfig(),
     exportedAt,
     files: readDataExportFiles(),
-    kind: "claude-code-router-data-export",
+    kind: "omr-data-export",
     version: 1
   };
 
@@ -882,7 +930,7 @@ function assertExportTargetIsNotInternalDataFile(file: string): void {
     ...dataExportCandidateFiles()
   ].map((item) => path.resolve(item)));
   if (reserved.has(target)) {
-    throw new Error("Choose a different export path. Internal CCR data files cannot be overwritten.");
+    throw new Error("Choose a different export path. Internal OMR data files cannot be overwritten.");
   }
 }
 
@@ -890,7 +938,7 @@ function inspectPluginDirectory(directory: string): PluginDirectorySelection {
   const manifest = readFirstJson([
     path.join(directory, "plugin.json"),
     path.join(directory, "ccr-plugin.json"),
-    path.join(directory, ".ccr-plugin", "plugin.json"),
+    path.join(directory, ".omr-plugin", "plugin.json"),
     path.join(directory, ".codex-plugin", "plugin.json")
   ]);
   const packageJsonManifest = readFirstJson([path.join(directory, "package.json")]);
@@ -1249,7 +1297,7 @@ function normalizePluginAppUrl(value: string | undefined): string {
     throw new Error("Plugin app URL cannot be protocol-relative.");
   }
   if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)) {
-    throw new Error("Plugin app URL must be an http(s) URL or a CCR gateway path.");
+    throw new Error("Plugin app URL must be an http(s) URL or an OMR gateway path.");
   }
   return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
 }
@@ -1468,7 +1516,7 @@ function normalizeExternalTarget(target: unknown): string | undefined {
   if (url.protocol === "ccr:" && url.hostname.toLowerCase() === "plugin") {
     return url.toString();
   }
-  throw new Error("Only http, https, and CCR plugin URLs can be opened.");
+  throw new Error("Only http, https, and OMR plugin URLs can be opened.");
 }
 
 function execDetached(command: string, args: string[]): Promise<void> {

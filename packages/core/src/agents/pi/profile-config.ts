@@ -64,7 +64,7 @@ export function writePiGatewayConfig(
   const profileHome = resolvePiAgentDir(configDir, profile);
   const sessionDir = resolvePiSessionDir(configDir, profile);
   const file = path.join(profileHome, "models.json");
-  const providerId = sanitizeProviderId(profile.providerId || "") || "claude-code-router";
+  const providerId = sanitizeProviderId(profile.providerId || "") || "omr";
   const models = piProfileModels(config, profile, defaultModel);
   const model = models.includes(defaultModel) ? defaultModel : models[0] || defaultModel || "default";
   const content = `${JSON.stringify(piModelsJson(config, profile, providerId, token, models), null, 2)}\n`;

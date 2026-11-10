@@ -25,7 +25,7 @@ export async function runCoreServer(args = process.argv.slice(2)): Promise<void>
     port: options.port,
     startGateway: options.startGateway
   });
-  process.stdout.write(`CCR core server is running at ${runtime.url}\n`);
+  process.stdout.write(`OMR core server is running at ${runtime.url}\n`);
 
   let closing = false;
   const shutdown = (signal: NodeJS.Signals) => {

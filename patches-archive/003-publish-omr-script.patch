@@ -1,0 +1,67 @@
+From c75506a5ffc9aeca1b10f880ddcf45188af4575c Mon Sep 17 00:00:00 2001
+From: AI Assistant <ai@openclaw.local>
+Date: Sat, 8 Aug 2026 12:30:00 +0800
+Subject: [PATCH 3/7] =?UTF-8?q?chore:=20=E5=8F=91=E5=B8=83=E8=84=9A?=
+ =?UTF-8?q?=E6=9C=AC=20publish-omr.sh=20=E2=80=94=20=E6=9E=84=E5=BB=BA+?=
+ =?UTF-8?q?=E6=89=93=E5=8C=85+=E4=B8=8A=E4=BC=A0+=E9=AA=8C=E8=AF=81?=
+ =?UTF-8?q?=E4=B8=80=E6=9D=A1=E5=91=BD=E4=BB=A4?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ scripts/publish-omr.sh | 42 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
+ create mode 100755 scripts/publish-omr.sh
+
+diff --git a/scripts/publish-omr.sh b/scripts/publish-omr.sh
+new file mode 100755
+index 0000000..d71504f
+--- /dev/null
++++ b/scripts/publish-omr.sh
+@@ -0,0 +1,42 @@
++#!/bin/bash
++# ============================================================
++# publish-omr.sh — 构建 + 打包 + 发布 OMR tarball 到云端
++#
++# 用法：
++#   publish-omr.sh              # 构建 → npm pack → 上传 → 验证 URL
++#   publish-omr.sh --skip-build # 跳过构建，只打包上传（源码没改时用）
++#
++# 产物：https://dopple.ohoooho.com/omr/ohoooho-model-router-<version>.tgz
++# 被 install.sh 引用（CCR_NPM_PACKAGE）
++# ============================================================
++
++set -e
++SRC="/root/ohoooho-model-router"
++CLI="$SRC/packages/cli"
++SSH_KEY="$HOME/.ssh/id_ed25519_orangepi"
++SERVER="root@140.143.246.15"
++REMOTE_DIR="/var/www/dopple/omr"
++BASE_URL="https://dopple.ohoooho.com/omr"
++
++cd "$SRC"
++[ "${1:-}" != "--skip-build" ] && {
++  echo "==> 构建..."
++  npm run build:assets
++}
++
++cd "$CLI"
++echo "==> npm pack..."
++TARBALL=$(npm pack 2>/dev/null | tail -1)
++echo "==> 产物: $TARBALL ($(du -h "$TARBALL" | cut -f1))"
++
++echo "==> 上传到 $SERVER:$REMOTE_DIR/"
++scp -i "$SSH_KEY" -o ConnectTimeout=15 "$TARBALL" "$SERVER:$REMOTE_DIR/"
++
++VERSION=$(basename "$TARBALL" .tgz)
++URL="$BASE_URL/$TARBALL"
++echo "==> 验证: $URL"
++curl -s -o /dev/null -w "  HTTP %{http_code}, %{size_download} bytes\n" "$URL"
++
++echo "==> 完成。install.sh 引用的 URL 应为:"
++echo "  CCR_NPM_PACKAGE=\"$URL\""
++echo "（如果版本号变了，记得同步改 install.sh 的 CCR_NPM_PACKAGE）"
+-- 
+2.53.0
+

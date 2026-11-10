@@ -16,6 +16,7 @@ import { ensureProfileGateway, ProfileGatewayUnavailableError } from "@ccr/core/
 import { buildProfileLaunchPlan, defaultProfileOpenSurface, findProfileForOpen, profileLaunchSpawnCommand, resolveProfileOpenSurface, shouldAutoStartProfileGateway } from "@ccr/core/profiles/launch-core";
 import { openSystemExternal, startWebManagementServer } from "@ccr/core/web/management-server";
 import { assertAvailableGatewayModels, type AppConfig, type GatewayStatus, type ProfileConfig, type ProfileOpenResult, type ProfileOpenSurface } from "@ccr/core/contracts/app";
+import { verifyLicenseFile, type License as TaoxianLicense } from "./license/taoxian-license.js";
 
 installSocketTypeOfServiceCompat();
 
@@ -45,7 +46,14 @@ type StopCliOptions = {
   help: boolean;
 };
 
-type CliOptions = ProfileCliOptions | StopCliOptions | WebCliOptions;
+type ConsoleCliOptions = {
+  command: "console";
+  help: boolean;
+  open: boolean;
+  port?: number;
+};
+
+type CliOptions = ConsoleCliOptions | ProfileCliOptions | StopCliOptions | WebCliOptions;
 
 type ServiceState = {
   host?: string;
@@ -60,15 +68,45 @@ type ServiceState = {
 const serviceStateFileName = "service.json";
 const serviceStartLockFileName = "service-start.lock";
 const profileGatewayLeaseDirName = "profile-gateway-leases";
-const serviceInstanceTokenEnv = "CCR_SERVICE_INSTANCE_TOKEN";
+const serviceInstanceTokenEnv = "OMR_SERVICE_INSTANCE_TOKEN";
 const serviceRpcTimeoutMs = 2_000;
 const serviceStartTimeoutMs = 30_000;
 const serviceStopTimeoutMs = 10_000;
 const profileGatewayIdleGraceMs = 2_000;
 const profileGatewayLeasePollMs = 500;
-const webAuthHeader = "x-ccr-web-auth";
-const webAuthQueryParam = "ccr_web_token";
-const defaultCliCommandName = "ccr";
+const webAuthHeader = "x-omr-web-auth";
+
+/**
+ * Taoxian License v1.2 verify (K-251) — 装脚本验签位置
+ * 跳过条件: TAOXIAN_LICENSE_SKIP=1 (开发模式) 或 cli 入口是 dev (npm run dev)
+ */
+async function verifyTaoxianLicenseOrExit(): Promise<TaoxianLicense> {
+  if (process.env.TAOXIAN_LICENSE_SKIP === "1") {
+    return { customerId: "dev-skip", expMode: 0, scopes: 0n, issuedAt: 0, taoxianVersion: 1 };
+  }
+  const licensePaths = [
+    process.env.TAOXIAN_LICENSE_PATH,
+    "/etc/taoxian/license.bin",
+    "/root/.taoxian/license.bin",
+    `${process.env.HOME || ""}/.taoxian/license.bin`,
+  ].filter(Boolean) as string[];
+  for (const p of licensePaths) {
+    try {
+      const license = verifyLicenseFile(p);
+      process.stdout.write(`Taoxian license verified (customer=${license.customerId}, scopes=0x${license.scopes.toString(16)})\n`);
+      return license;
+    } catch {
+      // 试下一个
+    }
+  }
+  process.stderr.write(
+    `Taoxian license verification failed: not found in [${licensePaths.join(", ")}]\n` +
+    `Set TAOXIAN_LICENSE_PATH=/path/to/license.bin or TAOXIAN_LICENSE_SKIP=1 (dev only).\n`
+  );
+  process.exit(2);
+}
+const webAuthQueryParam = "omr_web_token";
+const defaultCliCommandName = "omr";
 const prepareProfileOnlyEnv = "CCR_CLI_PREPARE_PROFILE_ONLY";
 
 async function main(): Promise<void> {
@@ -96,6 +134,14 @@ async function main(): Promise<void> {
       return;
     }
     await stopService();
+    return;
+  }
+  if (options.command === "console") {
+    if (options.help) {
+      printConsoleHelp(0);
+      return;
+    }
+    await runConsole(options);
     return;
   }
   if (options.command === "web") {
@@ -131,7 +177,7 @@ async function main(): Promise<void> {
     throw new Error("ZCode profiles can only open the app; agent arguments are not supported.");
   }
   if (profile.agent === "claude-design") {
-    throw new Error("Claude Design profiles can only be opened from CCR Desktop.");
+    throw new Error("Claude Design profiles can only be opened from OMR Desktop.");
   }
   if (profile.agent === "claude-code" && resolvedSurface === "app" && profileOptions.agentArgs.length > 0) {
     throw new Error("Claude App profiles do not support agent arguments.");
@@ -219,7 +265,7 @@ async function main(): Promise<void> {
     const plan = buildProfileLaunchPlan(configDir, profile, resolvedSurface, profileOptions.agentArgs);
 
     if (path.isAbsolute(plan.command) && !existsSync(plan.command)) {
-      throw new Error(`Profile launcher was not found: ${plan.command}. Open CCR once or re-save the profile.`);
+      throw new Error(`Profile launcher was not found: ${plan.command}. Open OMR once or re-save the profile.`);
     }
 
     const childEnv = {
@@ -251,6 +297,9 @@ function parseArgs(args: string[]): CliOptions {
   }
   if (args[0] === "stop") {
     return parseStopArgs(args.slice(1));
+  }
+  if (args[0] === "console") {
+    return parseConsoleArgs(args.slice(1));
   }
   if (args[0] === "serve" || args[0] === "web") {
     return parseWebArgs(args.slice(1), "web");
@@ -304,6 +353,153 @@ function profileAppName(profile: Pick<ProfileConfig, "agent">): string {
     return "Claude Design";
   }
   return codexDesktopAppName;
+}
+
+type ConsoleProbeResult = {
+  alive: boolean;
+  authenticated: boolean;
+};
+
+function parseConsoleArgs(args: string[]): ConsoleCliOptions {
+  const options: ConsoleCliOptions = {
+    command: "console",
+    help: false,
+    open: false
+  };
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--help" || arg === "-h") {
+      options.help = true;
+      continue;
+    }
+    if (arg === "--open") {
+      options.open = true;
+      continue;
+    }
+    if (arg === "--no-open") {
+      options.open = false;
+      continue;
+    }
+    if (arg === "--port") {
+      index += 1;
+      options.port = parsePort(requiredArg(args[index], "--port"));
+      continue;
+    }
+    if (arg.startsWith("--port=")) {
+      options.port = parsePort(arg.slice("--port=".length));
+      continue;
+    }
+    throw new Error(`Unknown console option: ${arg}`);
+  }
+  return options;
+}
+
+function consoleDataDir(): string {
+  const configured = process.env.OMR_DATA_DIR?.trim();
+  if (configured) {
+    return configured;
+  }
+  return CONFIGDIR;
+}
+
+function readEnvPort(name: string): number | undefined {
+  const raw = process.env[name]?.trim();
+  if (!raw) {
+    return undefined;
+  }
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed > 0 && parsed <= 65535 ? parsed : undefined;
+}
+
+/**
+ * 解析 Web 管理面的鉴权 token。
+ * 顺序: 进程 env → <dataDir>/web-auth.env (systemd EnvironmentFile 同款)。
+ * 两者都没有 ⇒ 服务端每次启动随机生成, 浏览器存的 token 会失效, 管理操作 401。
+ */
+function resolveConsoleAuthToken(dataDir: string): string | undefined {
+  const fromEnv = process.env.OMR_WEB_AUTH_TOKEN?.trim();
+  if (fromEnv) {
+    return fromEnv;
+  }
+  const envFile = path.join(dataDir, "web-auth.env");
+  if (!existsSync(envFile)) {
+    return undefined;
+  }
+  try {
+    const content = readFileSync(envFile, "utf8");
+    for (const rawLine of content.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#")) {
+        continue;
+      }
+      const separator = line.indexOf("=");
+      if (separator < 0) {
+        continue;
+      }
+      const key = line.slice(0, separator).trim();
+      if (key !== "OMR_WEB_AUTH_TOKEN") {
+        continue;
+      }
+      const value = line.slice(separator + 1).trim().replace(/^["']|["']$/g, "");
+      return value || undefined;
+    }
+  } catch (error) {
+    process.stderr.write(`Failed to read ${envFile}: ${formatError(error)}\n`);
+  }
+  return undefined;
+}
+
+async function probeConsoleEndpoint(baseUrl: string, token: string | undefined): Promise<ConsoleProbeResult> {
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (token) {
+    headers["x-omr-web-auth"] = token;
+  }
+  try {
+    const response = await fetch(`${baseUrl}api/omr/rpc`, {
+      body: JSON.stringify({ args: [], method: "getAppInfo" }),
+      headers,
+      method: "POST",
+      signal: AbortSignal.timeout(4000)
+    });
+    if (response.status === 401) {
+      return { alive: true, authenticated: false };
+    }
+    return { alive: response.ok, authenticated: response.ok };
+  } catch {
+    return { alive: false, authenticated: false };
+  }
+}
+
+async function runConsole(options: ConsoleCliOptions): Promise<void> {
+  await verifyTaoxianLicenseOrExit();
+  const dataDir = consoleDataDir();
+  const port = options.port ?? readEnvPort("OMR_WEB_PORT") ?? readEnvPort("CCR_WEB_PORT") ?? 3458;
+  const baseUrl = `http://127.0.0.1:${port}/`;
+  const token = resolveConsoleAuthToken(dataDir);
+
+  const probe = await probeConsoleEndpoint(baseUrl, token);
+  if (!probe.alive) {
+    process.stderr.write(`OMR 管理服务没在跑 (${baseUrl})。先把它拉起来:\n`);
+    process.stderr.write(`  systemctl start omr\n`);
+    process.stderr.write(`  或者 ${cliCommandName()} start\n`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const url = token ? baseUrl + "?omr_web_token=" + encodeURIComponent(token) : baseUrl;
+  process.stdout.write(`OMR 控制台: ${url}\n`);
+  if (token) {
+    process.stdout.write(`链接带 token, 打开一次浏览器就记住了, 之后直接开 ${baseUrl} 即可。\n`);
+  } else {
+    process.stderr.write(`⚠️ 没找到 OMR_WEB_AUTH_TOKEN, 管理操作会 401。\n`);
+    process.stderr.write(`   修法: omr.service 里加 EnvironmentFile=-${path.join(dataDir, "web-auth.env")}\n`);
+  }
+  if (!probe.authenticated) {
+    process.stderr.write(`⚠️ 这个 token 服务端不认 (可能服务端重启时随机换过), 管理操作仍会 401。\n`);
+  }
+  if (options.open) {
+    await openManagementUrl(url);
+  }
 }
 
 function parseStopArgs(args: string[]): StopCliOptions {
@@ -390,6 +586,7 @@ function parseWebArgs(args: string[], command: WebCliOptions["command"], default
 }
 
 async function startService(options: WebCliOptions): Promise<ServiceState> {
+  await verifyTaoxianLicenseOrExit();
   const releaseStartLock = await acquireServiceStartLock();
   try {
     const current = readServiceState();
@@ -420,15 +617,15 @@ async function startService(options: WebCliOptions): Promise<ServiceState> {
     });
     const spawnError = await waitForImmediateSpawnError(child, 1000);
     if (spawnError) {
-      throw new Error(`Failed to start CCR service: ${spawnError}`);
+      throw new Error(`Failed to start OMR service: ${spawnError}`);
     }
     child.unref();
 
     const state = await waitForServiceState(child.pid, serviceStartTimeoutMs);
     if (!state) {
-      throw new Error(`CCR service did not report ready within ${serviceStartTimeoutMs}ms.`);
+      throw new Error(`OMR service did not report ready within ${serviceStartTimeoutMs}ms.`);
     }
-    process.stdout.write(`CCR service started at ${state.url} (pid ${state.pid}).\n`);
+    process.stdout.write(`OMR service started at ${state.url} (pid ${state.pid}).\n`);
     if (options.open) {
       await openManagementUrl(state.url);
     }
@@ -443,7 +640,7 @@ async function reuseRunningService(current: ServiceState, options: WebCliOptions
   if (options.startGateway && (!state.startGateway || options.ensureGatewayRunning)) {
     const gatewayStatus = await callServiceRpc<GatewayStatus>(state, "startGateway");
     if (gatewayStatus.state !== "running") {
-      throw new Error(gatewayStatus.lastError || "CCR service did not start the gateway.");
+      throw new Error(gatewayStatus.lastError || "OMR service did not start the gateway.");
     }
     state = { ...state, startGateway: true };
   }
@@ -453,7 +650,7 @@ async function reuseRunningService(current: ServiceState, options: WebCliOptions
   if (state !== current) {
     writeServiceState(state);
   }
-  process.stdout.write(`CCR service is already running at ${state.url} (pid ${state.pid}).\n`);
+  process.stdout.write(`OMR service is already running at ${state.url} (pid ${state.pid}).\n`);
   if (options.open) {
     await openManagementUrl(state.url);
   }
@@ -470,10 +667,10 @@ async function openManagementUi(options: WebCliOptions): Promise<void> {
 async function openManagementUrl(url: string): Promise<void> {
   try {
     await openSystemExternal(url);
-    process.stdout.write(`Opened CCR management UI at ${url}\n`);
+    process.stdout.write(`Opened OMR management UI at ${url}\n`);
   } catch (error) {
     process.stderr.write(`Failed to open browser: ${formatError(error)}\n`);
-    process.stdout.write(`CCR management UI is available at ${url}\n`);
+    process.stdout.write(`OMR management UI is available at ${url}\n`);
   }
 }
 
@@ -493,6 +690,7 @@ function serviceChildEnv(serviceToken: string): NodeJS.ProcessEnv {
 }
 
 async function runWebServer(options: WebCliOptions): Promise<void> {
+  await verifyTaoxianLicenseOrExit();
   const runtime = await startWebManagementServer({
     host: options.host,
     open: options.open,
@@ -511,7 +709,7 @@ async function runWebServer(options: WebCliOptions): Promise<void> {
       url: runtime.url
     });
   }
-  process.stdout.write(`CCR web management is running at ${runtime.url}\n`);
+  process.stdout.write(`OMR web management is running at ${runtime.url}\n`);
 
   let closing = false;
   let profileLeaseMonitor: NodeJS.Timeout | undefined;
@@ -560,13 +758,13 @@ async function runWebServer(options: WebCliOptions): Promise<void> {
 async function stopService(): Promise<void> {
   const state = readServiceState();
   if (!state) {
-    process.stdout.write("CCR service is not running.\n");
+    process.stdout.write("OMR service is not running.\n");
     return;
   }
   const verification = await verifyServiceState(state);
   if (!verification.ok) {
     clearServiceState(state.pid);
-    process.stdout.write("CCR service is not running.\n");
+    process.stdout.write("OMR service is not running.\n");
     return;
   }
 
@@ -575,10 +773,10 @@ async function stopService(): Promise<void> {
     ? await waitForProcessExit(state.pid, serviceStopTimeoutMs)
     : await waitForServiceUnavailable(state, serviceStopTimeoutMs);
   if (!stopped) {
-    throw new Error(`CCR service did not stop within ${serviceStopTimeoutMs}ms.`);
+    throw new Error(`OMR service did not stop within ${serviceStopTimeoutMs}ms.`);
   }
   clearServiceState(state.pid);
-  process.stdout.write("CCR service stopped.\n");
+  process.stdout.write("OMR service stopped.\n");
 }
 
 function printHelp(exitCode: number): void {
@@ -589,6 +787,7 @@ function printHelp(exitCode: number): void {
     `  ${command} ui [--daemon] [--host <host>] [--port <port>] [--open|--no-open] [--gateway|--no-gateway]`,
     `  ${command} serve [--daemon] [--host <host>] [--port <port>] [--open|--no-open] [--gateway|--no-gateway]`,
     `  ${command} stop`,
+    `  ${command} console [--port <port>] [--open|--no-open]`,
     `  ${command} <profile-name-or-id> [cli|app] [-- <agent args>]`,
     "",
     "Notes:",
@@ -601,6 +800,7 @@ function printHelp(exitCode: number): void {
     `  ${command} ui`,
     `  ${command} serve --no-open`,
     `  ${command} stop`,
+    `  ${command} console`,
     `  ${command} Codex`,
     `  ${command} default-codex -- --model gpt-5-codex`,
     `  ${command} default-codex app`
@@ -641,7 +841,7 @@ function printUiHelp(exitCode: number): void {
     "Usage:",
     `  ${command} ui [--daemon] [--host <host>] [--port <port>] [--open|--no-open] [--gateway|--no-gateway]`,
     "",
-    "Starts the background CCR service if needed and opens the management UI in the default browser.",
+    "Starts the background OMR service if needed and opens the management UI in the default browser.",
     "",
     "Options:",
     "  --daemon         Run the management server in the background (default for ui).",
@@ -662,13 +862,36 @@ function printUiHelp(exitCode: number): void {
   process.exitCode = exitCode;
 }
 
+function printConsoleHelp(exitCode: number): void {
+  const command = cliCommandName();
+  const output = [
+    "Usage:",
+    `  ${command} console [--port <port>] [--open|--no-open]`,
+    "",
+    "Prints the OMR management console URL for an already-running OMR service.",
+    "Reuses the service's fixed auth token when one is configured, so the link works in a browser.",
+    "",
+    "Options:",
+    "  --port <port>    Management server port. Defaults to OMR_WEB_PORT / CCR_WEB_PORT or 3458.",
+    "  --open           Also open the URL in the default browser.",
+    "  --no-open        Only print the URL (default).",
+    "",
+    "Environment:",
+    "  OMR_WEB_AUTH_TOKEN  Token used for management UI and RPC authentication.",
+    "  OMR_DATA_DIR        Data directory. Defaults to the runtime config dir."
+  ].join("\n");
+  const stream = exitCode === 0 ? process.stdout : process.stderr;
+  stream.write(`${output}\n`);
+  process.exitCode = exitCode;
+}
+
 function printStopHelp(exitCode: number): void {
   const command = cliCommandName();
   const output = [
     "Usage:",
     `  ${command} stop`,
     "",
-    `Stops the background CCR service started by \`${command} start\`.`
+    `Stops the background OMR service started by \`${command} start\`.`
   ].join("\n");
   const stream = exitCode === 0 ? process.stdout : process.stderr;
   stream.write(`${output}\n`);
@@ -947,7 +1170,7 @@ async function verifyServiceState(state: ServiceState): Promise<ServiceStateVeri
   }
 
   const appInfo = await callServiceRpc<{ name?: unknown }>(state, "getAppInfo").catch(() => undefined);
-  return appInfo?.name === "Claude Code Router"
+  return appInfo?.name === "OMR"
     ? { ok: true, trustedPid: false }
     : { ok: false };
 }
@@ -956,13 +1179,13 @@ async function waitForServiceUnavailable(state: ServiceState, timeoutMs: number)
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
     const appInfo = await callServiceRpc<{ name?: unknown }>(state, "getAppInfo").catch(() => undefined);
-    if (appInfo?.name !== "Claude Code Router") {
+    if (appInfo?.name !== "OMR") {
       return true;
     }
     await delay(150);
   }
   const appInfo = await callServiceRpc<{ name?: unknown }>(state, "getAppInfo").catch(() => undefined);
-  return appInfo?.name !== "Claude Code Router";
+  return appInfo?.name !== "OMR";
 }
 
 async function callServiceRpc<T>(state: ServiceState, method: string, args: unknown[] = [], timeoutMs = serviceRpcTimeoutMs): Promise<T> {
@@ -986,7 +1209,7 @@ async function callServiceRpc<T>(state: ServiceState, method: string, args: unkn
     });
     const payload = await response.json().catch(() => undefined) as { ok?: boolean; value?: T } | undefined;
     if (!response.ok || !payload?.ok) {
-      throw new Error(`CCR service RPC ${method} failed with HTTP ${response.status}`);
+      throw new Error(`OMR service RPC ${method} failed with HTTP ${response.status}`);
     }
     return payload.value as T;
   } finally {
@@ -997,7 +1220,7 @@ async function callServiceRpc<T>(state: ServiceState, method: string, args: unkn
 function serviceRpcEndpoint(url: string): string | undefined {
   try {
     const parsed = new URL(url);
-    return `${parsed.origin}/api/ccr/rpc`;
+    return `${parsed.origin}/api/omr/rpc`;
   } catch {
     return undefined;
   }

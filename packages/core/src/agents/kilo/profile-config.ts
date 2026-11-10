@@ -82,16 +82,16 @@ export function isManagedKiloConfigContent(content: string, providerId: string):
     return false;
   }
   const headers = isRecord(provider.options.headers) ? provider.options.headers : {};
-  return headers["x-ccr-client"] === "kilo" || headers["X-CCR-Client"] === "kilo";
+  return headers["x-omr-client"] === "kilo" || headers["x-ccr-client"] === "kilo" || headers["X-CCR-Client"] === "kilo";
 }
 
 export function kiloProviderId(profile: Pick<ProfileConfig, "providerId">): string {
-  return sanitizeProviderId(profile.providerId || "") || "claude-code-router";
+  return sanitizeProviderId(profile.providerId || "") || "omr";
 }
 
 function kiloGatewayOverrides(config: AppConfig, profile: ProfileConfig, token: string): Record<string, unknown> {
   const providerId = kiloProviderId(profile);
-  const providerName = profile.providerName?.trim() || "Claude Code Router";
+  const providerName = profile.providerName?.trim() || "OMR";
   const model = normalizeClientModel(profile.model) || defaultClientModel(config);
   const modelRef = `${providerId}/${model}`;
   const models = buildCodexModelCatalogIds(config, model, { allowedModels: profileAllowedModels({ ...profile, model }) });

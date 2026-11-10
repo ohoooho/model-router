@@ -114,8 +114,8 @@ type RawTraceStorageLimits = {
   inboxMaxBytes: number;
 };
 
-const rawTraceInboxDirectoryName = ".ccr-inbox";
-const rawTraceDeadLetterDirectoryName = ".ccr-dead-letter";
+const rawTraceInboxDirectoryName = ".omr-inbox";
+const rawTraceDeadLetterDirectoryName = ".omr-dead-letter";
 const rawTraceStagingDirectoryName = ".ccr-staging";
 const rawTraceDeliveryFileName = ".ccr-delivery.json";
 const rawTraceReadyFileName = ".ccr-ready.json";
@@ -1446,7 +1446,7 @@ export function buildRawTraceConfig(
   const bodyCaptureEnabled = bodyCapture !== "none" && maxBodyBytes >= 1024;
   const requestLogsEnabled = shouldRecordRequestLogs(config);
   const standaloneUsageCapture = options.standaloneUsageCapture === true;
-  const enabled = !rawTraceDisabledFromEnv() && (
+  const enabled = rawTraceEnabledFromEnv() && (
     standaloneUsageCapture ||
     (requestLogsEnabled && bodyCaptureEnabled)
   );
@@ -1609,9 +1609,15 @@ export function requestLogSampled(requestId: string, rate: number): boolean {
 }
 
 
-function rawTraceDisabledFromEnv(): boolean {
-  const value = (process.env.CCR_RAW_TRACE_ENABLED ?? process.env.CCR_RAW_TRACE ?? "").trim().toLowerCase();
-  return value === "0" || value === "false" || value === "no" || value === "off";
+function rawTraceEnabledFromEnv(): boolean {
+  const value = (
+    process.env.OMR_RAW_TRACE_ENABLED
+    ?? process.env.OMR_RAW_TRACE
+    ?? process.env.CCR_RAW_TRACE_ENABLED
+    ?? process.env.CCR_RAW_TRACE
+    ?? ""
+  ).trim().toLowerCase();
+  return value === "1" || value === "true" || value === "yes" || value === "on";
 }
 
 
@@ -1650,10 +1656,10 @@ export async function readRawTraceRequestLogBundle(
   const clientRequestHeaders = headerRecordFromUnknown(clientRequestMetadata?.headers);
   const upstreamRequestHeaders = headerRecordFromUnknown(upstreamRequestMetadata?.headers);
   const client = inferGatewayClient(undefined, clientRequestHeaders ?? {});
-  const attempt = positiveAttemptNumber(readUnknownHeader(
-    clientRequestHeaders,
-    "x-ccr-route-attempt"
-  ));
+  const attempt = positiveAttemptNumber(
+    readUnknownHeader(clientRequestHeaders, "x-omr-route-attempt") ??
+    readUnknownHeader(clientRequestHeaders, "x-ccr-route-attempt")
+  );
 
   return {
     files: {

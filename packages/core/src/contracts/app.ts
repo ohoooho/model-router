@@ -106,7 +106,7 @@ export type AppUpdateStatus = {
   supported: boolean;
 };
 
-export const BUILTIN_FUSION_TOOL_SERVER_NAME = "ccr-fusion-builtins";
+export const BUILTIN_FUSION_TOOL_SERVER_NAME = "omr-fusion-builtins";
 export const BUILTIN_FUSION_VISION_TOOL_NAME = "vision_understand";
 export const BUILTIN_FUSION_WEB_SEARCH_TOOL_NAME = "web_search";
 export const BUILTIN_FUSION_IMAGE_GENERATION_TOOL_NAME = "image_generation";
@@ -117,7 +117,7 @@ export const GROK_API_DEFAULT_VIDEO_MODEL = "grok-imagine-video";
 // Legacy sentinel retained only to migrate configs created before media execution
 // moved from the Grok CLI subprocess to the Grok API.
 export const GROK_CLI_MEDIA_MODEL_SELECTOR = "grok-cli";
-export const MEDIA_TOOLS_MCP_SERVER_NAME = "ccr-media-tools";
+export const MEDIA_TOOLS_MCP_SERVER_NAME = "omr-media-tools";
 export const MEDIA_IMAGE_GENERATE_TOOL_PREFIX = "image_generate";
 export const MEDIA_IMAGE_EDIT_TOOL_PREFIX = "image_edit";
 export const MEDIA_VIDEO_START_TOOL_PREFIX = "video_generate";
@@ -253,6 +253,20 @@ export function effectiveContextWindowPercentFor(metadata: ProviderModelMetadata
     : undefined;
 }
 
+// OMR-FORK-CHANGE-004（@omr/fork/multi-cred-strategies, 2026-08-11）
+// 桃仙 OMR 多 Credential 路由策略：4 策略架构
+// 见 dopple/MULTI-CRED-STRATEGIES.md
+//   auto-balance (默认): 按剩余容量加权分配，平滑用满所有 key
+//   waterfall:          先用 A 用完再用 B 用完
+//   priority:           首选 A，A 挂了才用 B
+//   manual:             OMR 不自动切，请求时按用户选
+// 策略绑在 virtualModelProfile 上（也可在 credential 上 per-key 覆盖）。
+export type CredentialRoutingStrategy =
+  | "auto-balance"
+  | "manual"
+  | "priority"
+  | "waterfall";
+
 export type ProviderCredentialConfig = {
   account?: ProviderAccountConfig;
   api_key?: string;
@@ -264,6 +278,8 @@ export type ProviderCredentialConfig = {
   name?: string;
   limits?: ApiKeyLimitConfig;
   priority?: number;
+  // OMR-FORK-CHANGE-004: per-credential 策略覆盖（可选，virtualModelProfile.strategy 优先）
+  strategy?: CredentialRoutingStrategy;
   weight?: number;
 };
 
@@ -853,14 +869,14 @@ export type GatewayPluginAppConfig = {
 export const CLAUDE_DESIGN_PLUGIN_ID = "claude-design";
 export const CLAUDE_SHIP_PLUGIN_ID = "claude-ship";
 export const DEFAULT_CLAUDE_DESIGN_APP: GatewayPluginAppConfig = {
-  description: "Open Claude Design in a dedicated CCR Electron window.",
+  description: "Open Claude Design in a dedicated OMR Electron window.",
   icon: "palette",
   id: "claude-design",
   name: "Claude Design",
   url: "https://claude-design.ccrdesk.top/design"
 };
 export const DEFAULT_CLAUDE_SHIP_APP: GatewayPluginAppConfig = {
-  description: "Open Claude Ship in a dedicated CCR Electron window.",
+  description: "Open Claude Ship in a dedicated OMR Electron window.",
   icon: "rocket",
   id: "claude-ship",
   name: "Claude Ship",
@@ -1123,12 +1139,14 @@ export type VirtualModelProfileConfig = {
   match: VirtualModelMatchConfig;
   materialization: VirtualModelMaterializationConfig;
   metadata?: Record<string, unknown>;
+  // OMR-FORK-CHANGE-004: 策略绑在 virtualModelProfile 上（默认 auto-balance）
+  strategy?: CredentialRoutingStrategy;
   toolChoice?: unknown;
   tools: VirtualModelToolConfig[];
 };
 
 export const NO_AVAILABLE_GATEWAY_MODELS_MESSAGE =
-  "No available models. Configure at least one provider with a model before starting CCR Gateway or opening an agent through CCR.";
+  "No available models. Configure at least one provider with a model before starting OMR Gateway or opening an agent through OMR.";
 
 export function assertAvailableGatewayModels(config: Pick<AppConfig, "Providers" | "virtualModelProfiles">): void {
   if (!hasAvailableGatewayModels(config)) {
@@ -1140,9 +1158,16 @@ export function hasAvailableGatewayModels(config: Pick<AppConfig, "Providers" | 
   return availableGatewayModelIds(config).length > 0;
 }
 
+// OMR-FORK-CHANGE-001（@omr/fork/hide-provider, 2026-08-11）
+// 桃仙 OMR 核心商业哲学：隐藏 Provider（dopple/PRINCIPLE-HIDE-PROVIDER.md）
+// 上游 CCR 强制暴露 `${providerName}/${modelName}` 格式 + `Fusion/` 场景前缀
+// 桃仙改造：/v1/models 返回纯模型名 + 场景 ID（无前缀），让客户不知道底层 provider
+// 改动 4 处：(1) baseEntries 不带 provider 前缀 (2) prefix 不带 provider 前缀
+//          (3) suffix 不带 provider 前缀 (4) 场景 ID 不带 Fusion 前缀
 export function availableGatewayModelIds(config: Pick<AppConfig, "Providers" | "virtualModelProfiles">): string[] {
   const baseEntries = availableGatewayBaseModelEntries(config.Providers);
-  const ids = baseEntries.map((entry) => `${entry.providerName}/${entry.modelName}`);
+  // OMR-FORK-CHANGE-001 (1): 原 `${entry.providerName}/${entry.modelName}` → 纯 modelName
+  const ids = baseEntries.map((entry) => entry.modelName);
 
   for (const profile of config.virtualModelProfiles ?? []) {
     if (!isGatewayModelVisibleVirtualProfile(profile)) {
@@ -1153,13 +1178,15 @@ export function availableGatewayModelIds(config: Pick<AppConfig, "Providers" | "
       for (const prefix of profile.match?.prefixes ?? []) {
         const normalizedPrefix = prefix.trim();
         if (normalizedPrefix) {
-          ids.push(`${entry.providerName}/${normalizedPrefix}${entry.modelName}`);
+          // OMR-FORK-CHANGE-001 (2): 原 `${entry.providerName}/${normalizedPrefix}${entry.modelName}` → 纯 prefix + modelName
+          ids.push(`${normalizedPrefix}${entry.modelName}`);
         }
       }
       for (const suffix of profile.match?.suffixes ?? []) {
         const normalizedSuffix = suffix.trim();
         if (normalizedSuffix) {
-          ids.push(`${entry.providerName}/${entry.modelName}${normalizedSuffix}`);
+          // OMR-FORK-CHANGE-001 (3): 原 `${entry.providerName}/${entry.modelName}${normalizedSuffix}` → 纯 modelName + suffix
+          ids.push(`${entry.modelName}${normalizedSuffix}`);
         }
       }
     }
@@ -1167,7 +1194,8 @@ export function availableGatewayModelIds(config: Pick<AppConfig, "Providers" | "
     for (const alias of profile.match?.exactAliases ?? []) {
       const normalizedAlias = alias.trim();
       if (normalizedAlias && baseEntries.length > 0) {
-        ids.push(normalizedAlias.toLowerCase().startsWith("fusion/") ? normalizedAlias : `Fusion/${normalizedAlias}`);
+        // OMR-FORK-CHANGE-001 (4): 原 `Fusion/${normalizedAlias}` 逻辑去掉 → 直接 push normalizedAlias
+        ids.push(normalizedAlias);
       }
     }
   }

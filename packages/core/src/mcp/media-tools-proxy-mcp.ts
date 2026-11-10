@@ -8,15 +8,15 @@ type JsonRpcResponse =
 type McpTool = { description: string; inputSchema: Record<string, unknown>; name: string };
 
 const protocolVersion = "2024-11-05";
-const targetUrl = env("CCR_MEDIA_MCP_URL");
-const targetApiKey = env("CCR_MEDIA_MCP_API_KEY");
-const requestTimeoutMs = clampInteger(Number(env("CCR_MEDIA_MCP_REQUEST_TIMEOUT_MS")), 1_000, 3_600_000, 630_000);
+const targetUrl = env("OMR_MEDIA_MCP_URL");
+const targetApiKey = env("OMR_MEDIA_MCP_API_KEY");
+const requestTimeoutMs = clampInteger(Number(env("OMR_MEDIA_MCP_REQUEST_TIMEOUT_MS")), 1_000, 3_600_000, 630_000);
 const tools = readTools();
 
 let inputBuffer = Buffer.alloc(0);
 
 if (!targetUrl) {
-  process.stderr.write("CCR_MEDIA_MCP_URL is required.\n");
+  process.stderr.write("OMR_MEDIA_MCP_URL is required.\n");
   process.exit(1);
 }
 
@@ -68,7 +68,7 @@ async function handleJsonRpcRequest(payload: unknown): Promise<JsonRpcResponse |
       return jsonRpcResult(id, {
         capabilities: { tools: {} },
         protocolVersion,
-        serverInfo: { name: "ccr-media-tools", title: "CCR Media Tools", version: "1.0.0" }
+        serverInfo: { name: "omr-media-tools", title: "OMR Media Tools", version: "1.0.0" }
       });
     case "ping":
       return jsonRpcResult(id, {});
@@ -105,11 +105,11 @@ async function forwardToolCall(request: JsonRpcRequest, id: JsonRpcId): Promise<
     try {
       payload = JSON.parse(text) as unknown;
     } catch {
-      return jsonRpcError(id, -32603, "CCR media endpoint returned an invalid JSON-RPC response.");
+      return jsonRpcError(id, -32603, "OMR media endpoint returned an invalid JSON-RPC response.");
     }
     return isJsonRpcResponse(payload)
       ? payload
-      : jsonRpcError(id, -32603, "CCR media endpoint returned an invalid JSON-RPC response.");
+      : jsonRpcError(id, -32603, "OMR media endpoint returned an invalid JSON-RPC response.");
   } catch (error) {
     return jsonRpcError(id, -32603, formatError(error));
   } finally {
@@ -118,7 +118,7 @@ async function forwardToolCall(request: JsonRpcRequest, id: JsonRpcId): Promise<
 }
 
 function readTools(): McpTool[] {
-  const raw = env("CCR_MEDIA_MCP_TOOLS_JSON");
+  const raw = env("OMR_MEDIA_MCP_TOOLS_JSON");
   if (!raw) return [];
   let parsed: unknown;
   try {
@@ -135,7 +135,7 @@ function readTools(): McpTool[] {
     if (!name || seen.has(name)) continue;
     seen.add(name);
     result.push({
-      description: readString(item.description) ?? "CCR media generation tool.",
+      description: readString(item.description) ?? "OMR media generation tool.",
       inputSchema: isRecord(item.inputSchema) ? item.inputSchema : { type: "object", properties: {} },
       name
     });
@@ -154,12 +154,12 @@ function mediaEndpointError(status: number, body: string): string {
   try {
     const payload = JSON.parse(body) as unknown;
     if (isRecord(payload) && isRecord(payload.error) && typeof payload.error.message === "string") {
-      return `CCR media endpoint returned HTTP ${status}: ${payload.error.message}`;
+      return `OMR media endpoint returned HTTP ${status}: ${payload.error.message}`;
     }
   } catch {
     // Fall through to a bounded plain-text diagnostic.
   }
-  return `CCR media endpoint returned HTTP ${status}${body.trim() ? `: ${body.trim().slice(0, 500)}` : "."}`;
+  return `OMR media endpoint returned HTTP ${status}${body.trim() ? `: ${body.trim().slice(0, 500)}` : "."}`;
 }
 
 function jsonRpcResult(id: JsonRpcId, result: JsonValue): JsonRpcResponse {
@@ -199,7 +199,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function formatError(error: unknown): string {
   if (error instanceof Error) {
-    return error.name === "AbortError" ? `CCR media tool call timed out after ${requestTimeoutMs}ms.` : error.message;
+    return error.name === "AbortError" ? `OMR media tool call timed out after ${requestTimeoutMs}ms.` : error.message;
   }
   return String(error);
 }

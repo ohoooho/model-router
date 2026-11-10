@@ -2694,7 +2694,7 @@ type GatewayPluginMigrationResult = {
   plugins: GatewayPluginConfig[];
 };
 
-const CCR_EXTENSIONS_PLUGIN_IDS = new Set([CLAUDE_DESIGN_PLUGIN_ID, CLAUDE_SHIP_PLUGIN_ID, "cursor-proxy"]);
+const OMR_EXTENSIONS_PLUGIN_IDS = new Set([CLAUDE_DESIGN_PLUGIN_ID, CLAUDE_SHIP_PLUGIN_ID, "cursor-proxy"]);
 
 function migrateKnownGatewayPluginConfigs(plugins: GatewayPluginConfig[] | undefined): GatewayPluginMigrationResult {
   const sourcePlugins = plugins ?? [];
@@ -3011,7 +3011,7 @@ function withClaudeProductRuntimePluginConfig(config: AppConfig, pluginId: strin
     return config;
   }
   if (!isDesktopAppRuntime()) {
-    throw new Error(`${productName} is only available in CCR Desktop.`);
+    throw new Error(`${productName} is only available in OMR Desktop.`);
   }
   const plugin = claudeProductRuntimePluginConfig(pluginId);
   if (!plugin) {
@@ -3128,7 +3128,7 @@ function isLegacyClaudeDesignModule(modulePath: string | undefined): boolean {
 }
 
 function isLegacyExternalizedPluginModule(pluginId: string, modulePath: string | undefined): boolean {
-  if (!CCR_EXTENSIONS_PLUGIN_IDS.has(pluginId)) {
+  if (!OMR_EXTENSIONS_PLUGIN_IDS.has(pluginId)) {
     return false;
   }
   const normalized = modulePath?.replace(/\\/g, "/").toLowerCase() || "";
@@ -3140,25 +3140,27 @@ function isLegacyExternalizedPluginModule(pluginId: string, modulePath: string |
 
 function ccrExtensionsRootCandidates(previousModule: string | undefined): string[] {
   const candidates = [
-    process.env.CCR_EXTENSIONS_DIR,
-    ccrExtensionsRootFromLegacyModule(previousModule),
-    path.resolve(process.cwd(), "..", "ccr-extensions"),
-    path.resolve(process.cwd(), "ccr-extensions")
+    process.env.OMR_EXTENSIONS_DIR,
+    omrExtensionsRootFromLegacyModule(previousModule),
+    path.resolve(process.cwd(), "..", "omr-extensions"),
+    path.resolve(process.cwd(), "omr-extensions")
   ];
   return uniqueStrings(candidates.filter((candidate): candidate is string => Boolean(candidate?.trim())));
 }
 
-function ccrExtensionsRootFromLegacyModule(modulePath: string | undefined): string {
+function omrExtensionsRootFromLegacyModule(modulePath: string | undefined): string {
   if (!modulePath) {
     return "";
   }
   const resolved = path.resolve(modulePath);
   const segments = resolved.split(path.sep);
-  const index = segments.lastIndexOf("claude-code-router");
+  const omrIndex = segments.lastIndexOf("omr");
+  const ccrIndex = segments.lastIndexOf("claude-code-router");
+  const index = Math.max(omrIndex, ccrIndex);
   if (index <= 0) {
     return "";
   }
-  return path.join(path.sep, ...segments.slice(1, index), "ccr-extensions");
+  return path.join(path.sep, ...segments.slice(1, index), "omr-extensions");
 }
 
 export function migrateKnownGatewayPluginConfigsForTest(plugins: GatewayPluginConfig[] | undefined): GatewayPluginMigrationResult {
@@ -3732,8 +3734,8 @@ function parseProfiles(value: unknown): ProfileConfig[] | undefined {
         ...(availableModels ? { availableModels } : {}),
         model,
         name,
-        providerId: readString(item.providerId) || readString(item.provider) || "claude-code-router",
-        providerName: readString(item.providerName) || "Claude Code Router",
+        providerId: readString(item.providerId) || readString(item.provider) || "omr",
+        providerName: readString(item.providerName) || "OMR",
         remoteFrontendMode: parseCodexRemoteFrontendMode(readString(item.remoteFrontendMode) || readString(item.frontendMode) || readString(item.coreMode)) || "app",
         ...(routing ? { routing } : {}),
         scope: parseProfileScope(readString(item.scope) || readString(item.applyScope) || readString(item.effectScope)) || "global",
@@ -3889,7 +3891,7 @@ function defaultCodexConfigFile(agent: ProfileConfig["agent"]): string {
         : agent === "pi"
           ? "~/.pi/agent"
           : agent === CLAUDE_DESIGN_PLUGIN_ID
-            ? "~/.claude-code-router/claude-design"
+            ? "~/.omr/claude-design"
             : "~/.codex/config.toml";
 }
 
@@ -4110,7 +4112,7 @@ function createGeneratedGatewayApiKey(): ApiKeyConfig {
   return {
     createdAt: new Date().toISOString(),
     id: GENERATED_GATEWAY_API_KEY_ID,
-    key: `sk-ccr-${randomBytes(32).toString("base64url")}`,
+    key: `sk-omr-${randomBytes(32).toString("base64url")}`,
     name: "Local Gateway"
   };
 }

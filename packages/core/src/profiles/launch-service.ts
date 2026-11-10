@@ -24,12 +24,15 @@ import { applyProfileConfig, cleanupGeneratedBinBackups } from "@ccr/core/profil
 import { isDesktopAppRuntime } from "@ccr/core/runtime/desktop-app";
 import { windowsEnvironmentChangedPowerShellLines, windowsSystemCommand } from "@ccr/core/platform/windows-system";
 
-const ccrPathBlockStart = "# >>> Claude Code Router CLI >>>";
-const ccrPathBlockEnd = "# <<< Claude Code Router CLI <<<";
-export const desktopCliCommandName = "ccr-app";
-const desktopCliRuntimeFileName = "ccr-cli.js";
-const desktopCliCommandNameEnv = "CCR_CLI_COMMAND_NAME";
-export const CCR_CLI_COMPANION_RUNTIME_FILE_NAMES = [
+const omrPathBlockStart = "# >>> OMR CLI >>>";
+const omrPathBlockEnd = "# <<< OMR CLI <<<";
+// Legacy markers from claude-code-router era — kept for cleanup of old shell config blocks
+const legacyCcrPathBlockStart = "# >>> Claude Code Router CLI >>>";
+const legacyCcrPathBlockEnd = "# <<< Claude Code Router CLI <<<";
+export const desktopCliCommandName = "omr-app";
+const desktopCliRuntimeFileName = "omr-cli.js";
+const desktopCliCommandNameEnv = "OMR_CLI_COMMAND_NAME";
+export const OMR_CLI_COMPANION_RUNTIME_FILE_NAMES = [
   "browser-web-search-proxy-mcp.js",
   "fusion-tool-fallback-mcp.js",
   "fusion-vision-mcp.js",
@@ -105,7 +108,7 @@ export async function getProfileOpenCommand(config: AppConfig, request: ProfileO
   const profile = findProfileForOpen(config, request.profileId);
   const surface = resolveProfileOpenSurface(profile, request.surface);
   if (profile.agent === "claude-design" && !isDesktopAppRuntime()) {
-    throw new Error("Claude Design profiles can only be opened from CCR Desktop.");
+    throw new Error("Claude Design profiles can only be opened from OMR Desktop.");
   }
   if (options.ensureLauncher) {
     ensureCcrCliLauncher(config);
@@ -124,7 +127,7 @@ export async function openProfileFromCcr(config: AppConfig, request: ProfileOpen
   const profile = findProfileForOpen(config, request.profileId);
   const surface = resolveProfileOpenSurface(profile, request.surface);
   if (profile.agent === "claude-design") {
-    throw new Error("Claude Design profiles can only be opened from CCR Desktop.");
+    throw new Error("Claude Design profiles can only be opened from OMR Desktop.");
   }
   if (profile.agent === "claude-code" && surface === "app") {
     return openClaudeAppProfile(config, profile);
@@ -218,7 +221,7 @@ async function openOpenCodeAppProfile(config: AppConfig, profile: ReturnType<typ
   const unmanagedPid = findRunningOpenCodeAppPid(profile.appPath);
   if (unmanagedPid) {
     throw new Error(
-      `OpenCode App is already running outside CCR (PID ${unmanagedPid}). ` +
+      `OpenCode App is already running outside OMR (PID ${unmanagedPid}). ` +
       "Close it before opening an OpenCode App profile."
     );
   }
@@ -240,7 +243,7 @@ async function openOpenCodeAppProfile(config: AppConfig, profile: ReturnType<typ
     throw new Error([
       `${appName} did not stay open for ${profile.name || profile.id}.`,
       ...(entry.spawnError ? [`Error: ${entry.spawnError}`] : []),
-      "Close any OpenCode App instance that was not opened by CCR, then try again.",
+      "Close any OpenCode App instance that was not opened by OMR, then try again.",
       `Command: ${entry.command}`,
       `User data: ${entry.userDataDir}`
     ].join(" "));
@@ -410,7 +413,7 @@ async function ensureGatewayConfigRunning(
     if (existingGateway.state === "unavailable") {
       if (!startIfMissing) {
         const reason = existingGateway.reason ? `: ${existingGateway.reason}` : "";
-        throw new ProfileGatewayUnavailableError(`CCR gateway is not running at ${profileGatewayEndpoint(config)}${reason}. Start CCR Desktop or run ccr start before opening ${appName}.`);
+        throw new ProfileGatewayUnavailableError(`OMR gateway is not running at ${profileGatewayEndpoint(config)}${reason}. Start OMR Desktop or run omr start before opening ${appName}.`);
       }
     } else {
       throw new Error(existingGatewayConflictMessage(existingGateway, appName));
@@ -418,7 +421,7 @@ async function ensureGatewayConfigRunning(
   }
 
   if (!startIfMissing) {
-    throw new ProfileGatewayUnavailableError(`CCR gateway is not running at ${profileGatewayEndpoint(config)}. Start CCR Desktop or run ccr start before opening ${appName}.`);
+    throw new ProfileGatewayUnavailableError(`OMR gateway is not running at ${profileGatewayEndpoint(config)}. Start OMR Desktop or run omr start before opening ${appName}.`);
   }
 
   const startedStatus = await gatewayService.start(config);
@@ -434,7 +437,7 @@ async function ensureGatewayConfigRunning(
     throw new Error(existingGatewayConflictMessage(existingGateway, appName));
   }
 
-  throw new Error(startedStatus.lastError || `CCR gateway did not start for ${appName}.`);
+  throw new Error(startedStatus.lastError || `OMR gateway did not start for ${appName}.`);
 }
 
 type ExistingProfileGatewayProbe =
@@ -556,7 +559,7 @@ function isCcrGatewayRoot(value: unknown): boolean {
   if (!isRecord(value)) {
     return false;
   }
-  return value.name === "claude-code-router" || value.plugin === "claude-code-router";
+  return value.name === "omr" || value.name === "claude-code-router" || value.plugin === "omr" || value.plugin === "claude-code-router";
 }
 
 function isCcrGatewayHealth(value: unknown): boolean {
@@ -719,21 +722,21 @@ function unquoteShellValue(value: string): string {
 function existingGatewayConflictMessage(probe: ExistingProfileGatewayProbe, appName: string): string {
   if (probe.state === "unauthorized") {
     const details = probe.message ? ` ${probe.message}` : "";
-    return `CCR gateway is already running at ${probe.endpoint}, but it does not accept the API key for ${appName}.${details} Restart CCR Desktop or run ccr start to refresh the gateway before opening this profile.`;
+    return `OMR gateway is already running at ${probe.endpoint}, but it does not accept the API key for ${appName}.${details} Restart OMR Desktop or run omr start to refresh the gateway before opening this profile.`;
   }
   if (probe.state === "unusable") {
-    return `CCR gateway is already running at ${probe.endpoint}, but it cannot serve ${appName} right now (HTTP ${probe.status}). Restart CCR Desktop or run ccr start to refresh the gateway before opening this profile.`;
+    return `OMR gateway is already running at ${probe.endpoint}, but it cannot serve ${appName} right now (HTTP ${probe.status}). Restart OMR Desktop or run omr start to refresh the gateway before opening this profile.`;
   }
   if (probe.state === "incompatible") {
     return `CCR gateway is already running at ${probe.endpoint}, but it is not compatible with ${appName}. ${probe.message}`;
   }
   if (probe.state === "not-ccr") {
-    return `Port ${probe.endpoint} is already in use by a non-CCR service. Stop that process or change the CCR gateway port.`;
+    return `Port ${probe.endpoint} is already in use by a non-OMR service. Stop that process or change the OMR gateway port.`;
   }
   if (probe.state === "unavailable") {
-    return `CCR gateway is not reachable at ${probe.endpoint}${probe.reason ? `: ${probe.reason}` : ""}.`;
+    return `OMR gateway is not reachable at ${probe.endpoint}${probe.reason ? `: ${probe.reason}` : ""}.`;
   }
-  return `CCR gateway is already running at ${probe.endpoint}.`;
+  return `OMR gateway is already running at ${probe.endpoint}.`;
 }
 
 function isAddressInUseError(message: string | undefined): boolean {
@@ -758,7 +761,7 @@ function probeGatewayHost(host: string): string {
 function profileGatewayConfigFor(config: AppConfig, profile: ReturnType<typeof findProfileForOpen>): AppConfig {
   const token = findProfileApiKey(config, profile);
   if (!token) {
-    throw new Error(`No CCR API key was found for profile "${profile.name || profile.id}". Re-save the profile and try again.`);
+    throw new Error(`No OMR API key was found for profile "${profile.name || profile.id}". Re-save the profile and try again.`);
   }
   return profileGatewayConfigWithToken(config, profile, token);
 }
@@ -834,7 +837,7 @@ export async function stopProfileFromCcr(config: AppConfig, request: ProfileOpen
   const profile = findProfileForOpen(config, request.profileId);
   const surface = resolveProfileOpenSurface(profile, request.surface);
   if (surface !== "app") {
-    throw new Error(`${profile.name || profile.id} does not support stopping ${surface.toUpperCase()} from CCR.`);
+    throw new Error(`${profile.name || profile.id} does not support stopping ${surface.toUpperCase()} from OMR.`);
   }
 
   const key = profileRuntimeKey(profile.id, surface);
@@ -1307,7 +1310,7 @@ function nodeErrorCode(error: unknown): string | undefined {
 function startClaudeAppBotWorker(config: AppConfig, profile: ReturnType<typeof findProfileForOpen>): void {
   const botEnv = botGatewayProfileEnv(config, profile, "app");
   stopClaudeAppBotWorker();
-  if (botEnv.CCR_BOT_GATEWAY_ENABLED !== "true") {
+  if (botEnv.OMR_BOT_GATEWAY_ENABLED !== "true") {
     return;
   }
 
@@ -1324,15 +1327,15 @@ function startClaudeAppBotWorker(config: AppConfig, profile: ReturnType<typeof f
     ...settingsEnv,
     ...botEnv,
     ...(nodeLaunch.electronRunAsNode ? { ELECTRON_RUN_AS_NODE: "1" } : {}),
-    CCR_CLAUDE_BASE_CONFIG_DIR: path.dirname(settingsFile),
+    OMR_CLAUDE_BASE_CONFIG_DIR: path.dirname(settingsFile),
     CLAUDE_CONFIG_DIR: path.dirname(settingsFile),
     CLAUDE_USER_DATA_DIR: claudeAppUserDataDir,
-    CCR_CLAUDE_APP_USER_DATA_PATH: claudeAppUserDataDir,
-    CCR_CLAUDE_CODE_BOT_WORKER: "1",
-    CCR_CLAUDE_CODE_MODEL: profile.model.trim(),
-    CCR_CODEX_MODEL: profile.model.trim(),
-    CCR_CODEX_WORKSPACE_NAME: profile.name || profile.id,
-    CCR_PROFILE_SURFACE: "app",
+    OMR_CLAUDE_APP_USER_DATA_PATH: claudeAppUserDataDir,
+    OMR_CLAUDE_CODE_BOT_WORKER: "1",
+    OMR_CLAUDE_CODE_MODEL: profile.model.trim(),
+    OMR_CODEX_MODEL: profile.model.trim(),
+    OMR_CODEX_WORKSPACE_NAME: profile.name || profile.id,
+    OMR_PROFILE_SURFACE: "app",
     CODEXL_CODEX_WORKSPACE_NAME: profile.name || profile.id,
     CODEXL_PROFILE_SURFACE: "app",
     ...claudeCodeUtcTimezoneEnvOverride()
@@ -1347,7 +1350,7 @@ function startClaudeAppBotWorker(config: AppConfig, profile: ReturnType<typeof f
   });
   claudeAppBotWorker = child;
   claudeAppBotWorkerProfileId = profile.id;
-  claudeAppBotWorkerStateDir = botEnv.CCR_BOT_GATEWAY_STATE_DIR;
+  claudeAppBotWorkerStateDir = botEnv.OMR_BOT_GATEWAY_STATE_DIR;
   child.stderr?.on("data", (chunk) => {
     console.warn(`[profile] Claude App bot worker stderr: ${chunk.toString("utf8").trim()}`);
   });
@@ -1379,7 +1382,7 @@ function startOpenCodeAppBotWorker(
   launchSignature: string
 ): void {
   const botEnv = botGatewayProfileEnv(config, profile, "app");
-  if (botEnv.CCR_BOT_GATEWAY_ENABLED !== "true") {
+  if (botEnv.OMR_BOT_GATEWAY_ENABLED !== "true") {
     stopOpenCodeAppBotWorker(profile.id);
     return;
   }
@@ -1402,9 +1405,9 @@ function startOpenCodeAppBotWorker(
     ...stringRecord(profile.env),
     ...botEnv,
     ...(nodeLaunch.electronRunAsNode ? { ELECTRON_RUN_AS_NODE: "1" } : {}),
-    CCR_OPENCODE_BOT_WORKER: "1",
-    CCR_OPENCODE_WORKSPACE_NAME: profile.name || profile.id,
-    CCR_PROFILE_SURFACE: "app",
+    OMR_OPENCODE_BOT_WORKER: "1",
+    OMR_OPENCODE_WORKSPACE_NAME: profile.name || profile.id,
+    OMR_PROFILE_SURFACE: "app",
     OPENCODE_CLIENT: "cli",
     OPENCODE_CONFIG: configFile,
     OPENCODE_CONFIG_CONTENT: inlineConfig
@@ -1420,7 +1423,7 @@ function startOpenCodeAppBotWorker(
   openCodeAppBotWorker = child;
   openCodeAppBotWorkerProfileId = profile.id;
   openCodeAppBotWorkerSignature = launchSignature;
-  openCodeAppBotWorkerStateDir = botEnv.CCR_BOT_GATEWAY_STATE_DIR;
+  openCodeAppBotWorkerStateDir = botEnv.OMR_BOT_GATEWAY_STATE_DIR;
   child.stderr?.on("data", (chunk) => {
     console.warn(`[profile] OpenCode App bot worker stderr: ${chunk.toString("utf8").trim()}`);
   });
@@ -1448,7 +1451,7 @@ function startOpenCodeAppBotWorker(
 
 function startCodexAppBotWorker(config: AppConfig, profile: ReturnType<typeof findProfileForOpen>): void {
   const botEnv = botGatewayProfileEnv(config, profile, "app");
-  if (botEnv.CCR_BOT_GATEWAY_ENABLED !== "true") {
+  if (botEnv.OMR_BOT_GATEWAY_ENABLED !== "true") {
     stopCodexAppBotWorker(profile.id);
     return;
   }
@@ -1463,8 +1466,8 @@ function startCodexAppBotWorker(config: AppConfig, profile: ReturnType<typeof fi
     ...process.env,
     ...plan.env,
     ...botEnv,
-    CCR_CODEX_BOT_WORKER: "1",
-    CCR_PROFILE_SURFACE: "app",
+    OMR_CODEX_BOT_WORKER: "1",
+    OMR_PROFILE_SURFACE: "app",
     CODEXL_PROFILE_SURFACE: "app"
   };
   delete env.ELECTRON_NO_ATTACH_CONSOLE;
@@ -1475,7 +1478,7 @@ function startCodexAppBotWorker(config: AppConfig, profile: ReturnType<typeof fi
     windowsHide: true,
     windowsVerbatimArguments: launch.windowsVerbatimArguments
   });
-  codexAppBotWorkers.set(profile.id, { agent: profile.agent, child, stateDir: botEnv.CCR_BOT_GATEWAY_STATE_DIR });
+  codexAppBotWorkers.set(profile.id, { agent: profile.agent, child, stateDir: botEnv.OMR_BOT_GATEWAY_STATE_DIR });
   child.stderr?.on("data", (chunk) => {
     console.warn(`[profile] ${profile.agent === "zcode" ? "ZCode" : "Codex"} App bot worker stderr: ${chunk.toString("utf8").trim()}`);
   });
@@ -1552,11 +1555,11 @@ function ensureBotWorkerRuntime(runtimeFile: string): void {
     }
   }
   if (
-    !content.includes("CCR_CLAUDE_CODE_BOT_WORKER") ||
+    !content.includes("OMR_CLAUDE_CODE_BOT_WORKER") ||
     !content.includes("claude-bot-worker") ||
-    !content.includes("CCR_OPENCODE_BOT_WORKER") ||
+    !content.includes("OMR_OPENCODE_BOT_WORKER") ||
     !content.includes("opencode-bot-worker") ||
-    !content.includes("CCR_CODEX_BOT_WORKER") ||
+    !content.includes("OMR_CODEX_BOT_WORKER") ||
     !content.includes("codex-bot-worker")
   ) {
     throw new Error("Bot worker runtime does not contain all required entrypoints.");
@@ -1628,7 +1631,7 @@ function stopCodexAppMediaPreviewBridge(profileId?: string): void {
 }
 
 function nodeRuntimeLaunch(): { command: string; electronRunAsNode: boolean } {
-  const configured = process.env.CCR_NODE_BIN?.trim();
+  const configured = process.env.OMR_NODE_BIN?.trim();
   if (configured) {
     return { command: configured, electronRunAsNode: false };
   }
@@ -1674,7 +1677,7 @@ export function prepareCcrCliLauncherRuntime(): CcrCliLauncherPreparation {
 export function syncCcrCliCompanionRuntimes(runtimeSource: string, binDir: string): string[] {
   const sourceDir = path.dirname(runtimeSource);
   const synced: string[] = [];
-  for (const fileName of CCR_CLI_COMPANION_RUNTIME_FILE_NAMES) {
+  for (const fileName of OMR_CLI_COMPANION_RUNTIME_FILE_NAMES) {
     const source = path.join(sourceDir, fileName);
     if (!existsSync(source)) continue;
     const destination = path.join(binDir, fileName);
@@ -1741,10 +1744,10 @@ function cleanupLegacyCcrCliLauncher(binDir: string): void {
 }
 
 function isLegacyManagedCcrCliLauncher(source: string): boolean {
-  return source.includes("CCR_CLI_NODE_PATH") &&
+  return source.includes("OMR_CLI_NODE_PATH") &&
     source.includes(desktopCliRuntimeFileName) &&
     source.includes("ELECTRON_RUN_AS_NODE=1") &&
-    source.includes("CCR_NODE_BIN");
+    source.includes("OMR_NODE_BIN");
 }
 
 function findBundledCcrCliSource(): string {
@@ -1761,7 +1764,7 @@ function findBundledCcrCliSource(): string {
   ];
   const source = candidates.find((candidate) => existsSync(candidate));
   if (!source) {
-    throw new Error(`CCR CLI runtime was not found. Rebuild or reinstall CCR and try again. Checked: ${candidates.join(", ")}`);
+    throw new Error(`OMR CLI runtime was not found. Rebuild or reinstall OMR and try again. Checked: ${candidates.join(", ")}`);
   }
   return source;
 }
@@ -1781,14 +1784,14 @@ function posixCcrLauncher(runtimeFile: string): string {
     "#!/bin/sh",
     `${desktopCliCommandNameEnv}=${shQuote(desktopCliCommandName)}`,
     `export ${desktopCliCommandNameEnv}`,
-    `CCR_CLI_NODE_PATH=${shQuote(nodePath)}`,
+    `OMR_CLI_NODE_PATH=${shQuote(nodePath)}`,
     'if [ -n "$NODE_PATH" ]; then',
-    '  export NODE_PATH="$CCR_CLI_NODE_PATH:$NODE_PATH"',
+    '  export NODE_PATH="$OMR_CLI_NODE_PATH:$NODE_PATH"',
     "else",
-    '  export NODE_PATH="$CCR_CLI_NODE_PATH"',
+    '  export NODE_PATH="$OMR_CLI_NODE_PATH"',
     "fi",
-    'if [ -n "$CCR_NODE_BIN" ]; then',
-    `  exec "$CCR_NODE_BIN" ${shQuote(runtimeFile)} "$@"`,
+    'if [ -n "$OMR_NODE_BIN" ]; then',
+    `  exec "$OMR_NODE_BIN" ${shQuote(runtimeFile)} "$@"`,
     "fi",
     `ELECTRON_RUN_AS_NODE=1 exec ${shQuote(process.execPath)} ${shQuote(runtimeFile)} "$@"`
   ].join("\n") + "\n";
@@ -1801,12 +1804,12 @@ export function windowsCcrLauncher(runtimeFile: string, config?: AppConfig): str
     "@echo off",
     "setlocal",
     `set "${desktopCliCommandNameEnv}=${desktopCliCommandName}"`,
-    `set "CCR_CLI_RUNTIME=${cmdEnvValue(runtimeFile)}"`,
-    `set "CCR_CLI_NODE_PATH=${cmdEnvValue(nodePath)}"`,
+    `set "OMR_CLI_RUNTIME=${cmdEnvValue(runtimeFile)}"`,
+    `set "OMR_CLI_NODE_PATH=${cmdEnvValue(nodePath)}"`,
     "if defined NODE_PATH (",
-    "  set \"NODE_PATH=%CCR_CLI_NODE_PATH%;%NODE_PATH%\"",
+    "  set \"NODE_PATH=%OMR_CLI_NODE_PATH%;%NODE_PATH%\"",
     ") else (",
-    "  set \"NODE_PATH=%CCR_CLI_NODE_PATH%\"",
+    "  set \"NODE_PATH=%OMR_CLI_NODE_PATH%\"",
     ")",
     ...(dispatches.length > 0
       ? [
@@ -1816,22 +1819,22 @@ export function windowsCcrLauncher(runtimeFile: string, config?: AppConfig): str
           ":ccr_run_cli"
         ]
       : []),
-    "if defined CCR_NODE_BIN (",
-    '  "%CCR_NODE_BIN%" "%CCR_CLI_RUNTIME%" %*',
+    "if defined OMR_NODE_BIN (",
+    '  "%OMR_NODE_BIN%" "%OMR_CLI_RUNTIME%" %*',
     "  exit /b %ERRORLEVEL%",
     ")",
     "set \"ELECTRON_RUN_AS_NODE=1\"",
-    `${cmdQuote(process.execPath)} "%CCR_CLI_RUNTIME%" %*`,
+    `${cmdQuote(process.execPath)} "%OMR_CLI_RUNTIME%" %*`,
     "exit /b %ERRORLEVEL%",
     ...dispatches.flatMap((dispatch, index) => [
       `:ccr_profile_${index}`,
-      "set \"CCR_CLI_PREPARE_PROFILE_ONLY=1\"",
+      "set \"OMR_CLI_PREPARE_PROFILE_ONLY=1\"",
       "set \"ELECTRON_RUN_AS_NODE=1\"",
-      `${cmdQuote(process.execPath)} "%CCR_CLI_RUNTIME%" %*`,
+      `${cmdQuote(process.execPath)} "%OMR_CLI_RUNTIME%" %*`,
       "if errorlevel 1 exit /b %ERRORLEVEL%",
-      "set \"CCR_CLI_PREPARE_PROFILE_ONLY=\"",
+      "set \"OMR_CLI_PREPARE_PROFILE_ONLY=\"",
       "set \"ELECTRON_RUN_AS_NODE=\"",
-      "set \"CCR_CLI_DIRECT_PROFILE_DISPATCH=1\"",
+      "set \"OMR_CLI_DIRECT_PROFILE_DISPATCH=1\"",
       `call ${cmdQuote(dispatch.launcher)} %*`,
       "exit /b %ERRORLEVEL%"
     ])
@@ -2007,7 +2010,7 @@ function ensureShellRcPathBlock(rcFile: string, binDir: string): void {
   const source = existsSync(rcFile) ? readFileSync(rcFile, "utf8") : "";
   const block = shellRcPathBlock();
   const managedPattern = new RegExp(
-    `\\n?${escapeRegExp(ccrPathBlockStart)}[\\s\\S]*?${escapeRegExp(ccrPathBlockEnd)}\\n?`,
+    `\\n?(${escapeRegExp(omrPathBlockStart)}|${escapeRegExp(legacyCcrPathBlockStart)})[\\s\\S]*?(${escapeRegExp(omrPathBlockEnd)}|${escapeRegExp(legacyCcrPathBlockEnd)})\\n?`,
     "m"
   );
   if (managedPattern.test(source)) {
@@ -2024,15 +2027,15 @@ function ensureShellRcPathBlock(rcFile: string, binDir: string): void {
 }
 
 function shellRcPathBlock(): string {
-  const binDir = "$HOME/.claude-code-router/bin";
+  const binDir = "$HOME/.omr/bin";
   return [
-    ccrPathBlockStart,
-    "# Added by Claude Code Router. Enables the ccr-app command in new shells.",
+    omrPathBlockStart,
+    "# Added by OMR. Enables the omr-app command in new shells.",
     'case ":$PATH:" in',
     `  *":${binDir}:"*) ;;`,
     `  *) export PATH="${binDir}:$PATH" ;;`,
     "esac",
-    ccrPathBlockEnd
+    omrPathBlockEnd
   ].join("\n");
 }
 
@@ -2041,7 +2044,7 @@ function ensureFishPathBlock(file: string, binDir: string): void {
   const source = existsSync(file) ? readFileSync(file, "utf8") : "";
   const block = fishPathBlock();
   const managedPattern = new RegExp(
-    `\\n?${escapeRegExp(ccrPathBlockStart)}[\\s\\S]*?${escapeRegExp(ccrPathBlockEnd)}\\n?`,
+    `\\n?(${escapeRegExp(omrPathBlockStart)}|${escapeRegExp(legacyCcrPathBlockStart)})[\\s\\S]*?(${escapeRegExp(omrPathBlockEnd)}|${escapeRegExp(legacyCcrPathBlockEnd)})\\n?`,
     "m"
   );
   if (managedPattern.test(source)) {
@@ -2059,18 +2062,20 @@ function ensureFishPathBlock(file: string, binDir: string): void {
 
 function fishPathBlock(): string {
   return [
-    ccrPathBlockStart,
-    "# Added by Claude Code Router. Enables the ccr-app command in new shells.",
-    'set -l ccr_bin "$HOME/.claude-code-router/bin"',
-    "if not contains $ccr_bin $PATH",
-    "    set -gx PATH $ccr_bin $PATH",
+    omrPathBlockStart,
+    "# Added by OMR. Enables the omr-app command in new shells.",
+    'set -l omr_bin "$HOME/.omr/bin"',
+    "if not contains $omr_bin $PATH",
+    "    set -gx PATH $omr_bin $PATH",
     "end",
-    ccrPathBlockEnd
+    omrPathBlockEnd
   ].join("\n");
 }
 
 function shellRcAlreadyAddsCcrBin(source: string, binDir: string): boolean {
-  return source.includes("$HOME/.claude-code-router/bin") ||
+  return source.includes("$HOME/.omr/bin") ||
+    source.includes("~/.omr/bin") ||
+    source.includes("$HOME/.claude-code-router/bin") ||
     source.includes("~/.claude-code-router/bin") ||
     source.includes(binDir);
 }

@@ -17,8 +17,8 @@ import type { AppConfig, GatewayNetworkEndpoint } from "@ccr/core/contracts/app"
 import { fetchWithSystemProxy } from "@ccr/core/proxy/system-proxy-fetch";
 import { uniqueStrings } from "@ccr/core/gateway/internal/collections";
 import { isRecord, numberValue, stringValue } from "@ccr/core/gateway/internal/value";
-import { formatError, readHeader } from "@ccr/core/gateway/http/io";
-import { coreGatewayAuthHeader, coreGatewayAuthTokenEnv, gatewayEntryOverrideEnv, gatewayPackageCandidates, gatewayRuntimeMarkerFile, requireFromHere } from "@ccr/core/gateway/internal/shared";
+import { formatError, readCompatHeader } from "@ccr/core/gateway/http/io";
+import { coreGatewayAuthTokenEnv, gatewayEntryOverrideEnv, gatewayPackageCandidates, gatewayRuntimeMarkerFile, omrCoreGatewayAuthHeader, requireFromHere } from "@ccr/core/gateway/internal/shared";
 import type { CoreGatewayHealth, ManagedGatewayRuntimeMarker } from "@ccr/core/gateway/internal/shared";
 import { delay } from "@ccr/core/gateway/internal/clock";
 
@@ -189,7 +189,7 @@ function resolveGatewayBootstrapEntry(): string {
       : [])
   ].find((candidate) => existsSync(candidate));
   if (!entry) {
-    throw new Error("CCR gateway IPC bootstrap was not found. Run npm run build:assets.");
+    throw new Error("OMR gateway IPC bootstrap was not found. Run npm run build:assets.");
   }
   return entry;
 }
@@ -377,7 +377,12 @@ function createGatewayProcessEnv(
     AUTH_REQUIRED: "true",
     AUTH_STATIC_API_KEY_BEARER_ONLY: "false",
     AUTH_STATIC_API_KEY_ENV: coreGatewayAuthTokenEnv,
-    AUTH_STATIC_API_KEY_HEADER: publicGatewayMode ? "authorization" : coreGatewayAuthHeader,
+    AUTH_STATIC_API_KEY_HEADER: publicGatewayMode ? "authorization" : omrCoreGatewayAuthHeader,
+    // OMR fork 2026-08-19: dual-write CCR_* 兼容上游 @the-next-ai/ai-gateway v1.0.15
+    // 外部包 /health handler 仍读 CCR_GATEWAY_RUNTIME_ID (commit 97fe211 OMR-FORK-CHANGE-005
+    // 改了写路径 OMR_GATEWAY_RUNTIME_ID，但 ai-gateway 外部包没法同步改读路径)。
+    // 不 dual-write 会导致 health.runtimeId 永远 undefined → supervisor 等不到 healthy → gateway 永远启不起来。
+    OMR_GATEWAY_RUNTIME_ID: runtimeId,
     CCR_GATEWAY_RUNTIME_ID: runtimeId,
     [coreGatewayAuthTokenEnv]: authTokens.join(","),
     HOST: config.gateway.coreHost,
@@ -416,6 +421,10 @@ function createGatewayProcessEnv(
   env.http_proxy = upstreamProxyUrl;
   env.https_proxy = upstreamProxyUrl;
   env.all_proxy = upstreamProxyUrl;
+  env.OMR_UPSTREAM_PROXY_URL = upstreamProxyUrl;
+  env.OMR_UNDICI_MODULE = resolveUndiciProxyAgentModule();
+  // OMR fork 2026-08-19: dual-write CCR_* 让 ai-gateway 外部包仍能读
+  // (proxyPreloadFile 之前的 97fe211 commit 只改了 OMR_ 名, 漏了 CCR_ 兼容)
   env.CCR_UPSTREAM_PROXY_URL = upstreamProxyUrl;
   return env;
 }
@@ -443,7 +452,9 @@ function resolveGatewayNodeRuntime(): GatewayNodeRuntime {
 }
 
 function configuredGatewayNodeRuntimeCandidates(): GatewayNodeRuntime[] {
-  const configured = process.env.CCR_NODE_BIN?.trim();
+  // OMR fork 2026-08-19: dual-read 让 OMR_NODE_BIN 和 CCR_NODE_BIN 都能用
+  // (97fe211 commit 只改了读 OMR_NODE_BIN, 漏了 CCR_NODE_BIN 兼容)
+  const configured = process.env.OMR_NODE_BIN?.trim() ?? process.env.CCR_NODE_BIN?.trim();
   return configured ? [{ command: configured, electronRunAsNode: false }] : [];
 }
 
@@ -568,9 +579,9 @@ function securePathPermissions(file: string, mode: number): void {
 function gatewayFetchPreloadScript(): string {
   return [
     "\"use strict\";",
-    "const up = process.env.CCR_UPSTREAM_PROXY_URL;",
-    "const um = process.env.CCR_UNDICI_MODULE;",
-    "const rawTimeout = process.env.CCR_UPSTREAM_TIMEOUT_MS;",
+    "const up = process.env.OMR_UPSTREAM_PROXY_URL ?? process.env.CCR_UPSTREAM_PROXY_URL;",
+    "const um = process.env.OMR_UNDICI_MODULE ?? process.env.CCR_UNDICI_MODULE;",
+    "const rawTimeout = process.env.OMR_UPSTREAM_TIMEOUT_MS ?? process.env.CCR_UPSTREAM_TIMEOUT_MS;",
     "const parsedTimeout = rawTimeout === undefined || rawTimeout === '' ? NaN : Number(rawTimeout);",
     "const hasTimeout = Number.isFinite(parsedTimeout) && parsedTimeout >= 0;",
     "if ((up || hasTimeout) && um) {",
@@ -959,7 +970,7 @@ export function shouldServeGatewayRequest(config: AppConfig, request: IncomingMe
   if (config.gateway.enabled) {
     return true;
   }
-  return config.proxy.enabled && config.proxy.mode === "gateway" && readHeader(request.headers["x-ccr-proxy-mode"]) === "gateway";
+  return config.proxy.enabled && config.proxy.mode === "gateway" && readCompatHeader(request.headers, "proxy-mode") === "gateway";
 }
 
 export function applyCors(response: ServerResponse, config?: AppConfig): void {

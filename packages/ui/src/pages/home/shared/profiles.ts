@@ -558,8 +558,8 @@ export function createProfileDraft(agent: ProfileConfig["agent"] = "claude-code"
     model: "",
     name: name ?? profileAgentLabel(agent),
     opusModel: "",
-    providerId: "claude-code-router",
-    providerName: "Claude Code Router",
+    providerId: "omr",
+    providerName: "OMR",
     ...createProfileRoutingDraft(),
     scope: "ccr",
     settingsFile: "~/.claude/settings.json",
@@ -651,8 +651,8 @@ export function createProfileDraftFromProfile(profile: ProfileConfig, botConfigs
     envRows: keyValueRowsFromRecord(codexCompatibleProfileEnv(profile.env ?? {})),
     managedCompact: Boolean(profile.managedCompact),
     model: profile.model,
-    providerId: profile.providerId ?? "claude-code-router",
-    providerName: profile.providerName ?? "Claude Code Router",
+    providerId: profile.providerId ?? "omr",
+    providerName: profile.providerName ?? "OMR",
     scope: normalizeProfileFormScope(profile.scope),
     showAllSessions: profile.agent === "zcode" || profile.agent === "opencode" || profile.agent === "kilo" || profile.agent === "workbuddy" ? false : Boolean(profile.showAllSessions),
     surface
@@ -958,7 +958,7 @@ function createBotGatewayIntegrationId(profileId: string): string {
 
 function createBotGatewayStateDir(configId: string): string {
   const safe = configId.replace(/[^a-zA-Z0-9_.-]+/g, "-").replace(/^-+|-+$/g, "") || "default";
-  return `~/.claude-code-router/bot-gateway/${safe}`;
+  return `~/.omr/bot-gateway/${safe}`;
 }
 
 function uniqueBotGatewayConfigId(configs: BotGatewaySavedConfig[], value: string): string {
@@ -1382,6 +1382,7 @@ export function profileSummaryItems(
 
   return [
     { label: t(profile.agent === "kilo" ? "Kilo model" : profile.agent === "workbuddy" ? "Workbuddy model" : "Model"), value: modelValue },
+    { label: t("Provider ID"), value: profile.providerId ?? "omr" },
     ...allowedModelSummaryItems,
     ...(profile.agent === "zcode" || profile.agent === "opencode" || profile.agent === "kilo" || profile.agent === "workbuddy" || !profile.showAllSessions ? [] : [{ label: t("Show all sessions"), value: t("Enabled") }]),
     ...managedCompactItems,
@@ -1477,8 +1478,8 @@ export function normalizeProfileItem(profile: ProfileConfig, index: number): Pro
     managedCompact: Boolean(profile.managedCompact),
     model,
     name,
-    providerId: profile.providerId?.trim() || "claude-code-router",
-    providerName: profile.providerName?.trim() || "Claude Code Router",
+    providerId: profile.providerId?.trim() || "omr",
+    providerName: profile.providerName?.trim() || "OMR",
     ...(routing ? { routing } : {}),
     scope,
     showAllSessions: agent === "zcode" || agent === "opencode" || agent === "kilo" || agent === "workbuddy" ? false : Boolean(profile.showAllSessions),
@@ -1817,7 +1818,7 @@ function defaultCodexConfigFile(agent: ProfileConfig["agent"]): string {
         : agent === "pi"
           ? "~/.pi/agent"
           : agent === "claude-design"
-            ? "~/.claude-code-router/claude-design"
+            ? "~/.omr/claude-design"
             : "~/.codex/config.toml";
 }
 

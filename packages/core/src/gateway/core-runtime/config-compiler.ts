@@ -14,7 +14,7 @@ import { resolveGatewayPublicModelId } from "@ccr/core/gateway/features/model-di
 import { activeProviderCredentials, inferProtocol, normalizedProviderCapabilities, normalizeProviderProtocol, providerCapabilityForClientProtocol, providerCapabilityInternalName, providerCapabilityNameMatches, providerCredentialInternalName, providerProtocolForClientProtocol, sortProviderCredentialsForConfig, toCoreGatewayProviders } from "@ccr/core/providers/runtime-topology";
 import { buildRawTraceConfig } from "@ccr/core/observability/raw-trace-sync";
 import { endpoint, gatewayRuntimeSupportsRouterPlugin, resolveLocalAgentAuthProviderHookEntry, resolveRouterPluginEntry, resolveUndiciProxyAgentModule, resolveUpstreamHeaderSanitizerEntry, writeGatewayProxyPreloadFile } from "@ccr/core/gateway/core-runtime/supervisor";
-import { billingUsageSyncHeader, billingUsageSyncPath, claudeCodeOauthBetaHeader, claudeCodeOauthRequiredBeta, coreGatewayAuthHeader, coreGatewayAuthTokenEnv } from "@ccr/core/gateway/internal/shared";
+import { billingUsageSyncHeader, billingUsageSyncPath, claudeCodeOauthBetaHeader, claudeCodeOauthRequiredBeta, coreGatewayAuthTokenEnv, omrCoreGatewayAuthHeader } from "@ccr/core/gateway/internal/shared";
 import type { BrowserWebSearchMcpIntegration, CoreGatewayProvider } from "@ccr/core/gateway/internal/shared";
 import { uniqueStrings } from "@ccr/core/gateway/internal/collections";
 import { isLocalClaudeCodeOauthProviderPlugin, mergeAnthropicBetaValues } from "@ccr/core/providers/oauth-plugin";
@@ -81,7 +81,7 @@ export async function compileCoreGatewayConfig(
   const coreEndpoint = endpoint(runtimeHost, runtimePort);
   const proxyPreloadFile = upstreamProxyUrl ? writeGatewayProxyPreloadFile() : undefined;
   const proxyEnv = upstreamProxyUrl
-    ? { CCR_UPSTREAM_PROXY_URL: upstreamProxyUrl, CCR_UNDICI_MODULE: resolveUndiciProxyAgentModule() }
+    ? { OMR_UPSTREAM_PROXY_URL: upstreamProxyUrl, OMR_UNDICI_MODULE: resolveUndiciProxyAgentModule() }
     : undefined;
   const builtinToolArtifacts = await fusionBuiltinToolArtifacts(
     virtualModelProfiles,
@@ -135,7 +135,7 @@ export async function compileCoreGatewayConfig(
       staticApiKeys: {
         keyBearerOnly: false,
         keyEnv: coreGatewayAuthTokenEnv,
-        keyHeader: options.publicGatewayMode ? "authorization" : coreGatewayAuthHeader,
+        keyHeader: options.publicGatewayMode ? "authorization" : omrCoreGatewayAuthHeader,
         keys: coreGatewayStaticAuthKeys(config, coreAuthToken, options)
       }
     },
@@ -319,7 +319,7 @@ function withMissingCodexOauthProviderPlugins(
       continue;
     }
 
-    const keyPrefix = `ccr-local-agent-${providerNameSlug(runtimeName)}`;
+    const keyPrefix = `omr-local-agent-${providerNameSlug(runtimeName)}`;
     additions.push({
       codexOauth: {
         accessToken: codexAuth.accessToken,
@@ -761,7 +761,7 @@ function isLocalCodexOauthProviderPlugin(value: unknown): value is Record<string
     return false;
   }
   const key = stringValue(value.key)?.toLowerCase() ?? "";
-  return key.startsWith("ccr-local-agent-") && key.includes("codex-oauth");
+  return key.startsWith("omr-local-agent-") && key.includes("codex-oauth");
 }
 
 
@@ -867,7 +867,7 @@ function isLocalGrokOauthProviderPlugin(value: unknown): value is Record<string,
     return false;
   }
   const key = stringValue(value.key)?.toLowerCase() ?? "";
-  return key.startsWith("ccr-local-agent-") && key.includes("grok-cli-oauth");
+  return key.startsWith("omr-local-agent-") && key.includes("grok-cli-oauth");
 }
 
 
@@ -876,7 +876,7 @@ function isLocalKimiOauthProviderPlugin(value: unknown): value is Record<string,
     return false;
   }
   const key = stringValue(value.key)?.toLowerCase() ?? "";
-  return key.startsWith("ccr-local-agent-") && key.includes("kimi-cli-oauth");
+  return key.startsWith("omr-local-agent-") && key.includes("kimi-cli-oauth");
 }
 
 

@@ -57,13 +57,13 @@ function installVirtualConfigFile(config: Record<string, unknown>): void {
   };
   fs.writeFileSync = (file, data, options) => {
     if (isManagedConfigPath(file)) {
-      throw new Error("Gateway configuration is managed by Claude Code Router.");
+      throw new Error("Gateway configuration is managed by OMR.");
     }
     originalWriteFileSync(file, data, options);
   };
   fs.renameSync = (oldPath, newPath) => {
     if (isManagedConfigPath(oldPath) || isManagedConfigPath(newPath)) {
-      throw new Error("Gateway configuration is managed by Claude Code Router.");
+      throw new Error("Gateway configuration is managed by OMR.");
     }
     originalRenameSync(oldPath, newPath);
   };

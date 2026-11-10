@@ -176,5 +176,6 @@ declare global {
       onThemePreferenceChanged?: (callback: (theme: AppConfig["theme"]) => void) => () => void;
       onUpdateStatusChanged: (callback: (status: AppUpdateStatus) => void) => () => void;
     };
+    omr?: Window["ccr"];
   }
 }

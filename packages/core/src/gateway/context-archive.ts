@@ -604,7 +604,7 @@ export async function handleContextArchiveMcpRequest(
   executor?: ContextArchiveReplayExecutor
 ): Promise<void> {
   if (!contextArchiveMcpEnabled(config)) {
-    sendJson(response, 404, { error: { message: "CCR context archive MCP is disabled." } });
+    sendJson(response, 404, { error: { message: "OMR context archive MCP is disabled." } });
     return;
   }
   if ((request.method || "GET").toUpperCase() !== "POST") {
@@ -694,8 +694,8 @@ function historyAskTool(config: ContextArchiveConfig): McpTool {
   return {
     description: [
       "Ask the archived pre-compaction agent lineage a natural-language history task.",
-      "CCR starts with the provided archive and automatically searches parent compact generations when the latest snapshot lacks the answer.",
-      "CCR loads immutable original requests and appends only this task before replaying the original model route.",
+      "OMR starts with the provided archive and automatically searches parent compact generations when the latest snapshot lacks the answer.",
+      "OMR loads immutable original requests and appends only this task before replaying the original model route.",
       "Use archive_id and session_token exactly as provided by the latest compact handoff."
     ].join(" "),
     inputSchema: {
@@ -744,6 +744,7 @@ function replaySafeHeaders(
     "openai-organization",
     "openai-project",
     "user-agent",
+    "x-omr-client",
     "x-ccr-client",
     "x-client-name"
   ]);

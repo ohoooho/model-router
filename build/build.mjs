@@ -24,4 +24,8 @@ await Promise.all([
 
 syncUiRendererToRuntimeDists();
 
+// 断言: 前端 bridge 的 RPC 端点必须与服务端路由一致, 且构建产物不能是陈旧的。
+// 陈旧产物 => 运行时 405 => GUI 能看不能点 (2026-11-03 实测, 无任何运行时告警)。
+await import("./../scripts/verify-renderer-bridge.mjs");
+
 console.log(`Built monorepo package assets in ${mode} mode.`);

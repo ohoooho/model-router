@@ -1,4 +1,3 @@
-import electron from "electron";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import os from "node:os";
@@ -15,6 +14,17 @@ const testProjects = {
   electron: { runtime: "electron" },
   ui: { runtime: "node" }
 };
+// electron 只在真的要跑 electron project 的测试时才加载。
+// 顶层静态 import electron 会触发 node_modules/electron 的二进制安装/下载，
+// 机器上没有 Electron 二进制时表现为「跑 core 测试卡十几分钟零输出，像死锁」。
+// core 用的是 node-with-electron-fallback —— better-sqlite3 能加载就退化成 node，
+// 这条路径根本不需要 Electron。
+let electronPathPromise = null;
+function loadElectronPath() {
+  electronPathPromise ??= import("electron").then((mod) => mod.default);
+  return electronPathPromise;
+}
+
 const requestedProjects = process.argv.slice(2);
 const projects = requestedProjects.length === 0 ? Object.keys(testProjects) : requestedProjects;
 
@@ -37,7 +47,7 @@ async function runProject(project) {
 
   const testHome = mkdtempSync(path.join(os.tmpdir(), `ccr-${project}-test-home-`));
   const runtime = resolveRuntime(testProjects[project].runtime);
-  const executable = runtime === "electron" ? electron : process.execPath;
+  const executable = runtime === "electron" ? await loadElectronPath() : process.execPath;
   console.log(`\nRunning ${project} tests with ${runtime}...`);
 
   try {

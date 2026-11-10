@@ -61,19 +61,30 @@ import {
 import { getProviderCatalogModels } from "@ccr/core/providers/model-catalog";
 import { resolveUsageModelAttribution } from "@ccr/core/usage/model-attribution";
 
-const managedRootStart = "# BEGIN CCR managed profile";
-const managedRootEnd = "# END CCR managed profile";
-const managedProviderStart = "# BEGIN CCR managed Codex provider";
-const managedProviderEnd = "# END CCR managed Codex provider";
-const managedToolHubMcpStart = "# BEGIN CCR managed ToolHub MCP";
-const managedToolHubMcpEnd = "# END CCR managed ToolHub MCP";
-const managedContextArchiveMcpStart = "# BEGIN CCR managed Context Archive MCP";
-const managedContextArchiveMcpEnd = "# END CCR managed Context Archive MCP";
-const managedConfiguredModelPrefix = "# CCR configured model = ";
+const managedRootStart = "# BEGIN OMR managed profile";
+const managedRootEnd = "# END OMR managed profile";
+const managedProviderStart = "# BEGIN OMR managed Codex provider";
+const managedProviderEnd = "# END OMR managed Codex provider";
+const managedToolHubMcpStart = "# BEGIN OMR managed ToolHub MCP";
+const managedToolHubMcpEnd = "# END OMR managed ToolHub MCP";
+const managedContextArchiveMcpStart = "# BEGIN OMR managed Context Archive MCP";
+const managedContextArchiveMcpEnd = "# END OMR managed Context Archive MCP";
+const managedConfiguredModelPrefix = "# OMR configured model = ";
+const legacyManagedRootStart = "# BEGIN CCR managed profile";
+const legacyManagedRootEnd = "# END CCR managed profile";
+const legacyManagedProviderStart = "# BEGIN CCR managed Codex provider";
+const legacyManagedProviderEnd = "# END CCR managed Codex provider";
+const legacyManagedToolHubMcpStart = "# BEGIN CCR managed ToolHub MCP";
+const legacyManagedToolHubMcpEnd = "# END CCR managed ToolHub MCP";
+const legacyManagedContextArchiveMcpStart = "# BEGIN CCR managed Context Archive MCP";
+const legacyManagedContextArchiveMcpEnd = "# END CCR managed Context Archive MCP";
+const legacyManagedConfiguredModelPrefix = "# CCR configured model = ";
 const originalBackupSuffix = ".ccr-original";
 const originalMissingSuffix = ".ccr-original-missing";
+const legacyOriginalBackupSuffix = ".omr-original";
+const legacyOriginalMissingSuffix = ".omr-original-missing";
 const globalProfileTakeoverFile = path.join(CONFIGDIR, "global-profile-takeover.json");
-const fallbackClientToken = "ccr-local";
+const fallbackClientToken = "omr-local";
 const privateDirMode = 0o700;
 const privateExecutableMode = 0o700;
 const privateFileMode = 0o600;
@@ -390,7 +401,7 @@ function applyClaudeDesignProfile(profile: ProfileConfig, appliedAt: string): Pr
     appliedAt,
     client: "claude-design",
     enabled: profile.enabled,
-    message: "Claude Design profile is managed by CCR Desktop.",
+    message: "Claude Design profile is managed by OMR Desktop.",
     ok: true,
     path: resolveUserPath(CONFIGDIR)
   };
@@ -492,8 +503,8 @@ function applyClaudeCodeProfile(config: AppConfig, profile: ProfileConfig, token
       client: "claude-code",
       enabled: true,
       message: changed
-        ? `Claude Code settings are managed by CCR (wrapper ${wrapperResult.file}).`
-        : "Claude Code settings already match CCR.",
+        ? `Claude Code settings are managed by OMR (wrapper ${wrapperResult.file}).`
+        : "Claude Code settings already match OMR.",
       ok: true,
       path: settingsFile
     };
@@ -575,14 +586,14 @@ function applyCodexProfile(config: AppConfig, profile: ProfileConfig, token: str
       profile,
       configFile,
       `${clientName} profile is disabled.`,
-      (content) => isManagedCodexConfigContent(content, sanitizeCodexProviderId(profile.providerId || "") || "claude-code-router")
+      (content) => isManagedCodexConfigContent(content, sanitizeCodexProviderId(profile.providerId || "") || "omr")
     );
   }
 
   try {
     const endpoint = `${gatewayEndpoint(config).replace(/\/+$/g, "")}/v1`;
-    const providerId = sanitizeCodexProviderId(profile.providerId || "") || "claude-code-router";
-    const providerName = profile.providerName?.trim() || "Claude Code Router";
+    const providerId = sanitizeCodexProviderId(profile.providerId || "") || "omr";
+    const providerName = profile.providerName?.trim() || "OMR";
     const model = normalizeClientModel(profile.model) || defaultClientModel(config);
     const source = existsSync(configFile) ? readFileSync(configFile, "utf8") : "";
     const configFormat = normalizeCodexConfigFormat(profile.configFormat);
@@ -647,8 +658,8 @@ function applyCodexProfile(config: AppConfig, profile: ProfileConfig, token: str
       client: profile.agent,
       enabled: true,
       message: changed
-        ? `${clientName} config is managed by CCR${extras.length ? ` (${extras.join(", ")})` : ""}.`
-        : `${clientName} config already matches CCR.`,
+        ? `${clientName} config is managed by OMR${extras.length ? ` (${extras.join(", ")})` : ""}.`
+        : `${clientName} config already matches OMR.`,
       ok: true,
       path: configFile
     };
@@ -677,8 +688,8 @@ function applyGrokProfile(config: AppConfig, profile: ProfileConfig, token: stri
       client: "grok",
       enabled: true,
       message: wrapperResult.changed
-        ? `Grok CLI is configured to use CCR (wrapper ${wrapperResult.file}).`
-        : "Grok CLI already points to CCR.",
+        ? `Grok CLI is configured to use OMR (wrapper ${wrapperResult.file}).`
+        : "Grok CLI already points to OMR.",
       ok: true,
       path: wrapperResult.file
     };
@@ -708,8 +719,8 @@ function applyKimiProfile(config: AppConfig, profile: ProfileConfig, token: stri
       client: "kimi",
       enabled: true,
       message: wrapperResult.changed
-        ? `Kimi CLI is configured to use CCR (wrapper ${wrapperResult.file}).`
-        : "Kimi CLI already points to CCR.",
+        ? `Kimi CLI is configured to use OMR (wrapper ${wrapperResult.file}).`
+        : "Kimi CLI already points to OMR.",
       ok: true,
       path: wrapperResult.file
     };
@@ -738,8 +749,8 @@ function applyPiProfile(config: AppConfig, profile: ProfileConfig, token: string
       client: "pi",
       enabled: true,
       message: wrapperResult.changed
-        ? `Pi is configured to use CCR (config ${wrapperResult.configFile}, wrapper ${wrapperResult.file}).`
-        : "Pi config already matches CCR.",
+        ? `Pi is configured to use OMR (config ${wrapperResult.configFile}, wrapper ${wrapperResult.file}).`
+        : "Pi config already matches OMR.",
       ok: true,
       path: wrapperResult.configFile
     };
@@ -775,8 +786,8 @@ function applyOpenCodeProfile(config: AppConfig, profile: ProfileConfig, token: 
       client: "opencode",
       enabled: true,
       message: configResult.changed || wrapperResult.changed
-        ? `OpenCode is configured to use CCR (config ${configResult.file}, wrapper ${wrapperResult.file}).`
-        : "OpenCode config already matches CCR.",
+        ? `OpenCode is configured to use OMR (config ${configResult.file}, wrapper ${wrapperResult.file}).`
+        : "OpenCode config already matches OMR.",
       ok: true,
       path: configResult.file
     };
@@ -812,8 +823,8 @@ function applyKiloProfile(config: AppConfig, profile: ProfileConfig, token: stri
       client: "kilo",
       enabled: true,
       message: configResult.changed || wrapperResult.changed
-        ? `Kilo CLI is configured to use CCR (config ${configResult.file}, wrapper ${wrapperResult.file}).`
-        : "Kilo CLI config already matches CCR.",
+        ? `Kilo CLI is configured to use OMR (config ${configResult.file}, wrapper ${wrapperResult.file}).`
+        : "Kilo CLI config already matches OMR.",
       ok: true,
       path: configResult.file
     };
@@ -835,7 +846,7 @@ function applyZcodeProfile(config: AppConfig, profile: ProfileConfig, token: str
   }
 
   try {
-    const providerId = sanitizeCodexProviderId(profile.providerId || "") || "claude-code-router";
+    const providerId = sanitizeCodexProviderId(profile.providerId || "") || "omr";
     const model = normalizeClientModel(profile.model) || defaultClientModel(config);
     const configResult = writeZcodeGatewayConfig(config, profile, token, { backup: true });
     const middlewareResult = profile.cliMiddleware
@@ -857,8 +868,8 @@ function applyZcodeProfile(config: AppConfig, profile: ProfileConfig, token: str
       client: "zcode",
       enabled: true,
       message: changed
-        ? `ZCode config is managed by CCR${extras.length ? ` (${extras.join(", ")})` : ""}.`
-        : "ZCode config already matches CCR.",
+        ? `ZCode config is managed by OMR${extras.length ? ` (${extras.join(", ")})` : ""}.`
+        : "ZCode config already matches OMR.",
       ok: true,
       path: configResult.file
     };
@@ -919,17 +930,17 @@ function profilePath(profile: ProfileConfig): string {
 
 function resolveClaudeCodeSettingsFile(profile: ProfileConfig): string {
   if (isGeneratedProfileScope(profile.scope)) {
-    return path.join(ccrManagedProfileDir(profile), "claude", "settings.json");
+    return path.join(omrManagedProfileDir(profile), "claude", "settings.json");
   }
   return resolveUserPath(profile.settingsFile || "~/.claude/settings.json");
 }
 
 function claudeCodeToolHubMcpConfigFile(profile: ProfileConfig): string {
-  return path.join(ccrManagedProfileDir(profile), "claude", "toolhub-mcp.json");
+  return path.join(omrManagedProfileDir(profile), "claude", "toolhub-mcp.json");
 }
 
 function claudeCodeProfileSettingsStateFile(profile: ProfileConfig): string {
-  return path.join(ccrManagedProfileDir(profile), "claude", "settings-state.json");
+  return path.join(omrManagedProfileDir(profile), "claude", "settings-state.json");
 }
 
 function readClaudeCodeProfileSettingsState(profile: ProfileConfig): { envKeys: string[]; paths: string[] } {
@@ -1066,7 +1077,7 @@ function writeCodexToolHubMcpRuntimeConfig(config: AppConfig, token: string): { 
 function ensureToolHubMcpRuntimeFile(file: string): { changed: boolean } {
   const source = bundledToolHubMcpEntryPathCandidates().find((candidate) => existsSync(candidate));
   if (!source) {
-    throw new Error(`ToolHub MCP runtime was not found. Rebuild or reinstall CCR and try again. Checked: ${bundledToolHubMcpEntryPathCandidates().join(", ")}`);
+    throw new Error(`ToolHub MCP runtime was not found. Rebuild or reinstall OMR and try again. Checked: ${bundledToolHubMcpEntryPathCandidates().join(", ")}`);
   }
   return writeGeneratedFileIfChanged(file, readFileSync(source, "utf8"), { mode: publicExecutableMode });
 }
@@ -1076,7 +1087,7 @@ function resolveCodexConfigFile(profile: ProfileConfig): string {
     return resolveZcodeConfigFile(profile);
   }
   if (isGeneratedProfileScope(profile.scope)) {
-    return path.join(ccrManagedProfileDir(profile), codexConfigSubdir(profile.agent), "config.toml");
+    return path.join(omrManagedProfileDir(profile), codexConfigSubdir(profile.agent), "config.toml");
   }
   const codexHome = profile.codexHome?.trim();
   if (codexHome) {
@@ -1086,14 +1097,14 @@ function resolveCodexConfigFile(profile: ProfileConfig): string {
 }
 
 function codexModelCatalogFile(configFile: string): string {
-  return path.join(path.dirname(configFile), "ccr-model-catalog.json");
+  return path.join(path.dirname(configFile), "omr-model-catalog.json");
 }
 
 function zcodeMiddlewareModelCatalogFile(configFile: string): string {
-  return path.join(path.dirname(configFile), "ccr-zcode-middleware-model-catalog.json");
+  return path.join(path.dirname(configFile), "omr-zcode-middleware-model-catalog.json");
 }
 
-function ccrManagedProfileDir(profile: ProfileConfig): string {
+function omrManagedProfileDir(profile: ProfileConfig): string {
   const slug = sanitizeProfilePathSegment(profile.id || profile.name || profile.agent);
   const baseDir = path.join(CONFIGDIR, "profiles", slug || "profile");
   return profile.scope === "custom" ? path.join(baseDir, "custom") : baseDir;
@@ -1122,7 +1133,15 @@ function buildCodexConfigToml(
     managedToolHubMcpStart,
     managedToolHubMcpEnd,
     managedContextArchiveMcpStart,
-    managedContextArchiveMcpEnd
+    managedContextArchiveMcpEnd,
+    legacyManagedRootStart,
+    legacyManagedRootEnd,
+    legacyManagedProviderStart,
+    legacyManagedProviderEnd,
+    legacyManagedToolHubMcpStart,
+    legacyManagedToolHubMcpEnd,
+    legacyManagedContextArchiveMcpStart,
+    legacyManagedContextArchiveMcpEnd
   ]);
   content = removeCodexProviderTable(content, values.providerId);
   content = removeCodexMcpServerTable(content, TOOL_HUB_MCP_SERVER_NAME, { includeChildTables: !values.toolHubMcp });
@@ -1588,12 +1607,14 @@ function claudeCodeWrapperShellScript(
   auth: { remoteSyncApiKeyFile: string; wifIdentityTokenFile?: string },
   mcpConfigFile: string | undefined
 ): string {
-  const realClaude = profile.env?.CCR_CLAUDE_CODE_BIN?.trim() || "claude";
+  const realClaude = profile.env?.OMR_CLAUDE_CODE_BIN?.trim()
+    || profile.env?.CCR_CLAUDE_CODE_BIN?.trim()
+    || "claude";
   const surface = normalizeProfileSurface(profile.surface);
   const remoteEndpoint = `${gatewayEndpoint(config)}/__ccr/remote`;
   const settingsDir = path.dirname(resolveClaudeCodeSettingsFile(profile));
   const envExports = Object.entries(profileEnv(profile))
-    .filter(([key]) => key !== "CCR_CLAUDE_CODE_BIN" && !isClaudeCodeManagedModelEnvKey(key) && !isClaudeCodeFirstPartyProviderEnvKey(key) && !isClaudeCodeWifEnvKey(key))
+    .filter(([key]) => key !== "OMR_CLAUDE_CODE_BIN" && key !== "CCR_CLAUDE_CODE_BIN" && !isClaudeCodeManagedModelEnvKey(key) && !isClaudeCodeFirstPartyProviderEnvKey(key) && !isClaudeCodeWifEnvKey(key))
     .map(([key, value]) => `export ${key}=${shellQuote(value)}`);
   const botEnvExports = shellBotGatewayEnvExports(config, profile);
   return [
@@ -1603,18 +1624,26 @@ function claudeCodeWrapperShellScript(
     ...shellEnvExports(claudeCodeRuntimeEnv(config, profile, settingsDir, auth.wifIdentityTokenFile)),
     ...shellEnvExports(claudeCodeMcpConfigEnv(mcpConfigFile)),
     ...shellEnvExports(claudeCodeUtcTimezoneEnvOverride()),
+    `: "\${OMR_PROFILE_SURFACE:=${surface}}"`,
     `: "\${CCR_PROFILE_SURFACE:=${surface}}"`,
-    "export CCR_PROFILE_SURFACE",
+    "export OMR_PROFILE_SURFACE CCR_PROFILE_SURFACE",
     ...botEnvExports,
+    `export OMR_CLAUDE_CODE_WRAPPER=1`,
     `export CCR_CLAUDE_CODE_WRAPPER=1`,
+    `export OMR_REAL_CLAUDE_CODE_BIN=${shellQuote(realClaude)}`,
     `export CCR_REAL_CLAUDE_CODE_BIN=${shellQuote(realClaude)}`,
     `export CODEXL_CLAUDE_CODE_BIN=${shellQuote(realClaude)}`,
+    `if [ -z "\${OMR_REMOTE_SYNC_ENABLED:-}" ]; then OMR_REMOTE_SYNC_ENABLED=1; fi`,
     `if [ -z "\${CCR_REMOTE_SYNC_ENABLED:-}" ]; then CCR_REMOTE_SYNC_ENABLED=1; fi`,
+    `if [ -z "\${OMR_REMOTE_SYNC_ENDPOINT:-}" ]; then OMR_REMOTE_SYNC_ENDPOINT=${shellQuote(remoteEndpoint)}; fi`,
     `if [ -z "\${CCR_REMOTE_SYNC_ENDPOINT:-}" ]; then CCR_REMOTE_SYNC_ENDPOINT=${shellQuote(remoteEndpoint)}; fi`,
+    `if [ -z "\${OMR_REMOTE_SYNC_API_KEY_FILE:-}" ]; then OMR_REMOTE_SYNC_API_KEY_FILE=${shellQuote(auth.remoteSyncApiKeyFile)}; fi`,
     `if [ -z "\${CCR_REMOTE_SYNC_API_KEY_FILE:-}" ]; then CCR_REMOTE_SYNC_API_KEY_FILE=${shellQuote(auth.remoteSyncApiKeyFile)}; fi`,
+    `if [ -z "\${OMR_REMOTE_SYNC_PROFILE_ID:-}" ]; then OMR_REMOTE_SYNC_PROFILE_ID=${shellQuote(profile.id || profile.name || "claude-code")}; fi`,
     `if [ -z "\${CCR_REMOTE_SYNC_PROFILE_ID:-}" ]; then CCR_REMOTE_SYNC_PROFILE_ID=${shellQuote(profile.id || profile.name || "claude-code")}; fi`,
+    `if [ -z "\${OMR_REMOTE_SYNC_PROFILE_NAME:-}" ]; then OMR_REMOTE_SYNC_PROFILE_NAME=${shellQuote(profile.name || profile.id || "Claude Code")}; fi`,
     `if [ -z "\${CCR_REMOTE_SYNC_PROFILE_NAME:-}" ]; then CCR_REMOTE_SYNC_PROFILE_NAME=${shellQuote(profile.name || profile.id || "Claude Code")}; fi`,
-    "export CCR_REMOTE_SYNC_ENABLED CCR_REMOTE_SYNC_ENDPOINT CCR_REMOTE_SYNC_API_KEY_FILE CCR_REMOTE_SYNC_PROFILE_ID CCR_REMOTE_SYNC_PROFILE_NAME",
+    "export OMR_REMOTE_SYNC_ENABLED CCR_REMOTE_SYNC_ENABLED OMR_REMOTE_SYNC_ENDPOINT CCR_REMOTE_SYNC_ENDPOINT OMR_REMOTE_SYNC_API_KEY_FILE CCR_REMOTE_SYNC_API_KEY_FILE OMR_REMOTE_SYNC_PROFILE_ID CCR_REMOTE_SYNC_PROFILE_ID OMR_REMOTE_SYNC_PROFILE_NAME CCR_REMOTE_SYNC_PROFILE_NAME",
     ...nodeRuntimeShellExecLines(runtimeFile),
     ""
   ].join("\n");
@@ -1627,12 +1656,14 @@ function claudeCodeWrapperCmdScript(
   auth: { remoteSyncApiKeyFile: string; wifIdentityTokenFile?: string },
   mcpConfigFile: string | undefined
 ): string {
-  const realClaude = profile.env?.CCR_CLAUDE_CODE_BIN?.trim() || "claude";
+  const realClaude = profile.env?.OMR_CLAUDE_CODE_BIN?.trim()
+    || profile.env?.CCR_CLAUDE_CODE_BIN?.trim()
+    || "claude";
   const surface = normalizeProfileSurface(profile.surface);
   const remoteEndpoint = `${gatewayEndpoint(config)}/__ccr/remote`;
   const settingsDir = path.dirname(resolveClaudeCodeSettingsFile(profile));
   const envExports = Object.entries(profileEnv(profile))
-    .filter(([key]) => key !== "CCR_CLAUDE_CODE_BIN" && !isClaudeCodeManagedModelEnvKey(key) && !isClaudeCodeFirstPartyProviderEnvKey(key) && !isClaudeCodeWifEnvKey(key))
+    .filter(([key]) => key !== "OMR_CLAUDE_CODE_BIN" && key !== "CCR_CLAUDE_CODE_BIN" && !isClaudeCodeManagedModelEnvKey(key) && !isClaudeCodeFirstPartyProviderEnvKey(key) && !isClaudeCodeWifEnvKey(key))
     .map(([key, value]) => cmdSetLine(key, value));
   const botEnvExports = cmdBotGatewayEnvExports(config, profile);
   return [
@@ -1642,15 +1673,23 @@ function claudeCodeWrapperCmdScript(
     ...cmdEnvExports(claudeCodeRuntimeEnv(config, profile, settingsDir, auth.wifIdentityTokenFile)),
     ...cmdEnvExports(claudeCodeMcpConfigEnv(mcpConfigFile)),
     ...cmdEnvExports(claudeCodeUtcTimezoneEnvOverride()),
+    `if not defined OMR_PROFILE_SURFACE ${cmdSetLine("OMR_PROFILE_SURFACE", surface)}`,
     `if not defined CCR_PROFILE_SURFACE ${cmdSetLine("CCR_PROFILE_SURFACE", surface)}`,
     ...botEnvExports,
+    cmdSetLine("OMR_CLAUDE_CODE_WRAPPER", "1"),
     cmdSetLine("CCR_CLAUDE_CODE_WRAPPER", "1"),
+    cmdSetLine("OMR_REAL_CLAUDE_CODE_BIN", realClaude),
     cmdSetLine("CCR_REAL_CLAUDE_CODE_BIN", realClaude),
     cmdSetLine("CODEXL_CLAUDE_CODE_BIN", realClaude),
+    `if not defined OMR_REMOTE_SYNC_ENABLED ${cmdSetLine("OMR_REMOTE_SYNC_ENABLED", "1")}`,
     `if not defined CCR_REMOTE_SYNC_ENABLED ${cmdSetLine("CCR_REMOTE_SYNC_ENABLED", "1")}`,
+    `if not defined OMR_REMOTE_SYNC_ENDPOINT ${cmdSetLine("OMR_REMOTE_SYNC_ENDPOINT", remoteEndpoint)}`,
     `if not defined CCR_REMOTE_SYNC_ENDPOINT ${cmdSetLine("CCR_REMOTE_SYNC_ENDPOINT", remoteEndpoint)}`,
+    `if not defined OMR_REMOTE_SYNC_API_KEY_FILE ${cmdSetLine("OMR_REMOTE_SYNC_API_KEY_FILE", auth.remoteSyncApiKeyFile)}`,
     `if not defined CCR_REMOTE_SYNC_API_KEY_FILE ${cmdSetLine("CCR_REMOTE_SYNC_API_KEY_FILE", auth.remoteSyncApiKeyFile)}`,
+    `if not defined OMR_REMOTE_SYNC_PROFILE_ID ${cmdSetLine("OMR_REMOTE_SYNC_PROFILE_ID", profile.id || profile.name || "claude-code")}`,
     `if not defined CCR_REMOTE_SYNC_PROFILE_ID ${cmdSetLine("CCR_REMOTE_SYNC_PROFILE_ID", profile.id || profile.name || "claude-code")}`,
+    `if not defined OMR_REMOTE_SYNC_PROFILE_NAME ${cmdSetLine("OMR_REMOTE_SYNC_PROFILE_NAME", profile.name || profile.id || "Claude Code")}`,
     `if not defined CCR_REMOTE_SYNC_PROFILE_NAME ${cmdSetLine("CCR_REMOTE_SYNC_PROFILE_NAME", profile.name || profile.id || "Claude Code")}`,
     ...nodeRuntimeCmdExecLines(runtimeFile),
     ""
@@ -1684,7 +1723,7 @@ function openCodeWrapperFilename(profile: ProfileConfig): string {
 }
 
 function openCodeWrapperShellScript(profile: ProfileConfig, configFile: string, inlineConfig: string): string {
-  const realOpenCode = profile.env?.CCR_OPENCODE_BIN?.trim() || profile.env?.OPENCODE_BIN?.trim() || "opencode";
+  const realOpenCode = profile.env?.OMR_OPENCODE_BIN?.trim() || profile.env?.OPENCODE_BIN?.trim() || "opencode";
   const envExports = Object.entries(profileEnv(profile))
     .filter(([key]) => !isOpenCodeManagedEnvKey(key))
     .map(([key, value]) => `export ${key}=${shellQuote(value)}`);
@@ -1694,14 +1733,14 @@ function openCodeWrapperShellScript(profile: ProfileConfig, configFile: string, 
     `export OPENCODE_CONFIG=${shellQuote(configFile)}`,
     `export OPENCODE_CONFIG_CONTENT=${shellQuote(inlineConfig)}`,
     "export OPENCODE_CLIENT=cli",
-    "export CCR_PROFILE_SURFACE=cli",
+    "export OMR_PROFILE_SURFACE=cli",
     `exec ${shellQuote(realOpenCode)} "$@"`,
     ""
   ].join("\n");
 }
 
 function openCodeWrapperCmdScript(profile: ProfileConfig, configFile: string, inlineConfig: string): string {
-  const realOpenCode = profile.env?.CCR_OPENCODE_BIN?.trim() || profile.env?.OPENCODE_BIN?.trim() || "opencode";
+  const realOpenCode = profile.env?.OMR_OPENCODE_BIN?.trim() || profile.env?.OPENCODE_BIN?.trim() || "opencode";
   const envExports = Object.entries(profileEnv(profile))
     .filter(([key]) => !isOpenCodeManagedEnvKey(key))
     .map(([key, value]) => cmdSetLine(key, value));
@@ -1711,7 +1750,7 @@ function openCodeWrapperCmdScript(profile: ProfileConfig, configFile: string, in
     cmdSetLine("OPENCODE_CONFIG", configFile),
     cmdSetLine("OPENCODE_CONFIG_CONTENT", inlineConfig),
     cmdSetLine("OPENCODE_CLIENT", "cli"),
-    cmdSetLine("CCR_PROFILE_SURFACE", "cli"),
+    cmdSetLine("OMR_PROFILE_SURFACE", "cli"),
     `${cmdQuote(realOpenCode)} %*`,
     "exit /b %ERRORLEVEL%",
     ""
@@ -1719,12 +1758,12 @@ function openCodeWrapperCmdScript(profile: ProfileConfig, configFile: string, in
 }
 
 function isOpenCodeManagedEnvKey(key: string): boolean {
-  return key === "CCR_OPENCODE_BIN" ||
+  return key === "OMR_OPENCODE_BIN" ||
     key === "OPENCODE_BIN" ||
     key === "OPENCODE_CLIENT" ||
     key === "OPENCODE_CONFIG" ||
     key === "OPENCODE_CONFIG_CONTENT" ||
-    key === "CCR_PROFILE_SURFACE";
+    key === "OMR_PROFILE_SURFACE";
 }
 
 function writeKiloWrapper(
@@ -1754,7 +1793,7 @@ function kiloWrapperFilename(profile: ProfileConfig): string {
 }
 
 function kiloWrapperShellScript(profile: ProfileConfig, configFile: string, inlineConfig: string): string {
-  const realKilo = profile.env?.CCR_KILO_BIN?.trim() || profile.env?.KILO_BIN?.trim() || "kilo";
+  const realKilo = profile.env?.OMR_KILO_BIN?.trim() || profile.env?.KILO_BIN?.trim() || "kilo";
   const envExports = Object.entries(profileEnv(profile))
     .filter(([key]) => !isKiloManagedEnvKey(key))
     .map(([key, value]) => `export ${key}=${shellQuote(value)}`);
@@ -1763,14 +1802,14 @@ function kiloWrapperShellScript(profile: ProfileConfig, configFile: string, inli
     ...envExports,
     `export KILO_CONFIG=${shellQuote(configFile)}`,
     `export KILO_CONFIG_CONTENT=${shellQuote(inlineConfig)}`,
-    "export CCR_PROFILE_SURFACE=cli",
+    "export OMR_PROFILE_SURFACE=cli",
     `exec ${shellQuote(realKilo)} "$@"`,
     ""
   ].join("\n");
 }
 
 function kiloWrapperCmdScript(profile: ProfileConfig, configFile: string, inlineConfig: string): string {
-  const realKilo = profile.env?.CCR_KILO_BIN?.trim() || profile.env?.KILO_BIN?.trim() || "kilo";
+  const realKilo = profile.env?.OMR_KILO_BIN?.trim() || profile.env?.KILO_BIN?.trim() || "kilo";
   const envExports = Object.entries(profileEnv(profile))
     .filter(([key]) => !isKiloManagedEnvKey(key))
     .map(([key, value]) => cmdSetLine(key, value));
@@ -1779,7 +1818,7 @@ function kiloWrapperCmdScript(profile: ProfileConfig, configFile: string, inline
     ...envExports,
     cmdSetLine("KILO_CONFIG", configFile),
     cmdSetLine("KILO_CONFIG_CONTENT", inlineConfig),
-    cmdSetLine("CCR_PROFILE_SURFACE", "cli"),
+    cmdSetLine("OMR_PROFILE_SURFACE", "cli"),
     `${cmdQuote(realKilo)} %*`,
     "exit /b %ERRORLEVEL%",
     ""
@@ -1787,13 +1826,13 @@ function kiloWrapperCmdScript(profile: ProfileConfig, configFile: string, inline
 }
 
 function isKiloManagedEnvKey(key: string): boolean {
-  return key === "CCR_KILO_BIN" ||
+  return key === "OMR_KILO_BIN" ||
     key === "KILO_BIN" ||
     key === "KILO_CONFIG" ||
     key === "KILO_CONFIG_CONTENT" ||
     key === "KILO_CONFIG_DIR" ||
     key === "KILO_PROVIDER" ||
-    key === "CCR_PROFILE_SURFACE";
+    key === "OMR_PROFILE_SURFACE";
 }
 
 function writeKimiWrapper(
@@ -1827,7 +1866,7 @@ function kimiWrapperFilename(profile: ProfileConfig): string {
 }
 
 function kimiWrapperShellScript(config: AppConfig, profile: ProfileConfig, profileHome: string): string {
-  const realKimi = profile.env?.CCR_KIMI_BIN?.trim() || profile.env?.KIMI_BIN?.trim() || "kimi";
+  const realKimi = profile.env?.OMR_KIMI_BIN?.trim() || profile.env?.KIMI_BIN?.trim() || "kimi";
   const envExports = Object.entries(profileEnv(profile))
     .filter(([key]) => !isKimiManagedEnvKey(key))
     .map(([key, value]) => `export ${key}=${shellQuote(value)}`);
@@ -1840,14 +1879,14 @@ function kimiWrapperShellScript(config: AppConfig, profile: ProfileConfig, profi
     "export NO_PROXY no_proxy",
     `unset ${kimiSingleModelEnvNames.join(" ")}`,
     `export KIMI_CODE_HOME=${shellQuote(profileHome)}`,
-    "export CCR_PROFILE_SURFACE=cli",
+    "export OMR_PROFILE_SURFACE=cli",
     `exec ${shellQuote(realKimi)} "$@"`,
     ""
   ].join("\n");
 }
 
 function kimiWrapperCmdScript(config: AppConfig, profile: ProfileConfig, profileHome: string): string {
-  const realKimi = profile.env?.CCR_KIMI_BIN?.trim() || profile.env?.KIMI_BIN?.trim() || "kimi";
+  const realKimi = profile.env?.OMR_KIMI_BIN?.trim() || profile.env?.KIMI_BIN?.trim() || "kimi";
   const envExports = Object.entries(profileEnv(profile))
     .filter(([key]) => !isKimiManagedEnvKey(key))
     .map(([key, value]) => cmdSetLine(key, value));
@@ -1859,7 +1898,7 @@ function kimiWrapperCmdScript(config: AppConfig, profile: ProfileConfig, profile
     `set "no_proxy=%no_proxy%,${cmdValue(noProxyHosts)}"`,
     ...kimiSingleModelEnvNames.map((key) => cmdSetLine(key, "")),
     cmdSetLine("KIMI_CODE_HOME", profileHome),
-    cmdSetLine("CCR_PROFILE_SURFACE", "cli"),
+    cmdSetLine("OMR_PROFILE_SURFACE", "cli"),
     `${cmdQuote(realKimi)} %*`,
     "exit /b %ERRORLEVEL%",
     ""
@@ -1883,12 +1922,12 @@ const kimiSingleModelEnvNames = [
 ] as const;
 
 function isKimiManagedEnvKey(key: string): boolean {
-  return key === "CCR_KIMI_BIN" ||
+  return key === "OMR_KIMI_BIN" ||
     key === "KIMI_BIN" ||
-    key === "CCR_KIMI_SOURCE_HOME" ||
+    key === "OMR_KIMI_SOURCE_HOME" ||
     key === "KIMI_CODE_HOME" ||
     kimiSingleModelEnvNames.some((name) => key === name) ||
-    key === "CCR_PROFILE_SURFACE";
+    key === "OMR_PROFILE_SURFACE";
 }
 
 function writePiWrapper(
@@ -1925,7 +1964,7 @@ function piWrapperShellScript(
   profile: ProfileConfig,
   piConfig: { model: string; profileHome: string; providerId: string; sessionDir: string }
 ): string {
-  const realPi = profile.env?.CCR_PI_BIN?.trim() || profile.env?.PI_BIN?.trim() || "pi";
+  const realPi = profile.env?.OMR_PI_BIN?.trim() || profile.env?.CCR_PI_BIN?.trim() || profile.env?.PI_BIN?.trim() || "pi";
   const envExports = Object.entries(profileEnv(profile))
     .filter(([key]) => !isPiManagedEnvKey(key))
     .map(([key, value]) => `export ${key}=${shellQuote(value)}`);
@@ -1939,7 +1978,7 @@ function piWrapperShellScript(
     `export PI_CODING_AGENT_DIR=${shellQuote(piConfig.profileHome)}`,
     `export PI_CODING_AGENT_SESSION_DIR=${shellQuote(piConfig.sessionDir)}`,
     `export PI_SKIP_VERSION_CHECK=${shellQuote(profile.env?.PI_SKIP_VERSION_CHECK?.trim() || "1")}`,
-    "export CCR_PROFILE_SURFACE=cli",
+    "export OMR_PROFILE_SURFACE=cli",
     `exec ${shellQuote(realPi)} --provider ${shellQuote(piConfig.providerId)} --model ${shellQuote(piConfig.model)} "$@"`,
     ""
   ].join("\n");
@@ -1951,7 +1990,7 @@ function piWrapperCmdScript(
   piConfig: { model: string; profileHome: string; providerId: string; sessionDir: string },
   runtimeFile: string
 ): string {
-  const realPi = profile.env?.CCR_PI_BIN?.trim() || profile.env?.PI_BIN?.trim() || "pi";
+  const realPi = profile.env?.OMR_PI_BIN?.trim() || profile.env?.CCR_PI_BIN?.trim() || profile.env?.PI_BIN?.trim() || "pi";
   const envExports = Object.entries(profileEnv(profile))
     .filter(([key]) => !isPiManagedEnvKey(key))
     .map(([key, value]) => cmdSetLine(key, value));
@@ -1965,10 +2004,15 @@ function piWrapperCmdScript(
     cmdSetLine("PI_CODING_AGENT_DIR", piConfig.profileHome),
     cmdSetLine("PI_CODING_AGENT_SESSION_DIR", piConfig.sessionDir),
     cmdSetLine("PI_SKIP_VERSION_CHECK", profile.env?.PI_SKIP_VERSION_CHECK?.trim() || "1"),
+    cmdSetLine("OMR_PROFILE_SURFACE", "cli"),
     cmdSetLine("CCR_PROFILE_SURFACE", "cli"),
+    cmdSetLine("OMR_PI_WRAPPER", "1"),
     cmdSetLine("CCR_PI_WRAPPER", "1"),
+    cmdSetLine("OMR_REAL_PI_BIN", realPi),
     cmdSetLine("CCR_REAL_PI_BIN", realPi),
+    cmdSetLine("OMR_PI_PROVIDER", piConfig.providerId),
     cmdSetLine("CCR_PI_PROVIDER", piConfig.providerId),
+    cmdSetLine("OMR_PI_MODEL", piConfig.model),
     cmdSetLine("CCR_PI_MODEL", piConfig.model),
     ...nodeRuntimeCmdExecLines(runtimeFile),
     ""
@@ -1976,12 +2020,22 @@ function piWrapperCmdScript(
 }
 
 function isPiManagedEnvKey(key: string): boolean {
-  return key === "CCR_PI_BIN" ||
+  return key === "OMR_PI_BIN" ||
+    key === "CCR_PI_BIN" ||
     key === "PI_BIN" ||
     key === "PI_CODING_AGENT_DIR" ||
     key === "PI_CODING_AGENT_SESSION_DIR" ||
     key === "PI_SKIP_VERSION_CHECK" ||
-    key === "CCR_PROFILE_SURFACE";
+    key === "OMR_PROFILE_SURFACE" ||
+    key === "CCR_PROFILE_SURFACE" ||
+    key === "OMR_PI_WRAPPER" ||
+    key === "CCR_PI_WRAPPER" ||
+    key === "OMR_REAL_PI_BIN" ||
+    key === "CCR_REAL_PI_BIN" ||
+    key === "OMR_PI_PROVIDER" ||
+    key === "CCR_PI_PROVIDER" ||
+    key === "OMR_PI_MODEL" ||
+    key === "CCR_PI_MODEL";
 }
 
 function kimiProfileModels(config: AppConfig, profile: ProfileConfig): string[] {
@@ -2021,7 +2075,7 @@ function buildKimiProfileConfigToml(
   const firstTableIndex = firstTomlTableIndex(preserved);
   const rootSource = firstTableIndex === -1 ? preserved : preserved.slice(0, firstTableIndex);
   const restSource = firstTableIndex === -1 ? "" : preserved.slice(firstTableIndex);
-  const providerId = "claude-code-router";
+  const providerId = "omr";
   const baseUrl = `${gatewayEndpoint(config).replace(/\/+$/g, "")}/v1`;
   const headers = kimiProfileCustomHeaderEntries(profile);
   const providerBlock = [
@@ -2051,7 +2105,7 @@ function buildKimiProfileConfigToml(
     ];
   });
   return [
-    "# Generated by Claude Code Router for this Kimi CLI profile.",
+    "# Generated by OMR for this Kimi CLI profile.",
     `default_model = ${tomlString(defaultModel)}`,
     trimLeadingBlankLines(rootSource).trimEnd(),
     "",
@@ -2232,13 +2286,14 @@ function ensureKimiProfileHome(profile: ProfileConfig): string {
 }
 
 export function resolveKimiSourceHome(profile: Pick<ProfileConfig, "env">): string {
-  const explicitRoot = profile.env?.CCR_KIMI_SOURCE_HOME?.trim() ||
+  const explicitRoot = profile.env?.OMR_KIMI_SOURCE_HOME?.trim() ||
+    profile.env?.CCR_KIMI_SOURCE_HOME?.trim() ||
     profile.env?.KIMI_CODE_HOME?.trim() ||
     process.env.KIMI_CODE_HOME?.trim();
   if (explicitRoot) {
     return resolveUserPath(explicitRoot);
   }
-  const internalHome = process.env.CCR_INTERNAL_HOME_DIR?.trim();
+  const internalHome = (process.env.OMR_INTERNAL_HOME_DIR?.trim() || process.env.CCR_INTERNAL_HOME_DIR?.trim());
   return internalHome
     ? path.join(internalHome, ".kimi-code")
     : resolveUserPath("~/.kimi-code");
@@ -2271,9 +2326,9 @@ function grokWrapperFilename(profile: ProfileConfig): string {
 }
 
 function grokWrapperShellScript(config: AppConfig, profile: ProfileConfig, token: string, model: string, profileHome: string): string {
-  const realGrok = profile.env?.CCR_GROK_BIN?.trim() || "grok";
+  const realGrok = profile.env?.OMR_GROK_BIN?.trim() || "grok";
   const envExports = Object.entries(profileEnv(profile))
-    .filter(([key]) => key !== "CCR_GROK_BIN" && !isGrokManagedEnvKey(key))
+    .filter(([key]) => key !== "OMR_GROK_BIN" && !isGrokManagedEnvKey(key))
     .map(([key, value]) => `export ${key}=${shellQuote(value)}`);
   const gatewayBaseUrl = `${gatewayEndpoint(config).replace(/\/+$/g, "")}/v1`;
   const noProxyHosts = gatewayNoProxyHosts(config);
@@ -2288,16 +2343,16 @@ function grokWrapperShellScript(config: AppConfig, profile: ProfileConfig, token
     `export XAI_API_KEY=${shellQuote(token)}`,
     `export GROK_DEFAULT_MODEL=${shellQuote(model)}`,
     `export GROK_HOME=${shellQuote(profileHome)}`,
-    `export CCR_PROFILE_SURFACE=cli`,
+    `export OMR_PROFILE_SURFACE=cli`,
     `exec ${shellQuote(realGrok)} "$@"`,
     ""
   ].join("\n");
 }
 
 function grokWrapperCmdScript(config: AppConfig, profile: ProfileConfig, token: string, model: string, profileHome: string): string {
-  const realGrok = profile.env?.CCR_GROK_BIN?.trim() || "grok";
+  const realGrok = profile.env?.OMR_GROK_BIN?.trim() || "grok";
   const envExports = Object.entries(profileEnv(profile))
-    .filter(([key]) => key !== "CCR_GROK_BIN" && !isGrokManagedEnvKey(key))
+    .filter(([key]) => key !== "OMR_GROK_BIN" && !isGrokManagedEnvKey(key))
     .map(([key, value]) => cmdSetLine(key, value));
   const gatewayBaseUrl = `${gatewayEndpoint(config).replace(/\/+$/g, "")}/v1`;
   const noProxyHosts = gatewayNoProxyHosts(config);
@@ -2311,7 +2366,7 @@ function grokWrapperCmdScript(config: AppConfig, profile: ProfileConfig, token: 
     cmdSetLine("XAI_API_KEY", token),
     cmdSetLine("GROK_DEFAULT_MODEL", model),
     cmdSetLine("GROK_HOME", profileHome),
-    cmdSetLine("CCR_PROFILE_SURFACE", "cli"),
+    cmdSetLine("OMR_PROFILE_SURFACE", "cli"),
     `${cmdQuote(realGrok)} %*`,
     "exit /b %ERRORLEVEL%",
     ""
@@ -2424,7 +2479,7 @@ function isGrokManagedEnvKey(key: string): boolean {
     key === "GROK_STORAGE_DIR" ||
     key === "GROK_CONFIG_DIR" ||
     key === "XAI_API_KEY" ||
-    key === "CCR_PROFILE_SURFACE";
+    key === "OMR_PROFILE_SURFACE";
 }
 
 function ensureGrokProfileHome(profile: ProfileConfig): string {
@@ -2468,7 +2523,7 @@ export function resolveGrokSourceHome(profile: Pick<ProfileConfig, "env">): stri
   if (explicitRoot) {
     return resolveUserPath(explicitRoot);
   }
-  const internalHome = process.env.CCR_INTERNAL_HOME_DIR?.trim();
+  const internalHome = (process.env.OMR_INTERNAL_HOME_DIR?.trim() || process.env.CCR_INTERNAL_HOME_DIR?.trim());
   return internalHome
     ? path.join(internalHome, ".grok")
     : resolveUserPath("~/.grok");
@@ -2653,20 +2708,20 @@ function codexMiddlewareFilename(profile: ProfileConfig, providerId: string): st
 
 function shellProfileSurfaceExports(surface: "auto" | "cli" | "app"): string[] {
   return [
-    "if [ -z \"${CCR_PROFILE_SURFACE:-}\" ]; then",
+    "if [ -z \"${OMR_PROFILE_SURFACE:-}\" ]; then",
     "  case \"${1:-}\" in",
-    "    app|app-server) CCR_PROFILE_SURFACE=app ;;",
-    `    *) CCR_PROFILE_SURFACE=${shellQuote(surface)} ;;`,
+    "    app|app-server) OMR_PROFILE_SURFACE=app ;;",
+    `    *) OMR_PROFILE_SURFACE=${shellQuote(surface)} ;;`,
     "  esac",
     "fi",
-    "export CCR_PROFILE_SURFACE"
+    "export OMR_PROFILE_SURFACE"
   ];
 }
 
 function shellCodexlProfileSurfaceExports(): string[] {
   return [
     "if [ -z \"${CODEXL_PROFILE_SURFACE:-}\" ]; then",
-    "  CODEXL_PROFILE_SURFACE=$CCR_PROFILE_SURFACE",
+    "  CODEXL_PROFILE_SURFACE=$OMR_PROFILE_SURFACE",
     "fi",
     "export CODEXL_PROFILE_SURFACE"
   ];
@@ -2674,8 +2729,8 @@ function shellCodexlProfileSurfaceExports(): string[] {
 
 function nodeRuntimeShellExecLines(runtimeFile: string): string[] {
   return [
-    "if [ -n \"${CCR_NODE_BIN:-}\" ]; then",
-    `  exec "$CCR_NODE_BIN" ${shellQuote(runtimeFile)} "$@"`,
+    "if [ -n \"${OMR_NODE_BIN:-}\" ]; then",
+    `  exec "$OMR_NODE_BIN" ${shellQuote(runtimeFile)} "$@"`,
     "fi",
     "if command -v node >/dev/null 2>&1; then",
     `  exec node ${shellQuote(runtimeFile)} "$@"`,
@@ -2707,19 +2762,19 @@ function codexMiddlewareShellScript(
     ? [
         `export ZCODE_HOME=${shellQuote(resolvedCodexHome)}`,
         `export ZCODE_STORAGE_DIR=${shellQuote(resolvedCodexHome)}`,
-        "if [ -z \"${CCR_REAL_ZCODE_CLI_PATH:-}\" ]; then",
-        `  CCR_REAL_ZCODE_CLI_PATH=${shellQuote(codexCli)}`,
+        "if [ -z \"${OMR_REAL_ZCODE_CLI_PATH:-}\" ]; then",
+        `  OMR_REAL_ZCODE_CLI_PATH=${shellQuote(codexCli)}`,
         "fi",
-        "export CCR_REAL_ZCODE_CLI_PATH",
-        `export CCR_ZCODE_PROFILE=${shellQuote(values.providerId)}`,
-        `export CCR_ZCODE_MODEL=${shellQuote(values.model)}`,
-        `export CCR_ZCODE_MODEL_CATALOG_FILE=${shellQuote(values.modelCatalogFile)}`,
-        `export CCR_ZCODE_MODEL_PROVIDER=${shellQuote(values.providerId)}`,
-        `export CCR_ZCODE_PROFILE_CONFIG_FORMAT=${shellQuote(values.configFormat)}`,
-        `export CCR_PROFILE_SCOPE=${shellQuote(normalizeProfileScope(profile.scope))}`,
-        `export CCR_ZCODE_REMOTE_FRONTEND_MODE=${shellQuote(remoteFrontendMode)}`,
+        "export OMR_REAL_ZCODE_CLI_PATH",
+        `export OMR_ZCODE_PROFILE=${shellQuote(values.providerId)}`,
+        `export OMR_ZCODE_MODEL=${shellQuote(values.model)}`,
+        `export OMR_ZCODE_MODEL_CATALOG_FILE=${shellQuote(values.modelCatalogFile)}`,
+        `export OMR_ZCODE_MODEL_PROVIDER=${shellQuote(values.providerId)}`,
+        `export OMR_ZCODE_PROFILE_CONFIG_FORMAT=${shellQuote(values.configFormat)}`,
+        `export OMR_PROFILE_SCOPE=${shellQuote(normalizeProfileScope(profile.scope))}`,
+        `export OMR_ZCODE_REMOTE_FRONTEND_MODE=${shellQuote(remoteFrontendMode)}`,
         "if [ -z \"${CODEXL_REAL_ZCODE_CLI_PATH:-}\" ]; then",
-        "  CODEXL_REAL_ZCODE_CLI_PATH=$CCR_REAL_ZCODE_CLI_PATH",
+        "  CODEXL_REAL_ZCODE_CLI_PATH=$OMR_REAL_ZCODE_CLI_PATH",
         "fi",
         "export CODEXL_REAL_ZCODE_CLI_PATH",
         `export CODEXL_ZCODE_PROFILE=${shellQuote(values.providerId)}`,
@@ -2739,12 +2794,27 @@ function codexMiddlewareShellScript(
               `export CODEBUDDY_HOME=${shellQuote(resolvedCodexHome)}`
             ]
           : []),
+        "if [ -z \"${OMR_REAL_CODEX_CLI_PATH:-}\" ]; then",
+        `  OMR_REAL_CODEX_CLI_PATH=${shellQuote(codexCli)}`,
+        "fi",
+        "export OMR_REAL_CODEX_CLI_PATH",
+        "if [ -z \"${OMR_BUNDLED_CODEX_CLI_PATH:-}\" ]; then",
+        "  OMR_BUNDLED_CODEX_CLI_PATH=$OMR_REAL_CODEX_CLI_PATH",
+        "fi",
+        "export OMR_BUNDLED_CODEX_CLI_PATH",
+        `export OMR_CODEX_PROFILE=${shellQuote(values.providerId)}`,
+        `export OMR_CODEX_MODEL=${shellQuote(values.model)}`,
+        `export OMR_CODEX_MODEL_CATALOG_FILE=${shellQuote(values.modelCatalogFile)}`,
+        `export OMR_CODEX_MODEL_PROVIDER=${shellQuote(values.providerId)}`,
+        `export OMR_CODEX_PROFILE_CONFIG_FORMAT=${shellQuote(values.configFormat)}`,
+        `export OMR_PROFILE_SCOPE=${shellQuote(normalizeProfileScope(profile.scope))}`,
+        `export OMR_CODEX_REMOTE_FRONTEND_MODE=${shellQuote(remoteFrontendMode)}`,
         "if [ -z \"${CCR_REAL_CODEX_CLI_PATH:-}\" ]; then",
-        `  CCR_REAL_CODEX_CLI_PATH=${shellQuote(codexCli)}`,
+        "  CCR_REAL_CODEX_CLI_PATH=$OMR_REAL_CODEX_CLI_PATH",
         "fi",
         "export CCR_REAL_CODEX_CLI_PATH",
         "if [ -z \"${CCR_BUNDLED_CODEX_CLI_PATH:-}\" ]; then",
-        "  CCR_BUNDLED_CODEX_CLI_PATH=$CCR_REAL_CODEX_CLI_PATH",
+        "  CCR_BUNDLED_CODEX_CLI_PATH=$OMR_BUNDLED_CODEX_CLI_PATH",
         "fi",
         "export CCR_BUNDLED_CODEX_CLI_PATH",
         `export CCR_CODEX_PROFILE=${shellQuote(values.providerId)}`,
@@ -2755,11 +2825,11 @@ function codexMiddlewareShellScript(
         `export CCR_PROFILE_SCOPE=${shellQuote(normalizeProfileScope(profile.scope))}`,
         `export CCR_CODEX_REMOTE_FRONTEND_MODE=${shellQuote(remoteFrontendMode)}`,
         "if [ -z \"${CODEXL_REAL_CODEX_CLI_PATH:-}\" ]; then",
-        "  CODEXL_REAL_CODEX_CLI_PATH=$CCR_REAL_CODEX_CLI_PATH",
+        "  CODEXL_REAL_CODEX_CLI_PATH=$OMR_REAL_CODEX_CLI_PATH",
         "fi",
         "export CODEXL_REAL_CODEX_CLI_PATH",
         "if [ -z \"${CODEXL_BUNDLED_CODEX_CLI_PATH:-}\" ]; then",
-        "  CODEXL_BUNDLED_CODEX_CLI_PATH=$CCR_BUNDLED_CODEX_CLI_PATH",
+        "  CODEXL_BUNDLED_CODEX_CLI_PATH=$OMR_BUNDLED_CODEX_CLI_PATH",
         "fi",
         "export CODEXL_BUNDLED_CODEX_CLI_PATH",
         `export CODEXL_CODEX_PROFILE=${shellQuote(values.providerId)}`,
@@ -2784,13 +2854,13 @@ function codexMiddlewareShellScript(
 
 function cmdProfileSurfaceExports(surface: "auto" | "cli" | "app"): string[] {
   return [
-    "if not defined CCR_PROFILE_SURFACE (",
+    "if not defined OMR_PROFILE_SURFACE (",
     "  if \"%~1\"==\"app\" (",
-    cmdSetLine("CCR_PROFILE_SURFACE", "app", "    "),
+    cmdSetLine("OMR_PROFILE_SURFACE", "app", "    "),
     "  ) else if \"%~1\"==\"app-server\" (",
-    cmdSetLine("CCR_PROFILE_SURFACE", "app", "    "),
+    cmdSetLine("OMR_PROFILE_SURFACE", "app", "    "),
     "  ) else (",
-    cmdSetLine("CCR_PROFILE_SURFACE", surface, "    "),
+    cmdSetLine("OMR_PROFILE_SURFACE", surface, "    "),
     "  )",
     ")"
   ];
@@ -2798,7 +2868,7 @@ function cmdProfileSurfaceExports(surface: "auto" | "cli" | "app"): string[] {
 
 function cmdCodexlProfileSurfaceExports(): string[] {
   return [
-    "if not defined CODEXL_PROFILE_SURFACE set \"CODEXL_PROFILE_SURFACE=%CCR_PROFILE_SURFACE%\""
+    "if not defined CODEXL_PROFILE_SURFACE set \"CODEXL_PROFILE_SURFACE=%OMR_PROFILE_SURFACE%\""
   ];
 }
 
@@ -2807,7 +2877,7 @@ function codexNativeHelperBypassShellLines(): string[] {
     "# Browser's native-pipe authorizer requires helper processes to bypass the CCR middleware.",
     "if [ \"${1:-}\" = 'sandbox' ] || { [ \"${1:-}\" = 'app-server' ] && [ \"${2:-}\" = '--listen' ] && [ \"${3:-}\" = 'stdio://' ]; }; then",
     "  unset CODEX_CLI_PATH",
-    "  exec \"$CCR_BUNDLED_CODEX_CLI_PATH\" \"$@\"",
+    "  exec \"$OMR_BUNDLED_CODEX_CLI_PATH\" \"$@\"",
     "fi"
   ];
 }
@@ -2816,8 +2886,8 @@ function nodeRuntimeCmdExecLines(runtimeFile: string): string[] {
   const quotedRuntime = cmdQuote(runtimeFile);
   const quotedHost = cmdQuote(process.execPath);
   return [
-    "if not defined CCR_NODE_BIN goto ccr_try_system_node",
-    `"%CCR_NODE_BIN%" ${quotedRuntime} %*`,
+    "if not defined OMR_NODE_BIN goto ccr_try_system_node",
+    `"%OMR_NODE_BIN%" ${quotedRuntime} %*`,
     "exit /b %ERRORLEVEL%",
     ":ccr_try_system_node",
     "where node >nul 2>nul",
@@ -2855,15 +2925,15 @@ function codexMiddlewareCmdScript(
     ? [
         cmdSetLine("ZCODE_HOME", resolvedCodexHome),
         cmdSetLine("ZCODE_STORAGE_DIR", resolvedCodexHome),
-        `if not defined CCR_REAL_ZCODE_CLI_PATH ${cmdSetLine("CCR_REAL_ZCODE_CLI_PATH", codexCli)}`,
-        cmdSetLine("CCR_ZCODE_PROFILE", values.providerId),
-        cmdSetLine("CCR_ZCODE_MODEL", values.model),
-        cmdSetLine("CCR_ZCODE_MODEL_CATALOG_FILE", values.modelCatalogFile),
-        cmdSetLine("CCR_ZCODE_MODEL_PROVIDER", values.providerId),
-        cmdSetLine("CCR_ZCODE_PROFILE_CONFIG_FORMAT", values.configFormat),
-        cmdSetLine("CCR_PROFILE_SCOPE", normalizeProfileScope(profile.scope)),
-        cmdSetLine("CCR_ZCODE_REMOTE_FRONTEND_MODE", remoteFrontendMode),
-        "if not defined CODEXL_REAL_ZCODE_CLI_PATH set \"CODEXL_REAL_ZCODE_CLI_PATH=%CCR_REAL_ZCODE_CLI_PATH%\"",
+        `if not defined OMR_REAL_ZCODE_CLI_PATH ${cmdSetLine("OMR_REAL_ZCODE_CLI_PATH", codexCli)}`,
+        cmdSetLine("OMR_ZCODE_PROFILE", values.providerId),
+        cmdSetLine("OMR_ZCODE_MODEL", values.model),
+        cmdSetLine("OMR_ZCODE_MODEL_CATALOG_FILE", values.modelCatalogFile),
+        cmdSetLine("OMR_ZCODE_MODEL_PROVIDER", values.providerId),
+        cmdSetLine("OMR_ZCODE_PROFILE_CONFIG_FORMAT", values.configFormat),
+        cmdSetLine("OMR_PROFILE_SCOPE", normalizeProfileScope(profile.scope)),
+        cmdSetLine("OMR_ZCODE_REMOTE_FRONTEND_MODE", remoteFrontendMode),
+        "if not defined CODEXL_REAL_ZCODE_CLI_PATH set \"CODEXL_REAL_ZCODE_CLI_PATH=%OMR_REAL_ZCODE_CLI_PATH%\"",
         cmdSetLine("CODEXL_ZCODE_PROFILE", values.providerId),
         cmdSetLine("CODEXL_ZCODE_MODEL_CATALOG_FILE", values.modelCatalogFile),
         cmdSetLine("CODEXL_ZCODE_MODEL_PROVIDER", values.providerId),
@@ -2881,6 +2951,15 @@ function codexMiddlewareCmdScript(
               cmdSetLine("CODEBUDDY_HOME", resolvedCodexHome)
             ]
           : []),
+        `if not defined OMR_REAL_CODEX_CLI_PATH ${cmdSetLine("OMR_REAL_CODEX_CLI_PATH", codexCli)}`,
+        "if not defined OMR_BUNDLED_CODEX_CLI_PATH set \"OMR_BUNDLED_CODEX_CLI_PATH=%OMR_REAL_CODEX_CLI_PATH%\"",
+        cmdSetLine("OMR_CODEX_PROFILE", values.providerId),
+        cmdSetLine("OMR_CODEX_MODEL", values.model),
+        cmdSetLine("OMR_CODEX_MODEL_CATALOG_FILE", values.modelCatalogFile),
+        cmdSetLine("OMR_CODEX_MODEL_PROVIDER", values.providerId),
+        cmdSetLine("OMR_CODEX_PROFILE_CONFIG_FORMAT", values.configFormat),
+        cmdSetLine("OMR_PROFILE_SCOPE", normalizeProfileScope(profile.scope)),
+        cmdSetLine("OMR_CODEX_REMOTE_FRONTEND_MODE", remoteFrontendMode),
         `if not defined CCR_REAL_CODEX_CLI_PATH ${cmdSetLine("CCR_REAL_CODEX_CLI_PATH", codexCli)}`,
         "if not defined CCR_BUNDLED_CODEX_CLI_PATH set \"CCR_BUNDLED_CODEX_CLI_PATH=%CCR_REAL_CODEX_CLI_PATH%\"",
         cmdSetLine("CCR_CODEX_PROFILE", values.providerId),
@@ -2890,8 +2969,8 @@ function codexMiddlewareCmdScript(
         cmdSetLine("CCR_CODEX_PROFILE_CONFIG_FORMAT", values.configFormat),
         cmdSetLine("CCR_PROFILE_SCOPE", normalizeProfileScope(profile.scope)),
         cmdSetLine("CCR_CODEX_REMOTE_FRONTEND_MODE", remoteFrontendMode),
-        "if not defined CODEXL_REAL_CODEX_CLI_PATH set \"CODEXL_REAL_CODEX_CLI_PATH=%CCR_REAL_CODEX_CLI_PATH%\"",
-        "if not defined CODEXL_BUNDLED_CODEX_CLI_PATH set \"CODEXL_BUNDLED_CODEX_CLI_PATH=%CCR_BUNDLED_CODEX_CLI_PATH%\"",
+        "if not defined CODEXL_REAL_CODEX_CLI_PATH set \"CODEXL_REAL_CODEX_CLI_PATH=%OMR_REAL_CODEX_CLI_PATH%\"",
+        "if not defined CODEXL_BUNDLED_CODEX_CLI_PATH set \"CODEXL_BUNDLED_CODEX_CLI_PATH=%OMR_BUNDLED_CODEX_CLI_PATH%\"",
         cmdSetLine("CODEXL_CODEX_PROFILE", values.providerId),
         cmdSetLine("CODEXL_CODEX_MODEL_CATALOG_FILE", values.modelCatalogFile),
         cmdSetLine("CODEXL_CODEX_MODEL_PROVIDER", values.providerId),
@@ -2913,7 +2992,7 @@ function codexMiddlewareCmdScript(
 
 function shellBotGatewayEnvExports(config: AppConfig, profile: ProfileConfig): string[] {
   return [
-    'if [ "$CCR_PROFILE_SURFACE" = "app" ]; then',
+    'if [ "$OMR_PROFILE_SURFACE" = "app" ]; then',
     ...Object.entries(botGatewayProfileEnv(config, profile, "app")).map(([key, value]) => `  export ${key}=${shellQuote(value)}`),
     "else",
     ...Object.entries(botGatewayProfileEnv(config, profile, "cli")).map(([key, value]) => `  export ${key}=${shellQuote(value)}`),
@@ -2927,7 +3006,7 @@ function shellEnvExports(env: Record<string, string>): string[] {
 
 function cmdBotGatewayEnvExports(config: AppConfig, profile: ProfileConfig): string[] {
   return [
-    `if /I "%CCR_PROFILE_SURFACE%"=="app" (`,
+    `if /I "%OMR_PROFILE_SURFACE%"=="app" (`,
     ...Object.entries(botGatewayProfileEnv(config, profile, "app")).map(([key, value]) => cmdSetLine(key, value, "  ")),
     ") else (",
     ...Object.entries(botGatewayProfileEnv(config, profile, "cli")).map(([key, value]) => cmdSetLine(key, value, "  ")),
@@ -2945,9 +3024,9 @@ function withoutBotGatewayEnv(values: Record<string, string>): Record<string, st
 
 function isBotGatewayEnvKey(key: string): boolean {
   return key === "BOT_GATEWAY_STATE_DIR" ||
-    key.startsWith("CCR_BOT_") ||
+    (key.startsWith("OMR_BOT_") || key.startsWith("CCR_BOT_")) ||
     key.startsWith("CODEXL_BOT_") ||
-    key === "CCR_BOT_GATEWAY_SDK_MODULE";
+    (key === "OMR_BOT_GATEWAY_SDK_MODULE" || key === "CCR_BOT_GATEWAY_SDK_MODULE");
 }
 
 function removeRootTomlKeys(source: string, keys: string[]): string {
@@ -2973,12 +3052,18 @@ function managedModelAssignment(source: string, configuredModel: string): string
 }
 
 function managedConfiguredModel(source: string): string | undefined {
-  const pattern = new RegExp(`^\\s*${escapeRegExp(managedConfiguredModelPrefix)}(.+?)\\s*$`, "m");
+  const prefixPattern = [managedConfiguredModelPrefix, legacyManagedConfiguredModelPrefix]
+    .map((prefix) => escapeRegExp(prefix))
+    .join("|");
+  const pattern = new RegExp(`^\\s*(?:${prefixPattern})(.+?)\\s*$`, "m");
   return source.match(pattern)?.[1];
 }
 
 function removeManagedConfiguredModelLine(source: string): string {
-  const pattern = new RegExp(`^\\s*${escapeRegExp(managedConfiguredModelPrefix)}.*(?:\\n|$)`, "gm");
+  const prefixPattern = [managedConfiguredModelPrefix, legacyManagedConfiguredModelPrefix]
+    .map((prefix) => escapeRegExp(prefix))
+    .join("|");
+  const pattern = new RegExp(`^\\s*(?:${prefixPattern}).*(?:\\n|$)`, "gm");
   return source.replace(pattern, "");
 }
 
@@ -3188,7 +3273,8 @@ function withoutManagedClaudeCodeApiKeyHelper(settings: Record<string, unknown>)
 }
 
 function isManagedClaudeCodeApiKeyHelper(value: unknown): boolean {
-  return typeof value === "string" && value.includes("ccr-claude-code-api-key-");
+  return typeof value === "string" &&
+    (value.includes("omr-claude-code-api-key-") || value.includes("ccr-claude-code-api-key-"));
 }
 
 function claudeCodeManagedSettingsEnvKeys(
@@ -3312,7 +3398,7 @@ function cleanupInactiveOpenCodeWrappers(profiles: ProfileConfig[]): number {
 
   let removed = 0;
   for (const entry of entries) {
-    if (!entry.startsWith("ccr-opencode-wrapper-") || activeFiles.has(entry)) {
+    if ((!entry.startsWith("omr-opencode-wrapper-") && !entry.startsWith("ccr-opencode-wrapper-")) || activeFiles.has(entry)) {
       continue;
     }
     rmSync(path.join(binDir, entry), { force: true });
@@ -3335,7 +3421,7 @@ function cleanupInactiveKiloWrappers(profiles: ProfileConfig[]): number {
 
   let removed = 0;
   for (const entry of entries) {
-    if (!entry.startsWith("ccr-kilo-wrapper-") || activeFiles.has(entry)) {
+    if ((!entry.startsWith("omr-kilo-wrapper-") && !entry.startsWith("ccr-kilo-wrapper-")) || activeFiles.has(entry)) {
       continue;
     }
     rmSync(path.join(binDir, entry), { force: true });
@@ -3372,18 +3458,23 @@ function cleanupInactiveClaudeCodeGeneratedFiles(profiles: ProfileConfig[]): num
 }
 
 function isClaudeCodeGeneratedRuntimeFile(fileName: string): boolean {
-  return fileName.startsWith("ccr-claude-code-api-key-") ||
+  return fileName.startsWith("omr-claude-code-api-key-") ||
+    fileName.startsWith("ccr-claude-code-api-key-") ||
+    fileName.startsWith("omr-claude-code-wif-token-") ||
     fileName.startsWith("ccr-claude-code-wif-token-") ||
+    fileName.startsWith("omr-claude-code-wrapper-") ||
     fileName.startsWith("ccr-claude-code-wrapper-");
 }
 
 function generatedBinBackupBaseName(entry: string): string | undefined {
-  const backupMarker = ".ccr-backup-";
-  const backupIndex = entry.indexOf(backupMarker);
-  if (backupIndex !== -1) {
-    return entry.slice(0, backupIndex);
+  const backupMarkers = [".ccr-backup-", ".omr-backup-"];
+  for (const backupMarker of backupMarkers) {
+    const backupIndex = entry.indexOf(backupMarker);
+    if (backupIndex !== -1) {
+      return entry.slice(0, backupIndex);
+    }
   }
-  for (const suffix of [originalMissingSuffix, originalBackupSuffix]) {
+  for (const suffix of [originalMissingSuffix, originalBackupSuffix, legacyOriginalMissingSuffix, legacyOriginalBackupSuffix]) {
     if (entry.endsWith(suffix)) {
       return entry.slice(0, -suffix.length);
     }
@@ -3393,19 +3484,31 @@ function generatedBinBackupBaseName(entry: string): string | undefined {
 
 function isManagedGeneratedBinFile(fileName: string): boolean {
   const normalized = fileName.replace(/\.cmd$/i, "");
-  return normalized === "ccr" ||
+  return normalized === "omr" ||
+    normalized === "omr-app" ||
+    normalized === "omr-cli.js" ||
+    normalized === "ccr" ||
     normalized === "ccr-app" ||
     normalized === "ccr-cli.js" ||
     normalized === TOOL_HUB_MCP_RUNTIME_FILE_NAME ||
     normalized === codexMiddlewareRuntimeFilename() ||
+    normalized.startsWith("omr-claude-code-api-key-") ||
     normalized.startsWith("ccr-claude-code-api-key-") ||
+    normalized.startsWith("omr-claude-code-wif-token-") ||
     normalized.startsWith("ccr-claude-code-wif-token-") ||
+    normalized.startsWith("omr-claude-code-wrapper-") ||
     normalized.startsWith("ccr-claude-code-wrapper-") ||
+    normalized.startsWith("omr-grok-cli-wrapper-") ||
     normalized.startsWith("ccr-grok-cli-wrapper-") ||
+    normalized.startsWith("omr-kimi-cli-wrapper-") ||
     normalized.startsWith("ccr-kimi-cli-wrapper-") ||
+    normalized.startsWith("omr-pi-wrapper-") ||
     normalized.startsWith("ccr-pi-wrapper-") ||
+    normalized.startsWith("omr-opencode-wrapper-") ||
     normalized.startsWith("ccr-opencode-wrapper-") ||
+    normalized.startsWith("omr-kilo-wrapper-") ||
     normalized.startsWith("ccr-kilo-wrapper-") ||
+    normalized.startsWith("omr-codex-cli-stdio-") ||
     normalized.startsWith("ccr-codex-cli-stdio-");
 }
 
@@ -3468,7 +3571,7 @@ function disabledProfileStatus(profile: ProfileConfig): ProfileClientApplyStatus
       (content) => isManagedKiloConfigContent(content, providerId)
     );
   }
-  const providerId = sanitizeCodexProviderId(profile.providerId || "") || "claude-code-router";
+  const providerId = sanitizeCodexProviderId(profile.providerId || "") || "omr";
   const clientName = codexCompatibleClientName(profile.agent);
   return restoreDisabledGlobalProfile(
     profile,
@@ -3530,7 +3633,8 @@ export function restoreInactiveGlobalProfileConfigs(profiles: ProfileConfig[]): 
   const openCodeProfiles = profiles.filter((profile) => profile.agent === "opencode");
   if (openCodeProfiles.length > 0 && !openCodeProfiles.some((profile) => profile.enabled && isGlobalProfile(profile))) {
     const providerIds = [...new Set([
-      "claude-code-router",
+      "omr",
+      "omr",
       ...openCodeProfiles.map(openCodeProviderId)
     ])];
     for (const file of uniqueResolvedPaths(openCodeProfiles.map(globalOpenCodeConfigCandidate))) {
@@ -3546,7 +3650,8 @@ export function restoreInactiveGlobalProfileConfigs(profiles: ProfileConfig[]): 
   const kiloProfiles = profiles.filter((profile) => profile.agent === "kilo");
   if (kiloProfiles.length > 0 && !kiloProfiles.some((profile) => profile.enabled && isGlobalProfile(profile))) {
     const providerIds = [...new Set([
-      "claude-code-router",
+      "omr",
+      "omr",
       ...kiloProfiles.map(kiloProviderId)
     ])];
     for (const file of uniqueResolvedPaths(kiloProfiles.map(globalKiloConfigCandidate))) {
@@ -3562,7 +3667,8 @@ export function restoreInactiveGlobalProfileConfigs(profiles: ProfileConfig[]): 
   const zcodeProfiles = profiles.filter((profile) => profile.agent === "zcode");
   if (zcodeProfiles.length > 0 && !zcodeProfiles.some((profile) => profile.enabled && isGlobalProfile(profile))) {
     const providerIds = [...new Set([
-      "claude-code-router",
+      "omr",
+      "omr",
       ...zcodeProfiles.map((profile) => sanitizeCodexProviderId(profile.providerId || "")).filter(Boolean)
     ])];
     const configFiles = uniqueResolvedPaths([
@@ -3739,7 +3845,7 @@ function inactiveGlobalCleanupStatus(
     client,
     enabled: false,
     message: restoreResult.missingBackup
-      ? `No active global ${codexCompatibleClientName(client)} profile is configured, but the global config is managed by CCR and no original backup was found.`
+      ? `No active global ${codexCompatibleClientName(client)} profile is configured, but the global config is managed by OMR and no original backup was found.`
       : `${codexCompatibleClientName(client)} global config was restored because no active global profile is configured.`,
     ok: !restoreResult.missingBackup,
     path: resolveUserPath(file)
@@ -3781,7 +3887,7 @@ function restoreDisabledZcodeProfile(profile: ProfileConfig, configFile: string)
     return disabledStatus("zcode", configFile, disabledMessage);
   }
 
-  const providerId = sanitizeCodexProviderId(profile.providerId || "") || "claude-code-router";
+  const providerId = sanitizeCodexProviderId(profile.providerId || "") || "omr";
   const storageRoot = zcodeHomeFromConfigFile(configFile);
   const files = [
     configFile,
@@ -3805,8 +3911,8 @@ function restoreDisabledZcodeProfile(profile: ProfileConfig, configFile: string)
       ? `${disabledMessage} No original ZCode config backup was found for ${profile.name || profile.id || "this profile"}.`
       : restored
         ? changed
-          ? "ZCode config was restored from the CCR backup because the global profile is disabled."
-          : "ZCode config already matches the CCR backup; profile is disabled."
+          ? "ZCode config was restored from the OMR backup because the global profile is disabled."
+          : "ZCode config already matches the OMR backup; profile is disabled."
         : disabledMessage,
     ok: !missingBackup,
     path: resolveUserPath(configFile)
@@ -3828,8 +3934,8 @@ function disabledRestoreStatus(
       ? `${disabledMessage} No original ${codexCompatibleClientName(client)} config backup was found for ${profileName}.`
       : restoreResult.restored
         ? restoreResult.changed
-          ? `${codexCompatibleClientName(client)} config was restored from the CCR backup because the global profile is disabled.`
-          : `${codexCompatibleClientName(client)} config already matches the CCR backup; profile is disabled.`
+          ? `${codexCompatibleClientName(client)} config was restored from the OMR backup because the global profile is disabled.`
+          : `${codexCompatibleClientName(client)} config already matches the OMR backup; profile is disabled.`
         : disabledMessage,
     ok: !restoreResult.missingBackup,
     path: resolveUserPath(file)
@@ -3884,10 +3990,10 @@ function originalSnapshotCandidate(
   file: string,
   isManagedContent: (content: string) => boolean
 ): { content: string; file: string } | undefined {
-  // Prefer the most recent non-CCR snapshot captured immediately before the
-  // latest takeover. The permanent .ccr-original file can be stale when the
-  // user changes the agent config between separate CCR sessions.
-  for (const candidate of [...backupFiles(file).reverse(), originalBackupFilePath(file)]) {
+  // Prefer the most recent non-OMR snapshot captured immediately before the
+  // latest takeover. The permanent .omr-original file can be stale when the
+  // user changes the agent config between separate OMR sessions.
+  for (const candidate of [...backupFiles(file).reverse(), originalBackupFilePath(file), legacyOriginalBackupFilePath(file)]) {
     if (!existsSync(candidate)) {
       continue;
     }
@@ -3909,9 +4015,10 @@ function backupCurrentConfigFile(file: string, mode: number | undefined): string
 function backupFiles(file: string): string[] {
   const dir = path.dirname(file);
   const prefix = `${path.basename(file)}.ccr-backup-`;
+  const legacyPrefix = `${path.basename(file)}.omr-backup-`;
   try {
     return readdirSync(dir)
-      .filter((entry) => entry.startsWith(prefix))
+      .filter((entry) => entry.startsWith(prefix) || entry.startsWith(legacyPrefix))
       .sort()
       .map((entry) => path.join(dir, entry));
   } catch {
@@ -3956,6 +4063,10 @@ function originalBackupFilePath(file: string): string {
 
 function originalMissingFilePath(file: string): string {
   return `${file}${originalMissingSuffix}`;
+}
+
+function legacyOriginalBackupFilePath(file: string): string {
+  return `${file}${legacyOriginalBackupSuffix}`;
 }
 
 function disabledStatus(client: ProfileClientKind, file: string, message: string): ProfileClientApplyStatus {
@@ -4027,7 +4138,12 @@ function isClaudeCodeProfileManagedSettingsPath(pathValue: string, managedSettin
 }
 
 function isManagedCodexConfigContent(content: string, providerId: string): boolean {
-  if (content.includes(managedRootStart) || content.includes(managedProviderStart)) {
+  if (
+    content.includes(managedRootStart) ||
+    content.includes(managedProviderStart) ||
+    content.includes(legacyManagedRootStart) ||
+    content.includes(legacyManagedProviderStart)
+  ) {
     return true;
   }
   const escapedProvider = escapeRegExp(providerId);
@@ -4186,7 +4302,7 @@ function defaultCodexConfigFile(agent: ProfileConfig["agent"]): string {
     : agent === "pi"
       ? "~/.pi/agent"
       : agent === "claude-design"
-        ? "~/.claude-code-router/claude-design"
+        ? "~/.omr/claude-design"
         : "~/.codex/config.toml";
 }
 

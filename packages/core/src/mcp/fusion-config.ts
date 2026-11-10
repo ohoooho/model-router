@@ -59,9 +59,9 @@ export async function fusionBuiltinToolArtifacts(
             ...(visionConfig.baseUrl && visionConfig.apiKey ? { VISION_API_KEY: visionConfig.apiKey } : {}),
             ...(visionConfig.timeoutMs ? { VISION_TIMEOUT_MS: String(visionConfig.timeoutMs) } : {}),
             ...(usageSync ? {
-              CCR_FUSION_USAGE_SYNC_ENDPOINT: usageSync.endpoint,
-              CCR_FUSION_USAGE_SYNC_HEADER: usageSync.header,
-              CCR_FUSION_USAGE_SYNC_TOKEN: usageSync.token
+              OMR_FUSION_USAGE_SYNC_ENDPOINT: usageSync.endpoint,
+              OMR_FUSION_USAGE_SYNC_HEADER: usageSync.header,
+              OMR_FUSION_USAGE_SYNC_TOKEN: usageSync.token
             } : {})
           },
           name: `fusion-vision-${sanitizedProfileId}`,
@@ -177,7 +177,7 @@ export function fusionToolFallbackMcpServer(
       ELECTRON_RUN_AS_NODE: "1",
       FUSION_FALLBACK_TOOLS_JSON: JSON.stringify(tools)
     },
-    name: uniqueMcpServerName("ccr-fusion-tool-fallback", existingServers),
+    name: uniqueMcpServerName("omr-fusion-tool-fallback", existingServers),
     protocolVersion: "2024-11-05",
     requestTimeoutMs: 600000,
     startupTimeoutMs: 600000,
@@ -303,9 +303,9 @@ function fusionFallbackToolUnavailableMessage(profile: unknown, toolName: string
 
 export function browserWebSearchUnavailableMessage(toolName: string): string {
   return [
-    `Fusion MCP tool "${toolName}" is unavailable because In-app Browser web search requires CCR Desktop.`,
+    `Fusion MCP tool "${toolName}" is unavailable because In-app Browser web search requires OMR Desktop.`,
     "This runtime did not register the Electron browser web search integration, so the hidden browser search tool cannot run here.",
-    "Run the profile in CCR Desktop or switch the Fusion web search provider to Brave, Bing, Google CSE, Serper, SerpAPI, Serply, Tavily, or Exa."
+    "Run the profile in OMR Desktop or switch the Fusion web search provider to Brave, Bing, Google CSE, Serper, SerpAPI, Serply, Tavily, or Exa."
   ].join(" ");
 }
 
@@ -321,7 +321,7 @@ function browserWebSearchFallbackToolDefinition(
     return undefined;
   }
   return {
-    description: "Fallback registration for CCR In-app Browser web search when the Electron browser integration is unavailable.",
+    description: "Fallback registration for OMR In-app Browser web search when the Electron browser integration is unavailable.",
     inputSchema: {
       additionalProperties: true,
       properties: {

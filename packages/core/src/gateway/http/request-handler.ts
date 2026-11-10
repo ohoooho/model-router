@@ -140,7 +140,7 @@ export class GatewayHttpRequestHandler {
         if (!browserAutomationMcpEnabled(this.config)) {
           sendJson(response, 404, {
             error: {
-              message: "CCR browser automation MCP is disabled."
+              message: "OMR browser automation MCP is disabled."
             }
           });
           return;
@@ -152,7 +152,7 @@ export class GatewayHttpRequestHandler {
         if (!this.browserAutomationMcpIntegration) {
           sendJson(response, 503, {
             error: {
-              message: "CCR browser automation MCP is only available in the Electron desktop app."
+              message: "OMR browser automation MCP is only available in the Electron desktop app."
             }
           });
           return;
@@ -168,7 +168,7 @@ export class GatewayHttpRequestHandler {
         }
         const contextArchiveConfig = contextArchiveConfigForApiKey(this.config, authorization.apiKey);
         if (!contextArchiveConfig) {
-          sendJson(response, 404, { error: { message: "CCR context archive MCP is disabled." } });
+          sendJson(response, 404, { error: { message: "OMR context archive MCP is disabled." } });
           return;
         }
         await handleContextArchiveMcpRequest(
@@ -182,7 +182,7 @@ export class GatewayHttpRequestHandler {
 
       if ([MEDIA_TOOLS_MCP_PATH, LEGACY_GROK_MEDIA_MCP_PATH].some((mcpPath) => path === mcpPath || path === `${mcpPath}/`)) {
         if (!this.config.mediaTools.enabled) {
-          sendJson(response, 404, { error: { message: "CCR Media Tools MCP is disabled." } });
+          sendJson(response, 404, { error: { message: "OMR Media Tools MCP is disabled." } });
           return;
         }
         const authorization = await authorize(request, response, this.config);
@@ -240,8 +240,8 @@ export class GatewayHttpRequestHandler {
         sendJson(response, 200, {
           core: "next-ai-gateway",
           endpoints: ["POST /v1/oauth/token", "GET /api/claude_cli/bootstrap", "POST /mcp", "POST /v1/messages", "POST /v1/messages/count_tokens", "GET /models", "GET /v1/models"],
-          name: "claude-code-router",
-          plugin: "claude-code-router",
+          name: "omr",
+          plugin: "omr",
           wrapperPlugins: this.config.plugins.filter((plugin) => plugin.enabled !== false).map((plugin) => plugin.id)
         });
         return;

@@ -86,16 +86,16 @@ export function isManagedOpenCodeConfigContent(content: string, providerId: stri
     return false;
   }
   const headers = isRecord(provider.options.headers) ? provider.options.headers : {};
-  return headers["x-ccr-client"] === "opencode" || headers["X-CCR-Client"] === "opencode";
+  return headers["x-omr-client"] === "opencode" || headers["x-ccr-client"] === "opencode" || headers["X-CCR-Client"] === "opencode";
 }
 
 export function openCodeProviderId(profile: Pick<ProfileConfig, "providerId">): string {
-  return sanitizeProviderId(profile.providerId || "") || "claude-code-router";
+  return sanitizeProviderId(profile.providerId || "") || "omr";
 }
 
 function openCodeGatewayOverrides(config: AppConfig, profile: ProfileConfig, token: string): Record<string, unknown> {
   const providerId = openCodeProviderId(profile);
-  const providerName = profile.providerName?.trim() || "Claude Code Router";
+  const providerName = profile.providerName?.trim() || "OMR";
   const model = normalizeClientModel(profile.model) || defaultClientModel(config);
   const modelRef = `${providerId}/${model}`;
   const models = openCodeModelConfigs(config, { ...profile, model }, model);

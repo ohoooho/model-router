@@ -171,7 +171,7 @@ function codexModelCatalogItem(
     default_reasoning_level: profile.defaultReasoningLevel,
     default_reasoning_effort: profile.defaultReasoningLevel,
     default_reasoning_summary: profile.defaultReasoningSummary,
-    description: profile.description ?? `CCR gateway model ${model}`,
+    description: profile.description ?? `OMR gateway model ${model}`,
     displayName: model,
     display_name: model,
     effective_context_window_percent: effectiveContextWindowPercent,

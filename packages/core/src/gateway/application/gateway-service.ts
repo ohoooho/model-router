@@ -18,7 +18,7 @@ import { closeServer, formatError } from "@ccr/core/gateway/http/io";
 import { RawTraceSynchronizer } from "@ccr/core/observability/raw-trace-sync";
 import { GatewayBillingSynchronizer } from "@ccr/core/usage/billing-sync";
 import { assertLoopbackCoreHost, endpoint, formatCoreGatewayChildExit, gatewayNetworkEndpoints, gatewayRuntimeSupportsRouterPlugin, generateCoreGatewayAuthToken, isCoreGatewayHealthy, loopbackCoreHostError, removeManagedCoreGatewayMarker, shouldRunGatewayRuntime, shouldRunUnifiedServer, spawnGatewayProcess, stopPreviousManagedCoreGateway, waitForCoreGatewayStop, waitForManagedCoreGatewayReady, writeManagedCoreGatewayMarker } from "@ccr/core/gateway/core-runtime/supervisor";
-import { coreGatewayAuthHeader } from "@ccr/core/gateway/internal/shared";
+import { omrCoreGatewayAuthHeader } from "@ccr/core/gateway/internal/shared";
 import type { BrowserAutomationMcpIntegration, BrowserWebSearchMcpIntegration, GatewayStopOptions } from "@ccr/core/gateway/internal/shared";
 import {
   ccrLiveTokenRateConfigMessageType,
@@ -194,7 +194,7 @@ class GatewayService {
         coreEndpoint: endpoint(runtimeHost, runtimePort)
       };
       mediaService.start(config, mediaToolsGatewayEndpoint(config), {
-        authHeader: coreGatewayAuthHeader,
+        authHeader: omrCoreGatewayAuthHeader,
         authToken: coreAuthToken,
         baseUrl: this.status.coreEndpoint
       });
@@ -445,7 +445,7 @@ class GatewayService {
       ? endpoint(config.gateway.host, config.gateway.port)
       : endpoint(config.gateway.coreHost, config.gateway.corePort);
     mediaService.updateConfig(config, mediaToolsGatewayEndpoint(config), {
-      authHeader: coreGatewayAuthHeader,
+      authHeader: omrCoreGatewayAuthHeader,
       authToken: this.coreAuthToken,
       baseUrl: runtimeCoreEndpoint
     });

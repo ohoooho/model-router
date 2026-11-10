@@ -1,17 +1,17 @@
 {
-  "name": "claude-code-router-monorepo",
-  "version": "3.1.3",
+  "name": "ohoooho-model-router-monorepo",
+  "version": "0.1.0",
   "private": true,
   "license": "MIT",
-  "description": "Local Claude Code Router gateway with CLI and web management UI.",
+  "description": "桃仙模型路由网关 OMR — Local model router gateway with CLI and web management UI (fork of claude-code-router)",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/musistudio/claude-code-router.git"
+    "url": "https://github.com/ohoooho/model-router.git"
   },
   "bugs": {
-    "url": "https://github.com/musistudio/claude-code-router/issues"
+    "url": "https://github.com/ohoooho/model-router/issues"
   },
-  "homepage": "https://github.com/musistudio/claude-code-router#readme",
+  "homepage": "https://github.com/ohoooho/model-router",
   "keywords": [
     "claude-code",
     "codex",
@@ -56,13 +56,13 @@
     "docker:build": "node build/docker-image.mjs",
     "docker:compose:build": "node build/docker-compose.mjs build",
     "docker:compose:up": "node build/docker-compose.mjs up -d --build",
-    "docker:run": "docker run --rm -p 3458:8080 -v ccr-data:/data claude-code-router:local",
+    "docker:run": "docker run --rm -p 3458:8080 -v omr-data:/data ohoooho-model-router:local",
     "test": "npm run test:packages && npm run test:architecture",
     "test:packages": "npm run test --workspaces --if-present",
-    "test:core": "npm test -w @claude-code-router/core",
-    "test:ui": "npm test -w @claude-code-router/ui",
-    "test:electron": "npm test -w @claude-code-router/electron",
-    "test:cli": "npm test -w @musistudio/claude-code-router",
+    "test:core": "npm test -w @ohoooho/model-router-core",
+    "test:ui": "npm test -w @ohoooho/model-router-ui",
+    "test:electron": "npm test -w @ohoooho/model-router-electron",
+    "test:cli": "npm test -w @ohoooho/model-router",
     "test:architecture": "node build/test.mjs architecture && node build/run-tests.mjs architecture",
     "test:system": "node tests/system/docker-smoke.mjs",
     "test:docker": "npm run test:system",

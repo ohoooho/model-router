@@ -81,7 +81,7 @@ const codexAppSpec: CodexCompatibleAppSpec = {
   bundledCliNames: ["codex", "Codex", "OpenAI Codex"],
   defaultCliCommand: "codex",
   displayName: codexDesktopAppName,
-  envPathKeys: ["CCR_CHATGPT_APP_PATH", "CHATGPT_APP_PATH", "CODEXL_CHATGPT_PATH", "CCR_CODEX_APP_PATH", "CODEX_APP_PATH", "CODEXL_CODEX_PATH"],
+  envPathKeys: ["OMR_CHATGPT_APP_PATH", "CHATGPT_APP_PATH", "CODEXL_CHATGPT_PATH", "OMR_CODEX_APP_PATH", "CODEX_APP_PATH", "CODEXL_CODEX_PATH"],
   kind: "codex",
   linuxCandidates: [
     "/opt/ChatGPT/chatgpt",
@@ -141,7 +141,7 @@ const zcodeAppSpec: CodexCompatibleAppSpec = {
   bundledCliNames: ["glm/zcode.cjs", "zcode", "ZCode", "Z Code", "z-code", "zai-code", "codex", "Codex"],
   defaultCliCommand: "zcode",
   displayName: "ZCode App",
-  envPathKeys: ["CCR_ZCODE_APP_PATH", "ZCODE_APP_PATH", "CODEXL_ZCODE_PATH"],
+  envPathKeys: ["OMR_ZCODE_APP_PATH", "ZCODE_APP_PATH", "CODEXL_ZCODE_PATH"],
   kind: "zcode",
   linuxCandidates: [
     "/opt/ZCode/zcode",
@@ -552,7 +552,7 @@ export function removeLegacyCodexVirtualAuthMarker(codexHome: string): boolean {
       keys[0] !== "OPENAI_API_KEY" ||
       keys[1] !== "auth_mode" ||
       value.auth_mode !== "apikey" ||
-      value.OPENAI_API_KEY !== "ccr-local-profile"
+      value.OPENAI_API_KEY !== "omr-local-profile"
     ) {
       return false;
     }
@@ -594,6 +594,7 @@ async function launchCodexCompatibleAppProfile(
     ...codexProfileEnv(profile, lookup.executable, spec),
     CODEXL_PROFILE_SURFACE: "app",
     CCR_PROFILE_SURFACE: "app",
+    OMR_PROFILE_SURFACE: "app",
     ...codexAppAgentEnv(spec, plan.command, codexHome, userDataDir, modelCatalogFile, workbuddyVirtualAuth),
     ...codexCompatibleAppGatewayEnv(spec, config),
     ...codexAppNetResponderEnv(spec.kind, netResponderPort),
@@ -604,9 +605,9 @@ async function launchCodexCompatibleAppProfile(
     ...appEnv
   };
   delete env.ELECTRON_RUN_AS_NODE;
-  delete env.CCR_CODEX_MODEL_CATALOG_B64;
+  delete env.OMR_CODEX_MODEL_CATALOG_B64;
   delete env.CODEXL_CODEX_MODEL_CATALOG_B64;
-  delete env.CCR_ZCODE_MODEL_CATALOG_B64;
+  delete env.OMR_ZCODE_MODEL_CATALOG_B64;
   delete env.CODEXL_ZCODE_MODEL_CATALOG_B64;
   sanitizeCodexCompatibleAppEnv(env, spec.kind);
 
@@ -642,16 +643,20 @@ function codexCompatibleAppGatewayEnv(spec: CodexCompatibleAppSpec, config?: App
 }
 
 function codexProfileEnv(profile: ProfileConfig, appExecutable: string, spec: CodexCompatibleAppSpec): Record<string, string> {
-  const providerId = sanitizeCodexProviderId(profile.providerId || "") || "claude-code-router";
+  const providerId = sanitizeCodexProviderId(profile.providerId || "") || "omr";
   const realCliPath = profile.codexCliPath?.trim() || bundledCodexCliPath(appExecutable, spec) || spec.defaultCliCommand;
   const remoteFrontendMode = normalizeCodexRemoteFrontendMode(profile.remoteFrontendMode);
   if (spec.kind === "zcode") {
     return {
-      ...(profile.model.trim() ? { CCR_ZCODE_MODEL: profile.model.trim() } : {}),
+      ...(profile.model.trim() ? { CCR_ZCODE_MODEL: profile.model.trim(), OMR_ZCODE_MODEL: profile.model.trim() } : {}),
       CCR_ZCODE_MODEL_PROVIDER: providerId,
       CCR_ZCODE_PROFILE: providerId,
       CCR_ZCODE_REMOTE_FRONTEND_MODE: remoteFrontendMode,
       CCR_REAL_ZCODE_CLI_PATH: realCliPath,
+      OMR_ZCODE_MODEL_PROVIDER: providerId,
+      OMR_ZCODE_PROFILE: providerId,
+      OMR_ZCODE_REMOTE_FRONTEND_MODE: remoteFrontendMode,
+      OMR_REAL_ZCODE_CLI_PATH: realCliPath,
       CODEXL_REAL_ZCODE_CLI_PATH: realCliPath,
       CODEXL_ZCODE_CORE_MODE: remoteFrontendMode,
       CODEXL_ZCODE_MODEL_PROVIDER: providerId,
@@ -659,10 +664,12 @@ function codexProfileEnv(profile: ProfileConfig, appExecutable: string, spec: Co
       CODEXL_ZCODE_WORKSPACE_NAME: profile.name || providerId
     };
   }
+  const middlewareLog = process.env.OMR_CODEX_CLI_MIDDLEWARE_LOG?.trim()
+    || process.env.CCR_CODEX_CLI_MIDDLEWARE_LOG?.trim();
   const codexEnv = {
-    ...(profile.model.trim() ? { CCR_CODEX_MODEL: profile.model.trim() } : {}),
-    ...(process.env.CCR_CODEX_CLI_MIDDLEWARE_LOG?.trim()
-      ? { CCR_CODEX_CLI_MIDDLEWARE_LOG: process.env.CCR_CODEX_CLI_MIDDLEWARE_LOG.trim() }
+    ...(profile.model.trim() ? { CCR_CODEX_MODEL: profile.model.trim(), OMR_CODEX_MODEL: profile.model.trim() } : {}),
+    ...(middlewareLog
+      ? { CCR_CODEX_CLI_MIDDLEWARE_LOG: middlewareLog, OMR_CODEX_CLI_MIDDLEWARE_LOG: middlewareLog }
       : {}),
     ...codexSharedChatGptAuthEnv(),
     CCR_CODEX_MODEL_PROVIDER: providerId,
@@ -670,6 +677,11 @@ function codexProfileEnv(profile: ProfileConfig, appExecutable: string, spec: Co
     CCR_CODEX_REMOTE_FRONTEND_MODE: remoteFrontendMode,
     CCR_BUNDLED_CODEX_CLI_PATH: realCliPath,
     CCR_REAL_CODEX_CLI_PATH: realCliPath,
+    OMR_CODEX_MODEL_PROVIDER: providerId,
+    OMR_CODEX_PROFILE: providerId,
+    OMR_CODEX_REMOTE_FRONTEND_MODE: remoteFrontendMode,
+    OMR_BUNDLED_CODEX_CLI_PATH: realCliPath,
+    OMR_REAL_CODEX_CLI_PATH: realCliPath,
     CODEXL_BUNDLED_CODEX_CLI_PATH: realCliPath,
     CODEXL_CODEX_CORE_MODE: remoteFrontendMode,
     CODEXL_CODEX_MODEL_PROVIDER: providerId,
@@ -680,13 +692,18 @@ function codexProfileEnv(profile: ProfileConfig, appExecutable: string, spec: Co
   if (spec.kind !== "workbuddy") {
     return codexEnv;
   }
+  const workbuddyModel = profile.model.trim();
   return {
     ...codexEnv,
-    ...(profile.model.trim() ? { CCR_WORKBUDDY_MODEL: profile.model.trim() } : {}),
+    ...(workbuddyModel ? { CCR_WORKBUDDY_MODEL: workbuddyModel, OMR_WORKBUDDY_MODEL: workbuddyModel } : {}),
     CCR_REAL_WORKBUDDY_CLI_PATH: realCliPath,
     CCR_WORKBUDDY_MODEL_PROVIDER: providerId,
     CCR_WORKBUDDY_PROFILE: providerId,
     CCR_WORKBUDDY_REMOTE_FRONTEND_MODE: remoteFrontendMode,
+    OMR_REAL_WORKBUDDY_CLI_PATH: realCliPath,
+    OMR_WORKBUDDY_MODEL_PROVIDER: providerId,
+    OMR_WORKBUDDY_PROFILE: providerId,
+    OMR_WORKBUDDY_REMOTE_FRONTEND_MODE: remoteFrontendMode,
     CODEXL_REAL_WORKBUDDY_CLI_PATH: realCliPath,
     CODEXL_WORKBUDDY_CORE_MODE: remoteFrontendMode,
     CODEXL_WORKBUDDY_MODEL_PROVIDER: providerId,
@@ -702,12 +719,14 @@ function codexSharedChatGptAuthEnv(homeDir = os.homedir()): Record<string, strin
   }
   return {
     CCR_CODEX_CHATGPT_AUTH_FILE: authFile,
+    OMR_CODEX_CHATGPT_AUTH_FILE: authFile,
     CODEXL_CODEX_CHATGPT_AUTH_FILE: authFile
   };
 }
 
 function codexSharedChatGptAuthFile(homeDir: string): string | undefined {
   for (const configured of [
+    process.env.OMR_CODEX_CHATGPT_AUTH_FILE,
     process.env.CCR_CODEX_CHATGPT_AUTH_FILE,
     process.env.CODEXL_CODEX_CHATGPT_AUTH_FILE
   ]) {
@@ -776,16 +795,18 @@ function codexAppAgentEnv(
 ): Record<string, string> {
   if (spec.kind === "zcode") {
     return {
-        CCR_ZCODE_MODEL_CATALOG_FILE: modelCatalogFile,
-        CODEXL_ZCODE_MODEL_CATALOG_FILE: modelCatalogFile,
-        ZCODE_CLI_PATH: launcher,
-        ZCODE_ELECTRON_USER_DATA_PATH: userDataDir,
-        ZCODE_HOME: home,
-        ZCODE_STORAGE_DIR: home
-      };
+      CCR_ZCODE_MODEL_CATALOG_FILE: modelCatalogFile,
+      OMR_ZCODE_MODEL_CATALOG_FILE: modelCatalogFile,
+      CODEXL_ZCODE_MODEL_CATALOG_FILE: modelCatalogFile,
+      ZCODE_CLI_PATH: launcher,
+      ZCODE_ELECTRON_USER_DATA_PATH: userDataDir,
+      ZCODE_HOME: home,
+      ZCODE_STORAGE_DIR: home
+    };
   }
   const codexEnv = {
     CCR_CODEX_MODEL_CATALOG_FILE: modelCatalogFile,
+    OMR_CODEX_MODEL_CATALOG_FILE: modelCatalogFile,
     CODEX_CLI_PATH: launcher,
     CODEX_ELECTRON_USER_DATA_PATH: userDataDir,
     CODEX_HOME: home,
@@ -797,6 +818,7 @@ function codexAppAgentEnv(
   return {
     ...codexEnv,
     CCR_WORKBUDDY_MODEL_CATALOG_FILE: modelCatalogFile,
+    OMR_WORKBUDDY_MODEL_CATALOG_FILE: modelCatalogFile,
     ...(workbuddyVirtualAuth ? workbuddyVirtualAuthEnv(workbuddyVirtualAuth) : {}),
     CODEBUDDY_CLI_PATH: launcher,
     CODEBUDDY_CONFIG_DIR: home,
@@ -869,6 +891,7 @@ function workbuddyVirtualAuthEnv(result: WorkbuddyVirtualAuthResult): Record<str
   return {
     APPDATA: path.join(result.homeDir, "AppData", "Roaming"),
     CCR_WORKBUDDY_VIRTUAL_AUTH_FILE: result.authFile,
+    OMR_WORKBUDDY_VIRTUAL_AUTH_FILE: result.authFile,
     CODEXL_WORKBUDDY_VIRTUAL_AUTH_FILE: result.authFile,
     HOME: result.homeDir,
     LOCALAPPDATA: path.join(result.homeDir, "AppData", "Local"),
@@ -897,10 +920,10 @@ function workbuddySharedAuthDir(homeDir: string): string {
 
 function sanitizeCodexCompatibleAppEnv(env: NodeJS.ProcessEnv, kind: CodexCompatibleAppKind): void {
   const blockedPrefixes = kind === "zcode"
-    ? ["CCR_CODEX_", "CODEXL_CODEX_", "CCR_WORKBUDDY_", "CODEXL_WORKBUDDY_"]
+    ? ["OMR_CODEX_", "CCR_CODEX_", "CODEXL_CODEX_", "OMR_WORKBUDDY_", "CCR_WORKBUDDY_", "CODEXL_WORKBUDDY_"]
     : kind === "workbuddy"
-      ? ["CCR_ZCODE_", "CODEXL_ZCODE_"]
-      : ["CCR_ZCODE_", "CODEXL_ZCODE_", "CCR_WORKBUDDY_", "CODEXL_WORKBUDDY_"];
+      ? ["OMR_ZCODE_", "CCR_ZCODE_", "CODEXL_ZCODE_"]
+      : ["OMR_ZCODE_", "CCR_ZCODE_", "CODEXL_ZCODE_", "OMR_WORKBUDDY_", "CCR_WORKBUDDY_", "CODEXL_WORKBUDDY_"];
   for (const key of Object.keys(env)) {
     if (blockedPrefixes.some((prefix) => key.startsWith(prefix))) {
       delete env[key];
@@ -1036,7 +1059,7 @@ function macAppBundleFromExecutable(executable: string): string | undefined {
 function codexElectronUserDataDir(codexHome: string, profile: ProfileConfig, spec: CodexCompatibleAppSpec): string {
   return path.join(
     codexHome,
-    ".claude-code-router",
+    ".omr",
     spec.userDataDirName,
     sanitizeProfilePathSegment(profile.id || profile.name || "default") || "default"
   );

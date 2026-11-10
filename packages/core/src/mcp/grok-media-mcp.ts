@@ -135,7 +135,7 @@ async function handleJsonRpcRequest(payload: unknown, service: MediaService): Pr
       return jsonRpcResult(id, {
         capabilities: { tools: {} },
         protocolVersion,
-        serverInfo: { name: "ccr-media-tools", title: "CCR Media Tools", version: packageJson.version }
+        serverInfo: { name: "omr-media-tools", title: "OMR Media Tools", version: packageJson.version }
       });
     }
     if (request.method === "ping") return jsonRpcResult(id, {});

@@ -2,7 +2,7 @@
  * Extracted from gateway/service.ts. Keep this module focused on its named gateway boundary.
  */
 import { Readable } from "node:stream";
-import type { AppConfig, GatewayProviderConfig, GatewayProviderProtocol, ProviderCredentialConfig, RequestRouteTraceChange, RouterFallbackConfig } from "@ccr/core/contracts/app";
+import type { AppConfig, CredentialRoutingStrategy, GatewayProviderConfig, GatewayProviderProtocol, ProviderCredentialConfig, RequestRouteTraceChange, RouterFallbackConfig } from "@ccr/core/contracts/app";
 import { fetchWithSystemProxy } from "@ccr/core/proxy/system-proxy-fetch";
 import { createRouteExecutionPlan } from "@ccr/core/routing/execution-plan";
 import { rewriteRouteModelInUrl } from "@ccr/core/routing/protocol-adapter";
@@ -25,10 +25,8 @@ import type { ApiKeyLimitUsage, ProviderCredentialRoutingTarget, UpstreamAttempt
 import type { RouteTraceObserver } from "@ccr/core/observability/route-trace";
 import { monotonicNowMs } from "@ccr/core/observability/stream-experience";
 
-const providerCredentialSpilloverThreshold = 0.8;
 const openRouterDiscountModelHeader = "x-ccr-openrouter-discount-model";
 const openRouterDiscountProviderHeader = "x-ccr-openrouter-discount-provider-id";
-
 
 export function applyProviderCapabilityRouting(input: {
   body?: Buffer;
@@ -659,7 +657,9 @@ function prepareUpstreamCredentialAttempt(input: {
   }
 
   const usage = estimateLimitUsage(input.method, input.attempt.body ?? Buffer.alloc(0));
-  const selection = selectProviderCredentials(target.provider, target.protocol, credentials, usage);
+  // OMR-FORK-CHANGE-004: 从 routed model 解析 routing strategy（默认 auto-balance）
+  const strategy = resolveRoutingStrategyForModel(input.config, input.attempt.model);
+  const selection = selectProviderCredentials(target.provider, target.protocol, credentials, usage, strategy);
   if (selection.credentials.length === 0) {
     const preserveModelSelector = shouldPreserveCapabilityModelSelector(input.attempt.body, target);
     return {
@@ -1020,7 +1020,8 @@ function selectProviderCredentials(
   provider: GatewayProviderConfig,
   protocol: GatewayProviderProtocol,
   credentials: ProviderCredentialConfig[],
-  usage: ApiKeyLimitUsage
+  usage: ApiKeyLimitUsage,
+  strategy: CredentialRoutingStrategy = "auto-balance"
 ): { credentials: Array<{ credential: ProviderCredentialConfig; credentialId: string; internalName: string }>; saturated: boolean } {
   const candidates = credentials.map((credential, index) => {
     const providerIndex = provider.credentials?.indexOf(credential) ?? index;
@@ -1034,11 +1035,16 @@ function selectProviderCredentials(
       internalName: providerCredentialInternalName(provider, protocol, credential),
       limitState,
       priority: providerCredentialPriority(credential, providerIndex),
+      // OMR-FORK-CHANGE-004: per-credential 策略覆盖，可选
+      strategy: credential.strategy,
       weight: Math.max(1, credential.weight ?? 1)
     };
   });
   const available = candidates.filter((candidate) => !candidate.cooldown && !candidate.limitState.blocked);
-  const sorted = sortProviderCredentialCandidates(available.length > 0 ? available : candidates);
+  const sorted = sortProviderCredentialCandidates(
+    available.length > 0 ? available : candidates,
+    strategy
+  );
   return {
     credentials: sorted.map((candidate) => ({
       credential: candidate.credential,
@@ -1050,33 +1056,132 @@ function selectProviderCredentials(
 }
 
 
-function sortProviderCredentialCandidates<T extends {
+// OMR-FORK-CHANGE-004（@omr/fork/multi-cred-strategies, 2026-08-11）
+// 4 策略架构（详见 dopple/MULTI-CRED-STRATEGIES.md）
+//   auto-balance (默认): 按 (weight * (1-utilization)) 加权，剩余容量多的优先 → 平滑用满
+//   waterfall:          按 priority 升序，同优先级内 utilization DESC（用得多的继续用，用完才换）
+//   priority:           按 priority 升序，第一个没 cooldown 就用，A 挂才换 B
+//   manual:             不排序，原序返回，由调用方决定
+// 策略来源：virtualModelProfile.strategy ?? "auto-balance"（也支持 per-credential 覆盖）
+// OMR-FORK-CHANGE-004: 导出用于单元测试（4 个策略 case 用）
+export function sortProviderCredentialCandidates<T extends {
+  index: number;
+  limitState: { utilization: number };
+  priority: number;
+  weight: number;
+}>(candidates: T[], strategy: CredentialRoutingStrategy = "auto-balance"): T[] {
+  switch (strategy) {
+    case "waterfall":
+      return sortWaterfall(candidates);
+    case "priority":
+      return sortPriority(candidates);
+    case "manual":
+      // manual: 不自动切，按原配置顺序返回
+      return [...candidates];
+    case "auto-balance":
+    default:
+      return sortAutoBalance(candidates);
+  }
+}
+
+
+// auto-balance (默认): 按 effective_weight = weight × (1 - utilization) DESC 排序
+//   剩余容量越多（weight 大 × utilization 低）→ 越优先被尝试
+//   这是用户拍板方案 B（2026-08-11 16:47）：比之前的 "priority + spillover" 更直觉
+//   tie-break: index asc（稳定排序，配置顺序优先）
+function sortAutoBalance<T extends {
   index: number;
   limitState: { utilization: number };
   priority: number;
   weight: number;
 }>(candidates: T[]): T[] {
-  const prioritySorted = [...candidates].sort((left, right) =>
+  return [...candidates].sort((left, right) => {
+    const leftEffective = left.weight * (1 - left.limitState.utilization);
+    const rightEffective = right.weight * (1 - right.limitState.utilization);
+    return rightEffective - leftEffective || left.index - right.index;
+  });
+}
+
+
+// waterfall: 按 priority 升序；同优先级内 utilization DESC（用得多的继续用，榨干再换）
+//   行为: 先把 priority=1 的 key 用到 100%（触发 blocked），再切 priority=2，依此类推
+//   适合 "先把便宜套餐用光" 的场景
+function sortWaterfall<T extends {
+  index: number;
+  limitState: { utilization: number };
+  priority: number;
+  weight: number;
+}>(candidates: T[]): T[] {
+  return [...candidates].sort((left, right) =>
     left.priority - right.priority ||
-    left.limitState.utilization - right.limitState.utilization ||
+    right.limitState.utilization - left.limitState.utilization ||
     right.weight - left.weight ||
     left.index - right.index
   );
-  const primaryPriority = prioritySorted[0]?.priority;
-  const primaryCandidates = prioritySorted.filter((candidate) => candidate.priority === primaryPriority);
-  const shouldSpillOver = primaryCandidates.length > 0 &&
-    primaryCandidates.every((candidate) => candidate.limitState.utilization >= providerCredentialSpilloverThreshold);
+}
 
-  if (shouldSpillOver) {
-    return prioritySorted.sort((left, right) =>
-      left.limitState.utilization - right.limitState.utilization ||
-      left.priority - right.priority ||
-      right.weight - left.weight ||
-      left.index - right.index
-    );
+
+// priority: 严格按 priority 升序，第一个没 cooldown 就用；A 挂了（cooldown/blocked）才换 B
+//   行为: 单一主备；B/C 永远 standby；A 在 cooldown 时降级到 B，B 挂了再降级到 C
+//   适合 "A 主 B backup" 的稳定主备场景
+function sortPriority<T extends {
+  index: number;
+  limitState: { utilization: number };
+  priority: number;
+  weight: number;
+}>(candidates: T[]): T[] {
+  return [...candidates].sort((left, right) =>
+    left.priority - right.priority ||
+    left.index - right.index
+  );
+}
+
+
+// OMR-FORK-CHANGE-004: 从 model 名解析 routing strategy
+//   查找顺序: virtualModelProfile.strategy (按 exactAliases/prefixes/suffixes 匹配) ?? "auto-balance"
+//   该函数故意只在 executor.ts 内部使用，但导出用于单元测试
+export function resolveRoutingStrategyForModel(
+  config: AppConfig,
+  model: string | undefined
+): CredentialRoutingStrategy {
+  if (!model) return "auto-balance";
+  const normalized = model.trim().toLowerCase();
+  if (!normalized) return "auto-balance";
+  const profiles = config.virtualModelProfiles ?? [];
+  for (const profile of profiles) {
+    if (profile.enabled === false) continue;
+    const match = profile.match;
+    if (!match) continue;
+    if (match.exactAliases?.some((alias) => alias.trim().toLowerCase() === normalized)) {
+      return profile.strategy ?? "auto-balance";
+    }
+    if (match.prefixes?.some((prefix) => {
+      const trimmed = prefix.trim().toLowerCase();
+      return trimmed && normalized.startsWith(trimmed);
+    })) {
+      return profile.strategy ?? "auto-balance";
+    }
+    if (match.suffixes?.some((suffix) => {
+      const trimmed = suffix.trim().toLowerCase();
+      return trimmed && normalized.endsWith(trimmed);
+    })) {
+      return profile.strategy ?? "auto-balance";
+    }
   }
+  return "auto-balance";
+}
 
-  return prioritySorted;
+
+// OMR-FORK-CHANGE-004: 导出用于单元测试
+export function selectProviderCredentialsForTest(
+  provider: GatewayProviderConfig,
+  protocol: GatewayProviderProtocol,
+  credentials: ProviderCredentialConfig[],
+  strategy: CredentialRoutingStrategy = "auto-balance"
+): { credentials: Array<{ credential: ProviderCredentialConfig; credentialId: string; internalName: string }>; saturated: boolean } {
+  // 测试入口：usage 传 0，绕过 limit rules
+  const emptyUsage = { tokens: 0, requests: 0 } as unknown as ApiKeyLimitUsage;
+  return selectProviderCredentials(provider, protocol, credentials, emptyUsage, strategy);
 }
 
 
@@ -1222,7 +1327,7 @@ export function destroyResponseStreams(streams: Readable[]): void {
 
 export function mergeFallbackResponseHeaders(headers: Headers, result: UpstreamFetchResult): Headers {
   const credentialIds = result.attempt.credentialIds ?? [];
-  const credentialSaturated = result.attempt.headers?.["x-ccr-provider-credential-saturated"] === "true";
+  const credentialSaturated = (result.attempt.headers?.["x-omr-provider-credential-saturated"] ?? result.attempt.headers?.["x-ccr-provider-credential-saturated"]) === "true";
   if (result.failedAttempts.length === 0 && credentialIds.length === 0 && !credentialSaturated) {
     return headers;
   }

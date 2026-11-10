@@ -45,7 +45,7 @@ const maxMcpRequestBytes = 2 * 1024 * 1024;
 
 const networkCaptureTools: McpTool[] = [
   {
-    description: "Return CCR proxy capture status, proxy status, capture limits, and current capture count.",
+    description: "Return OMR proxy capture status, proxy status, capture limits, and current capture count.",
     inputSchema: objectSchema({}),
     name: "network_capture_status"
   },
@@ -93,7 +93,7 @@ export async function handleNetworkCaptureMcpRequest(request: IncomingMessage, r
 
   if (request.method === "GET") {
     sendJson(response, 200, {
-      name: "ccr-network-capture",
+      name: "omr-network-capture",
       protocol: "mcp",
       transport: "streamable-http",
       endpoint: "/mcp"
@@ -149,8 +149,8 @@ async function handleJsonRpcRequest(payload: unknown): Promise<JsonRpcResponse |
           },
           protocolVersion,
           serverInfo: {
-            name: "ccr-network-capture",
-            title: "CCR Network Capture",
+            name: "omr-network-capture",
+            title: "OMR Network Capture",
             version: appVersion()
           }
         });

@@ -1,12 +1,18 @@
 {
-  "appId": "com.claudecoderouter.desktop",
-  "productName": "Claude Code Router",
+  "appId": "com.ohoooho.model-router",
+  "productName": "OMR",
   "asar": true,
   "asarUnpack": [
     "**/*.node",
     "dist/bundled-plugins/**"
   ],
-  "electronLanguages": ["en-US", "zh-CN", "zh-TW", "zh_CN", "zh_TW"],
+  "electronLanguages": [
+    "en-US",
+    "zh-CN",
+    "zh-TW",
+    "zh_CN",
+    "zh_TW"
+  ],
   "npmRebuild": true,
   "publish": [
     {
@@ -24,8 +30,10 @@
   "afterAllArtifactBuild": "build/verify-update-metadata.cjs",
   "protocols": [
     {
-      "name": "Claude Code Router Provider Import",
-      "schemes": ["ccr"]
+      "name": "OMR Provider Import",
+      "schemes": [
+        "ccr"
+      ]
     }
   ],
   "files": [
@@ -47,8 +55,11 @@
     "entitlements": "build/entitlements.mac.plist",
     "entitlementsInherit": "build/entitlements.mac.inherit.plist",
     "notarize": true,
-    "target": ["dmg", "zip"],
-    "artifactName": "Claude-Code-Router_${version}.${ext}"
+    "target": [
+      "dmg",
+      "zip"
+    ],
+    "artifactName": "OMR_${version}.${ext}"
   },
   "afterSign": "build/verify-macos-notarization.cjs",
   "win": {
@@ -56,15 +67,19 @@
     "target": [
       {
         "target": "nsis",
-        "arch": ["x64"]
+        "arch": [
+          "x64"
+        ]
       }
     ],
-    "artifactName": "Claude-Code-Router_${version}.${ext}"
+    "artifactName": "OMR_${version}.${ext}"
   },
   "linux": {
-    "executableName": "claude-code-router",
-    "target": ["AppImage"],
-    "artifactName": "Claude-Code-Router_${version}.${ext}"
+    "executableName": "omr",
+    "target": [
+      "AppImage"
+    ],
+    "artifactName": "OMR_${version}.${ext}"
   },
   "nsis": {
     "oneClick": false,
@@ -75,6 +90,7 @@
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
     "runAfterFinish": true,
-    "shortcutName": "Claude Code Router"
-  }
+    "shortcutName": "OMR"
+  },
+  "executableName": "omr"
 }

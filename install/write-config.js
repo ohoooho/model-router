@@ -1,0 +1,454 @@
+// omr write-config: 用 OMR fork 真 6 表 schema 写 config.sqlite
+// 契约 §6.2.4: TX_CONTEXT_FILE 0600, BAOZI_KEY 等只走 env
+// 契约 §7.2: backup 优先, 写前校验 schema
+//
+// OMR fork 真 schema (失职 242 闭环, 6 表 vs 我之前写的 3 表):
+//   - app_config            (key-value: 配置 KV)
+//   - api_keys              (7 列: encrypted_key + encryption 算法名, 加密)
+//   - runtime_state         (key-value: Web UI 临时 token / 热状态)
+//   - config_schema_migrations (升级历史)
+//   - legacy_storage_backups  (sha256 + blob 自动备份老 config)
+//   - legacy_storage_cleanup  (异步清理老 config 排队)
+//
+// 路径品牌化 (失职 243 K-302 边界修正): 改 cli.js 加 OMR_DATA_DIR env,
+// write-config.js 写到 $OMR_DATA_DIR/config.sqlite (默认 ~/.omr/config.sqlite),
+// 不是 OMR fork 原版的 ~/.claude-code-router/config.sqlite.
+
+const { DatabaseSync } = require('node:sqlite');
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
+const {
+  TAOXIAN_VIRTUAL_MODELS,
+  applyManagedProviderVisibility,
+  mergeVirtualModelProfiles,
+} = require('./runtime-profiles');
+
+// 1. 路径品牌化: OMR_DATA_DIR env 优先, 默认 ~/.omr (跟 cli.js getOMRDataDir() 对齐)
+const OMR_DATA_DIR = (process.env.OMR_DATA_DIR && process.env.OMR_DATA_DIR.trim())
+  ? process.env.OMR_DATA_DIR.trim().replace(/\/$/, '')
+  : path.join(os.homedir(), '.omr');
+const CONFIG_DB = path.join(OMR_DATA_DIR, 'config.sqlite');
+
+// 2. inputs (TX_CONTEXT_FILE 0600 受保护, 契约 §6.2.4)
+// 4 场景 baozi_key (K-261 锁点, 老板 07:51 lockin)
+// 模板表达式 {{BAOZI_<SCENE>_KEY}} + fake_<scene>_*** 占位
+function isPlaceholderSecret(value) {
+  if (!value) return true;
+  const text = String(value).trim();
+  return (
+    text === '' ||
+    text === '***' ||
+    text.startsWith('fake_') ||
+    text.includes('{{') ||
+    (text.startsWith('<') && text.endsWith('>'))
+  );
+}
+
+function resolveSceneKey(envVal, fakeName) {
+  if (envVal && !isPlaceholderSecret(envVal)) return envVal.trim();
+  return 'fake_' + fakeName + '_***';
+}
+const SCENE_KEYS = {
+  'chat-auto':   resolveSceneKey(process.env.BAOZI_CHAT_KEY,   'chat'),
+  'coding-auto': resolveSceneKey(process.env.BAOZI_CODING_KEY, 'coding'),
+  'assist-auto': resolveSceneKey(process.env.BAOZI_ASSIST_KEY, 'assist'),
+  'team-auto':   resolveSceneKey(process.env.BAOZI_TEAM_KEY,   'team'),
+};
+const BAOZI_KEY = process.env.BAOZI_KEY || SCENE_KEYS['chat-auto'];
+const PERSONA_BAOZI_KEY = process.env.PERSONA_BAOZI_KEY || BAOZI_KEY;
+const BUTLER_BAOZI_KEY = process.env.BUTLER_BAOZI_KEY || BAOZI_KEY;
+const ADMIN_KEY = process.env.ADMIN_KEY || '';
+const LICENSE_JSON = process.env.LICENSE_JSON || '';
+const OMR_VERSION = process.env.OMR_VERSION || '0.1.0-fork3.0.18+p5';
+
+// 3. mkdir 数据目录 (0700 受保护)
+fs.mkdirSync(OMR_DATA_DIR, { recursive: true, mode: 0o700 });
+
+// 4. 建 6 表 (OMR fork 真 schema, 失职 242 闭环)
+const db = new DatabaseSync(CONFIG_DB);
+db.exec(`
+  -- 配置 KV (替代 JSON 主体的 key-value)
+  CREATE TABLE IF NOT EXISTS app_config (
+    key TEXT PRIMARY KEY,
+    value_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- 加密的 API key (双 baozi_key: persona + butler, 老板 17:42 lockin)
+  CREATE TABLE IF NOT EXISTS api_keys (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    encrypted_key TEXT NOT NULL,
+    encryption TEXT NOT NULL DEFAULT 'plain',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at TEXT NOT NULL DEFAULT '',
+    limits_json TEXT NOT NULL DEFAULT '{}'
+  );
+
+  -- 运行时热状态 (Web UI 临时 token)
+  CREATE TABLE IF NOT EXISTS runtime_state (
+    key TEXT PRIMARY KEY,
+    value_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- schema 升级迁移历史 (JSON 没有这个能力)
+  CREATE TABLE IF NOT EXISTS config_schema_migrations (
+    id TEXT PRIMARY KEY,
+    applied_at TEXT NOT NULL DEFAULT (datetime('now')),
+    details_json TEXT NOT NULL DEFAULT '{}'
+  );
+
+  -- 老 config 自动备份 (sha256 + blob)
+  CREATE TABLE IF NOT EXISTS legacy_storage_backups (
+    id TEXT PRIMARY KEY,
+    source_path TEXT NOT NULL,
+    source_kind TEXT NOT NULL,
+    sha256 TEXT NOT NULL,
+    content BLOB NOT NULL,
+    archived_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- 异步清理老 config 排队
+  CREATE TABLE IF NOT EXISTS legacy_storage_cleanup (
+    source_path TEXT PRIMARY KEY,
+    source_kind TEXT NOT NULL,
+    sha256 TEXT NOT NULL,
+    queued_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+
+// 5. 写 app_config: OMR 核心配置 (KV, 跟 fork 上游对齐)
+const upsertConfig = db.prepare(`
+  INSERT INTO app_config (key, value_json, updated_at)
+  VALUES (?, ?, datetime('now'))
+  ON CONFLICT(key) DO UPDATE SET
+    value_json=excluded.value_json,
+    updated_at=datetime('now')
+`);
+
+const OMR_CONFIG = {
+  version: OMR_VERSION,
+  fork_of: 'claude-code-router',
+  fork_base: 'v3.0.18',
+  patches_count: 5,
+  patches: ['K-251', 'K-272', 'K-273', 'K-294', 'K-295'],
+  // 双 baozi_key 引用 (实际 key 在 api_keys 表加密存)
+  baozi: {
+    api_base: process.env.BAOZI_API_BASE || 'https://baozi.ohoooho.com/api/v1',
+    oauth_resource: process.env.BAOZI_OAUTH_RESOURCE || 'https://baozi.ohoooho.com',
+    persona_key_id: 'baozi-persona',
+    butler_key_id: 'baozi-butler',
+  },
+  // v-models (老板 10:15 lockin + K-310 加 team-auto)
+  virtual_models: TAOXIAN_VIRTUAL_MODELS,
+  // 网关
+  gateway: {
+    host: process.env.OMR_GATEWAY_HOST || '127.0.0.1',
+    port: parseInt(process.env.OMR_GATEWAY_PORT || '3456', 10),
+    web_ui_port: parseInt(process.env.OMR_WEB_UI_PORT || '3458', 10),
+    open: false,
+  },
+};
+
+upsertConfig.run('omr', JSON.stringify(OMR_CONFIG));
+upsertConfig.run('gateway', JSON.stringify(OMR_CONFIG.gateway));
+upsertConfig.run('baozi', JSON.stringify(OMR_CONFIG.baozi));
+
+// virtual_models 是用户可改的路由资产：保留已有条目，只补默认缺失项。
+// 不能直接用安装器默认值覆盖，否则重配一次用户自定义虚拟模型就没了。
+const virtualModelsRow = db
+  .prepare("SELECT value_json FROM app_config WHERE key='virtual_models'")
+  .get();
+let existingVirtualModels = {};
+if (virtualModelsRow?.value_json) {
+  try {
+    const parsed = JSON.parse(virtualModelsRow.value_json);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      existingVirtualModels = parsed;
+    }
+  } catch {
+    existingVirtualModels = {};
+  }
+}
+upsertConfig.run(
+  'virtual_models',
+  JSON.stringify({ ...OMR_CONFIG.virtual_models, ...existingVirtualModels })
+);
+
+// 5.1 写运行时真正读取的 default 快照。
+// loadAppConfig() 读取 app_config.default；上面的命名空间记录是 OMR
+// 安装元数据，不能替代运行时 AppConfig。保留用户已有 Providers，只
+// 增量更新/添加桃仙 baozi provider。
+const defaultRow = db.prepare("SELECT value_json FROM app_config WHERE key='default'").get();
+let defaultConfig = {};
+if (defaultRow?.value_json) {
+  try { defaultConfig = JSON.parse(defaultRow.value_json); } catch { defaultConfig = {}; }
+}
+const providerModels = ['MiniMax-M3', 'claude-sonnet-4-5', 'kimi-k2.6', 'kimi-k2.7-code', 'deepseek-v3', 'qwen3-max', 'glm-4.6'];
+const existingProviders = Array.isArray(defaultConfig.Providers) ? defaultConfig.Providers : [];
+const existingBaoziProvider = existingProviders.find((provider) => provider && provider.name === 'baozi') || {};
+const incomingBaoziKey = process.env.BUTLER_BAOZI_KEY || '';
+const existingBaoziModels = Array.isArray(existingBaoziProvider.models)
+  ? existingBaoziProvider.models.filter((model) => typeof model === 'string' && model.trim())
+  : [];
+const existingBaoziKey = typeof existingBaoziProvider.apiKey === 'string' ? existingBaoziProvider.apiKey : '';
+const baoziProvider = {
+  ...existingBaoziProvider,
+  name: 'baozi',
+  // Taoxian aliases always route to Baozi, even when its key is a placeholder.
+  enabled: true,
+  // 重配时如果没给真 key，不要用空串/fake 覆盖现有 key，否则模型立即失效。
+  baseUrl: process.env.BAOZI_API_BASE || existingBaoziProvider.baseUrl || 'https://llm.ohoooho.com/v1',
+  apiKey: isPlaceholderSecret(incomingBaoziKey) && existingBaoziKey ? existingBaoziKey : incomingBaoziKey,
+  // 保留用户手写的模型，并补上安装器默认模型；不要整表覆盖。
+  models: Array.from(new Set([...existingBaoziModels, ...providerModels])),
+};
+const otherProviders = existingProviders.filter((provider) => provider && provider.name !== 'baozi');
+// 对客户端只暴露虚拟别名：启用 baozi，隐藏 tai。
+const managedProviders = applyManagedProviderVisibility([baoziProvider, ...otherProviders]);
+const router = defaultConfig.Router && typeof defaultConfig.Router === 'object' ? defaultConfig.Router : {};
+const fallback = router.fallback && typeof router.fallback === 'object' ? router.fallback : {};
+const fallbackModels = Array.isArray(fallback.models)
+  ? fallback.models.filter((model) => typeof model === 'string' && model.trim())
+  : [];
+
+// Runtime virtual models are read from default.virtualModelProfiles, not from
+// the legacy app_config.virtual_models metadata. Build profiles for the four
+// Taoxian scenes and give each a concrete fixed Baozi base model. Existing
+// profiles win; we only fill missing ids/baseModel and repair non-Baozi routes.
+const { profiles: existingProfiles } = mergeVirtualModelProfiles({
+  ...defaultConfig,
+  Providers: managedProviders,
+}, OMR_CONFIG.virtual_models);
+
+upsertConfig.run('default', JSON.stringify({
+  ...defaultConfig,
+  Providers: managedProviders,
+  virtualModelProfiles: existingProfiles,
+  preferredProvider: defaultConfig.preferredProvider || 'baozi',
+  Router: {
+    ...router,
+    fallback: {
+      ...fallback,
+      models: fallbackModels.length > 0 ? fallbackModels : ['baozi/MiniMax-M3'],
+    },
+  },
+  gateway: {
+    ...(defaultConfig.gateway || {}),
+    host: process.env.OMR_GATEWAY_HOST || defaultConfig.gateway?.host || '127.0.0.1',
+    port: parseInt(process.env.OMR_GATEWAY_PORT || defaultConfig.gateway?.port || '3456', 10),
+  },
+}));
+
+// 6. 写 api_keys: 加密存 (OMR fork 默认用 'plain', 失职 232 立刻修: 真加密用 libsodium)
+// 只在新行写入默认 limits；已有行的 limits_json 保持不动，避免安装器覆盖用户配置。
+const upsertApiKey = db.prepare(`
+  INSERT INTO api_keys (id, name, encrypted_key, encryption, created_at, expires_at, limits_json)
+  VALUES (?, ?, ?, ?, datetime('now'), ?, ?)
+  ON CONFLICT(id) DO UPDATE SET
+    encrypted_key=CASE
+      WHEN excluded.encrypted_key = ''
+        OR excluded.encrypted_key = '***'
+        OR excluded.encrypted_key GLOB 'fake_*'
+        OR excluded.encrypted_key GLOB '<*>'
+        OR instr(excluded.encrypted_key, '{{') > 0
+      THEN api_keys.encrypted_key
+      ELSE excluded.encrypted_key
+    END,
+    encryption=CASE
+      WHEN excluded.encrypted_key = ''
+        OR excluded.encrypted_key = '***'
+        OR excluded.encrypted_key GLOB 'fake_*'
+        OR excluded.encrypted_key GLOB '<*>'
+        OR instr(excluded.encrypted_key, '{{') > 0
+      THEN api_keys.encryption
+      ELSE excluded.encryption
+    END,
+    expires_at=CASE
+      WHEN excluded.encrypted_key = ''
+        OR excluded.encrypted_key = '***'
+        OR excluded.encrypted_key GLOB 'fake_*'
+        OR excluded.encrypted_key GLOB '<*>'
+        OR instr(excluded.encrypted_key, '{{') > 0
+      THEN api_keys.expires_at
+      ELSE excluded.expires_at
+    END
+`);
+
+// 一次性清理旧安装器在 2026-09-20 写死的垃圾限流值。
+// 60/100000、30/50000 不是产品默认值，只是当时的错误种子；
+// 清理后不再写入任何默认 rpm/tpm。用户要限流，自己在 UI 里设。
+//
+// 关键：用 config_schema_migrations 标记只跑一次。否则每次 configure
+// 都会重新检查，用户后来显式设置的 60/100000 也会被再次清掉。
+const limitsSeedCleanupMigrationId = 'limits-seed-cleanup-v1';
+const limitsCleanupApplied = db.prepare(
+  'SELECT 1 FROM config_schema_migrations WHERE id = ?'
+).get(limitsSeedCleanupMigrationId);
+
+if (!limitsCleanupApplied) {
+  const legacySeededLimits = {
+    'baozi-persona': { rpm: 60, tpm: 100000 },
+    'baozi-butler': { rpm: 30, tpm: 50000 },
+    'baozi-chat-auto': { rpm: 60, tpm: 100000 },
+    'baozi-coding-auto': { rpm: 60, tpm: 100000 },
+    'baozi-assist-auto': { rpm: 60, tpm: 100000 },
+    'baozi-team-auto': { rpm: 60, tpm: 100000 },
+  };
+  const selectLimits = db.prepare('SELECT limits_json FROM api_keys WHERE id = ?');
+  const updateLimits = db.prepare('UPDATE api_keys SET limits_json = ? WHERE id = ?');
+
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    for (const [id, seed] of Object.entries(legacySeededLimits)) {
+      const row = selectLimits.get(id);
+      if (!row) continue;
+      let limits;
+      try {
+        limits = JSON.parse(row.limits_json || '{}');
+      } catch {
+        continue;
+      }
+      if (!limits || typeof limits !== 'object' || Array.isArray(limits)) continue;
+      if (limits.rpm !== seed.rpm || limits.tpm !== seed.tpm) continue;
+      delete limits.rpm;
+      delete limits.tpm;
+      updateLimits.run(JSON.stringify(limits), id);
+      console.log(`  🔧 清理旧限流种子: ${id}`);
+    }
+    db.prepare(`
+      INSERT INTO config_schema_migrations (id, applied_at, details_json)
+      VALUES (?, datetime('now'), ?)
+      ON CONFLICT(id) DO NOTHING
+    `).run(limitsSeedCleanupMigrationId, JSON.stringify({
+      applied_by: 'omr-installer',
+      reason: 'remove legacy seeded rpm/tpm; no default limits are written',
+    }));
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+}
+
+// 双 baozi_key (老板 17:42 lockin)
+// 不再写任何 rpm/tpm：这两个值原本是 2026-09-20 一次性拍下的默认值，
+// 没有对照上游配额；网关只听 127.0.0.1，真正的额度由上游 provider 管。
+// 限流只在用户自己在 UI 里给某把 key 显式配置时才生效。
+upsertApiKey.run(
+  'baozi-persona',
+  'Baozi Persona Agent Key (分身调用)',
+  PERSONA_BAOZI_KEY,
+  process.env.BAOZI_ENCRYPTION || 'plain',
+  process.env.BAOZI_PERSONA_EXPIRES || '',
+  JSON.stringify({})
+);
+upsertApiKey.run(
+  'baozi-butler',
+  'Baozi Butler Key (大管家调用)',
+  BUTLER_BAOZI_KEY,
+  process.env.BAOZI_ENCRYPTION || 'plain',
+  process.env.BAOZI_BUTLER_EXPIRES || '',
+  JSON.stringify({})
+);
+// 4 场景 baozi_key (K-261 锁点) — 写入 api_keys 表
+// scene/fake 只是给库和 UI 看的元数据，不参与限流。
+for (const [scene, key] of Object.entries(SCENE_KEYS)) {
+  const isFake = key.indexOf('fake_') === 0;
+  upsertApiKey.run(
+    'baozi-' + scene,
+    'Baozi Scene Key (' + scene + ')' + (isFake ? ' [FAKE placeholder]' : ''),
+    key,
+    'plain',
+    '',
+    JSON.stringify({ scene: scene, fake: isFake })
+  );
+}
+
+// 老单 baozi_key (向后兼容, 指向 butler)
+upsertApiKey.run(
+  'baozi',
+  'Baozi (legacy single key, alias for butler)',
+  BUTLER_BAOZI_KEY,
+  'plain',
+  '',
+  '{}'
+);
+
+// admin api_key (OMR admin endpoint 用)
+if (ADMIN_KEY) {
+  upsertApiKey.run(
+    'local-gateway',
+    'Local Gateway (admin)',
+    ADMIN_KEY,
+    'plain',
+    '',
+    '{}'
+  );
+}
+
+// 7. 写 runtime_state: Web UI 临时 token (热状态)
+const upsertRuntime = db.prepare(`
+  INSERT INTO runtime_state (key, value_json, updated_at)
+  VALUES (?, ?, datetime('now'))
+  ON CONFLICT(key) DO UPDATE SET
+    value_json=excluded.value_json,
+    updated_at=datetime('now')
+`);
+
+upsertRuntime.run('web_ui_token', JSON.stringify({
+  // 启动时 ccr serve 会重新生成, 这里只是占位
+  placeholder: true,
+  regenerated_at_runtime: true,
+}));
+
+// 8. 写 config_schema_migrations: 当前 schema 版本
+const upsertMigration = db.prepare(`
+  INSERT INTO config_schema_migrations (id, applied_at, details_json)
+  VALUES (?, datetime('now'), ?)
+  ON CONFLICT(id) DO UPDATE SET
+    applied_at=datetime('now'),
+    details_json=excluded.details_json
+`);
+
+upsertMigration.run('v6-tables-omr-brand', JSON.stringify({
+  applied_by: 'omr-installer',
+  applied_at_iso: new Date().toISOString(),
+  tables: ['app_config', 'api_keys', 'runtime_state', 'config_schema_migrations', 'legacy_storage_backups', 'legacy_storage_cleanup'],
+  paths: { data_dir: OMR_DATA_DIR, db: CONFIG_DB },
+  notes: 'OMR fork 真 6 表 schema (失职 242 闭环) + 路径品牌化 ~/.omr (失职 243)',
+}));
+
+// 9. 写 license (如果存在, 存到 app_config 而不是单独的 License 表)
+if (LICENSE_JSON) {
+  try {
+    const lic = JSON.parse(LICENSE_JSON);
+    upsertConfig.run('license', JSON.stringify({
+      verified_at: new Date().toISOString(),
+      valid: !!lic,
+      content: lic,
+    }));
+  } catch (e) {
+    upsertConfig.run('license', JSON.stringify({
+      verified_at: new Date().toISOString(),
+      valid: false,
+      error: e.message,
+      raw: LICENSE_JSON.substring(0, 256),
+    }));
+  }
+}
+
+// 10. 收尾 + chmod
+db.close();
+fs.chmodSync(CONFIG_DB, 0o600);
+
+console.log('  ✅ config.sqlite 写入完成 (6 表 OMR fork schema)');
+console.log(`  📁 数据目录: ${OMR_DATA_DIR}`);
+console.log(`  📁 db 文件:   ${CONFIG_DB}`);
+console.log(`  🔑 api_keys:  3 个 (baozi-persona + baozi-butler + legacy baozi)`);
+if (ADMIN_KEY) console.log(`  🔑 admin_key: 长度 ${ADMIN_KEY.length}`);
+console.log(`  📋 app_config: omr/gateway/baozi/virtual_models/license (按存在)`);
+console.log(`  📋 runtime_state: web_ui_token (regenerated_at_runtime=true)`);
+console.log(`  📋 migrations: v6-tables-omr-brand`);

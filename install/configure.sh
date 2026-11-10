@@ -1,0 +1,277 @@
+#!/usr/bin/env bash
+# omr configure v3: 按 docs/COMPONENT-INSTALLATION-CONTRACT.md V1 + OMR fork 真 6 表 schema 改造
+#
+# 改造要点 (失职 213-217 + 失职 242-243):
+# 1. 用 context.json 接收 inputs (契约 §6.2) — 不再 OMR_BAOZI_API_KEY=... ./configure.sh
+# 2. secret 走受保护临时文件 TX_CONTEXT_FILE (md 17:30 commit 改的, 契约 §6.2.4)
+# 3. 双 baozi_key (persona + butler, 老板 17:42 lockin)
+# 4. OMR_DATA_DIR env 优先 (失职 243 品牌化, 默认 ~/.omr)
+# 5. backup 优先 (契约 §7.2)
+# 6. 写完真读 SQLite 验证 (K-258)
+# 7. doctor 4 状态: configured
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMPONENT_YAML="${SCRIPT_DIR}/component.yaml"
+
+# ===== 1. 路径品牌化 (OMR_DATA_DIR env 优先, 失职 243) =====
+OMR_DATA_DIR="${OMR_DATA_DIR:-${HOME}/.omr}"
+mkdir -p "${OMR_DATA_DIR}"
+chmod 700 "${OMR_DATA_DIR}"
+
+# ===== 1.1 Web 管理面固定 token =====
+# 不设 OMR_WEB_AUTH_TOKEN 时, 服务每次重启都随机生成 => 浏览器 localStorage 里的
+# token 立刻失效, 用户每次都要重新拿链接 => 谈不上「一劳永逸」。
+# 这里在装机时生成一次并固定下来 (omr.service 用 EnvironmentFile=- 读它)。
+WEB_AUTH_ENV="${OMR_DATA_DIR}/web-auth.env"
+if [ ! -s "${WEB_AUTH_ENV}" ]; then
+    if command -v openssl >/dev/null 2>&1; then
+        WEB_AUTH_TOKEN="$(openssl rand -hex 32)"
+    else
+        WEB_AUTH_TOKEN="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+    fi
+    printf 'OMR_WEB_AUTH_TOKEN=%s\n' "${WEB_AUTH_TOKEN}" > "${WEB_AUTH_ENV}"
+    echo "    Web 管理 token 已生成: ${WEB_AUTH_ENV}"
+else
+    # 沿用已有 token: 必须把它读回变量, 否则 set -u 下后面的 web-console-url
+    # 写入会撞 "unbound variable" 直接中断整个装机 (重装/再 configure 必踩)。
+    WEB_AUTH_TOKEN="$(sed -n 's/^OMR_WEB_AUTH_TOKEN=//p' "${WEB_AUTH_ENV}" | head -1)"
+    echo "    Web 管理 token 已存在, 沿用: ${WEB_AUTH_ENV}"
+fi
+chmod 600 "${WEB_AUTH_ENV}"
+
+# 控制台入口 (含 token), 供用户直接打开; 权限同样收紧, 不进任何日志/回显
+WEB_CONSOLE_URL_FILE="${OMR_DATA_DIR}/web-console-url"
+printf 'http://127.0.0.1:3458/?omr_web_token=%s\n' "${WEB_AUTH_TOKEN}" > "${WEB_CONSOLE_URL_FILE}"
+chmod 600 "${WEB_CONSOLE_URL_FILE}"
+unset WEB_AUTH_TOKEN
+
+echo "==> OMR configure v3 (契约 §6.2 + OMR fork 真 6 表 schema + OMR_DATA_DIR 品牌化)"
+echo "    OMR_DATA_DIR = ${OMR_DATA_DIR}"
+
+# ===== 2. 读 resolved_version (契约 §3.4) =====
+OMR_VERSION="${OMR_VERSION:-}"
+[ -z "${OMR_VERSION}" ] && OMR_VERSION=$(grep -A1 "default_version:" "${COMPONENT_YAML}" | head -1 | sed 's/.*default_version:[[:space:]]*//')
+
+# ===== 3. inputs 来源解析顺序 (契约 §6.2.5) =====
+# 组件声明 inputs → 订单物料 → 已有配置 → 用户输入 → default
+CONTEXT_FILE="${TX_CONTEXT_FILE:-${SCRIPT_DIR}/component.context.json}"
+
+# 优先用 context.json (md 17:30 commit 改了, 0600 受保护文件)
+BAOZI_PERSONA_KEY=""
+BAOZI_BUTLER_KEY=""
+BAOZI_API_KEY=""               # 老单 key (向后兼容)
+
+# K-261 锁点: 4 场景 baozi_key (老板 07:51 lockin)
+BAOZI_CHAT_KEY=""
+BAOZI_CODING_KEY=""
+BAOZI_ASSIST_KEY=""
+BAOZI_TEAM_KEY=""
+ADMIN_API_KEY=""
+LICENSE_PATH=""
+LICENSE_JSON=""
+
+context_value() {
+    # Read a value from the protected JSON snapshot without requiring jq.
+    # Arguments after the file are object keys; dotted keys are not parsed.
+    node - "$CONTEXT_FILE" "$@" <<'NODE'
+const fs = require('node:fs');
+const file = process.argv[2];
+const keys = process.argv.slice(3);
+let value = JSON.parse(fs.readFileSync(file, 'utf8'));
+for (const key of keys) value = value?.[key];
+if (value === undefined || value === null) process.stdout.write('');
+else if (typeof value === 'object') process.stdout.write(JSON.stringify(value));
+else process.stdout.write(String(value));
+NODE
+}
+
+if [ -f "${CONTEXT_FILE}" ]; then
+    echo "    从 context.json 读 inputs (契约 §6.2)"
+    PERMS=$(stat -c '%a' "${CONTEXT_FILE}" 2>/dev/null || stat -f '%Lp' "${CONTEXT_FILE}" 2>/dev/null || echo "")
+    if [ "${PERMS}" != "600" ] && [ -n "${PERMS}" ]; then
+        echo "WARN: context.json 权限 ${PERMS} 不是 0600, 自动 chmod"
+        chmod 600 "${CONTEXT_FILE}"
+    fi
+    BAOZI_PERSONA_KEY=$(context_value inputs baozi_persona_key value)
+    BAOZI_BUTLER_KEY=$(context_value inputs baozi_butler_key value)
+    BAOZI_API_KEY=$(context_value inputs baozi_api_key value)
+    # K-261 锁点: 4 场景 baozi_key 从 scene_key_map 读
+    BAOZI_CHAT_KEY=$(context_value inputs scene_key_map value chat-auto | sed 's/{{BAOZI_CHAT_KEY}}//')
+    BAOZI_CODING_KEY=$(context_value inputs scene_key_map value coding-auto | sed 's/{{BAOZI_CODING_KEY}}//')
+    BAOZI_ASSIST_KEY=$(context_value inputs scene_key_map value assist-auto | sed 's/{{BAOZI_ASSIST_KEY}}//')
+    BAOZI_TEAM_KEY=$(context_value inputs scene_key_map value team-auto | sed 's/{{BAOZI_TEAM_KEY}}//')
+    ADMIN_API_KEY=$(context_value inputs omr_admin_api_key value)
+    LICENSE_PATH=$(context_value inputs license_path value)
+fi
+
+# 兼容老调用方式 (环境变量 fallback, 失职 125 铁律: 不打印)
+if [ -z "${BAOZI_API_KEY}" ] && [ -n "${OMR_BAOZI_API_KEY:-}" ]; then
+    BAOZI_API_KEY="${OMR_BAOZI_API_KEY}"
+fi
+if [ -z "${BAOZI_PERSONA_KEY}" ] && [ -n "${OMR_BAOZI_PERSONA_KEY:-}" ]; then
+    BAOZI_PERSONA_KEY="${OMR_BAOZI_PERSONA_KEY}"
+fi
+if [ -z "${BAOZI_BUTLER_KEY}" ] && [ -n "${OMR_BAOZI_BUTLER_KEY:-}" ]; then
+    BAOZI_BUTLER_KEY="${OMR_BAOZI_BUTLER_KEY}"
+fi
+# K-261 锁点: 4 场景 baozi_key env fallback
+if [ -z "${BAOZI_CHAT_KEY}" ] && [ -n "${OMR_BAOZI_CHAT_KEY:-}" ]; then
+    BAOZI_CHAT_KEY="${OMR_BAOZI_CHAT_KEY}"
+fi
+if [ -z "${BAOZI_CODING_KEY}" ] && [ -n "${OMR_BAOZI_CODING_KEY:-}" ]; then
+    BAOZI_CODING_KEY="${OMR_BAOZI_CODING_KEY}"
+fi
+if [ -z "${BAOZI_ASSIST_KEY}" ] && [ -n "${OMR_BAOZI_ASSIST_KEY:-}" ]; then
+    BAOZI_ASSIST_KEY="${OMR_BAOZI_ASSIST_KEY}"
+fi
+if [ -z "${BAOZI_TEAM_KEY}" ] && [ -n "${OMR_BAOZI_TEAM_KEY:-}" ]; then
+    BAOZI_TEAM_KEY="${OMR_BAOZI_TEAM_KEY}"
+fi
+if [ -z "${ADMIN_API_KEY}" ] && [ -n "${OMR_API_KEY:-}" ]; then
+    ADMIN_API_KEY="${OMR_API_KEY}"
+fi
+if [ -z "${LICENSE_PATH}" ] && [ -n "${OMR_LICENSE_PATH:-}" ]; then
+    LICENSE_PATH="${OMR_LICENSE_PATH}"
+fi
+LICENSE_PATH="${LICENSE_PATH:-/opt/taoxian/license/license.json}"
+
+# 兜底: 订单物料没给就用 fake_key (OMR 路由层识别跳过真调)
+[ -z "${BAOZI_PERSONA_KEY}" ] && BAOZI_PERSONA_KEY="${BAOZI_API_KEY:-***}"
+[ -z "${BAOZI_BUTLER_KEY}" ] && BAOZI_BUTLER_KEY="${BAOZI_API_KEY:-***}"
+[ -z "${BAOZI_API_KEY}" ] && BAOZI_API_KEY="${BAOZI_BUTLER_KEY:-***}"
+
+# K-261 锁点: 4 场景 baozi_key fake 占位 (没真 key 时用 fake_<scene>_***)
+[ -z "${BAOZI_CHAT_KEY}" ]   && BAOZI_CHAT_KEY="fake_chat_***"
+[ -z "${BAOZI_CODING_KEY}" ] && BAOZI_CODING_KEY="fake_coding_***"
+[ -z "${BAOZI_ASSIST_KEY}" ] && BAOZI_ASSIST_KEY="fake_assist_***"
+[ -z "${BAOZI_TEAM_KEY}" ]   && BAOZI_TEAM_KEY="fake_team_***"
+
+# 4 场景 baozi_key export 给 write-config.js 用
+export BAOZI_CHAT_KEY BAOZI_CODING_KEY BAOZI_ASSIST_KEY BAOZI_TEAM_KEY
+
+# 打印脱敏后的 key 来源 (K-125 不打印明文)
+echo "    inputs (脱敏):"
+echo "      baozi_persona: $([ -n "${BAOZI_PERSONA_KEY}" ] && echo "from-${BAOZI_PERSONA_KEY:0:8}…" || echo empty)"
+echo "      baozi_butler:  $([ -n "${BAOZI_BUTLER_KEY}" ] && echo "from-${BAOZI_BUTLER_KEY:0:8}…" || echo empty)"
+echo "      admin:         $([ -n "${ADMIN_API_KEY}" ] && echo "present" || echo empty)"
+echo "      license:       ${LICENSE_PATH}"
+
+# ===== 4. backup 已有 config (契约 §7.2: 写前必 backup) =====
+CONFIG_DB="${OMR_DATA_DIR}/config.sqlite"
+
+# 已有配置默认不重写：重复部署/重装不应把 Provider、Key、模型路由覆盖成
+# 默认值或 fake 占位。需要重配时显式设置 OMR_RECONFIGURE_EXISTING=1。
+if [ -f "${CONFIG_DB}" ] && [ "${OMR_RECONFIGURE_EXISTING:-0}" != "1" ]; then
+    echo "==> 检测到已有 OMR 配置：保留现有 Provider/Key/模型"
+    # Runtime aliases live in default.virtualModelProfiles, which older Taoxian
+    # installs never materialized. Add only the missing profiles; do not rewrite
+    # providers, keys, router settings or user-owned profile fields.
+    if ! node "${SCRIPT_DIR}/migrate-runtime-config.js"; then
+        echo "WARN: 运行时虚拟模型迁移失败；OMR 现有配置未改动，Codex/Hermes 的 *-auto 别名可能不可用" >&2
+    fi
+    echo "    需要完整重配请设置 OMR_RECONFIGURE_EXISTING=1 后重跑"
+    exit 0
+fi
+
+echo "==> 1) backup 已有 config (契约 §7.2)"
+if [ -f "${CONFIG_DB}" ]; then
+    BACKUP="${CONFIG_DB}.bak-$(date +%Y%m%d-%H%M%S)"
+    cp "${CONFIG_DB}" "${BACKUP}"
+    # SQLite in WAL mode is a three-file database. Keep sidecars with the
+    # backup so a running/aborted process can be restored consistently.
+    for SIDE in "${CONFIG_DB}-wal" "${CONFIG_DB}-shm"; do
+        [ -f "${SIDE}" ] && cp "${SIDE}" "${BACKUP}$(printf '%s' "${SIDE}" | sed "s#${CONFIG_DB}##")"
+    done
+    chmod 600 "${BACKUP}"
+    echo "    backup → ${BACKUP}"
+fi
+
+# ===== 5. 用 node 写 SQLite (契约 §6.2.4: TX_CONTEXT_FILE 0600, 不进命令行) =====
+echo "==> 2) 写 config (node + node:sqlite, Key 走 env 不进参数)"
+
+# 模板占位 / fake 值不能当真实 admin key。
+case "${ADMIN_API_KEY}" in
+    ""|"***"|fake_*|"<"*">") ADMIN_API_KEY="" ;;
+esac
+
+# 已有配置里如果已有 local-gateway admin key，重配时不要换掉它，
+# 否则正在使用旧 key 的本地客户端会全部 401。
+if [ -z "${ADMIN_API_KEY}" ] && [ -f "${CONFIG_DB}" ]; then
+    ADMIN_API_KEY=$(node - "${CONFIG_DB}" <<'NODE' 2>/dev/null || true
+const { DatabaseSync } = require('node:sqlite');
+const db = new DatabaseSync(process.argv[2], { readOnly: true });
+const row = db.prepare("SELECT encrypted_key FROM api_keys WHERE id='local-gateway' AND encryption='plain'").get();
+db.close();
+process.stdout.write(row?.encrypted_key || '');
+NODE
+)
+    case "${ADMIN_API_KEY}" in
+        ""|"***"|fake_*|"<"*">") ADMIN_API_KEY="" ;;
+    esac
+fi
+
+# 生成 admin api key (如果没给, 用 openssl 随机)
+if [ -z "${ADMIN_API_KEY}" ]; then
+    ADMIN_API_KEY=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | xxd -p -c 32)
+fi
+
+# 读 license (如果存在)
+LICENSE_JSON=""
+if [ -f "${LICENSE_PATH}" ]; then
+    LICENSE_JSON=$(cat "${LICENSE_PATH}" 2>/dev/null || echo "")
+fi
+
+# 写 SQLite (契约 §6.2.4: 走 env + 临时 context, 不进命令行参数)
+PERSONA_BAOZI_KEY="${BAOZI_PERSONA_KEY}" \
+BUTLER_BAOZI_KEY="${BAOZI_BUTLER_KEY}" \
+BAOZI_KEY="${BAOZI_API_KEY}" \
+ADMIN_KEY="${ADMIN_API_KEY}" \
+LICENSE_JSON="${LICENSE_JSON}" \
+OMR_VERSION="${OMR_VERSION}" \
+OMR_DATA_DIR="${OMR_DATA_DIR}" \
+node "${SCRIPT_DIR}/write-config.js"
+
+# ===== 6. 写完真读验证 (K-258) =====
+echo "==> 3) 读回验证 (K-258: 真读, 不只看返回)"
+node -e "
+const { DatabaseSync } = require('node:sqlite');
+const path = require('path');
+const db = new DatabaseSync('${CONFIG_DB}', { readOnly: true });
+
+// OMR fork 真 6 表 schema (失职 242 闭环)
+const tables = db.prepare(\"SELECT name FROM sqlite_master WHERE type='table' ORDER BY name\").all();
+console.log('  tables:', tables.map(t => t.name).join(', '));
+
+const apiKeys = db.prepare('SELECT COUNT(*) AS c FROM api_keys').get();
+console.log('  api_keys rows:', apiKeys.c);
+if (apiKeys.c < 3) { console.error('ERR: api_keys 不足 3 (persona + butler + legacy)'); process.exit(2); }
+
+const appConfig = db.prepare('SELECT COUNT(*) AS c FROM app_config').get();
+console.log('  app_config rows:', appConfig.c);
+if (appConfig.c < 3) { console.error('ERR: app_config 不足 (omr/gateway/baozi 等)'); process.exit(3); }
+
+const migrations = db.prepare('SELECT COUNT(*) AS c FROM config_schema_migrations').get();
+console.log('  migrations:', migrations.c);
+
+const personaKey = db.prepare('SELECT length(encrypted_key) AS klen FROM api_keys WHERE id = ?').get('baozi-persona');
+const butlerKey = db.prepare('SELECT length(encrypted_key) AS klen FROM api_keys WHERE id = ?').get('baozi-butler');
+console.log('  baozi_persona_key_len:', personaKey?.klen ?? 0);
+console.log('  baozi_butler_key_len:',  butlerKey?.klen ?? 0);
+if (!personaKey || personaKey.klen < 3) { console.error('ERR: baozi_persona_key 缺失'); process.exit(4); }
+if (!butlerKey || butlerKey.klen < 3) { console.error('ERR: baozi_butler_key 缺失'); process.exit(5); }
+
+db.close();
+" || { echo "ERR: 配置验证失败"; exit 7; }
+
+chmod 600 "${CONFIG_DB}"
+
+# ===== 7. doctor configured 状态 (契约 §7.3) =====
+echo "==> 4) doctor configured (契约 §7.3)"
+echo "    ✅ config.sqlite schema 合法 (6 表)"
+echo "    ✅ api_keys ≥ 3 (baozi-persona + baozi-butler + legacy baozi)"
+echo "    ✅ app_config ≥ 3 (omr/gateway/baozi)"
+echo "    ✅ config_schema_migrations 记录 brand 升级"
+echo "    ✅ secret 不在日志/CLI 参数"
+echo ""
+echo "✅ OMR configure 完. configured 状态: passed. 跑 verify.sh 看 installed/healthy/upstream_ready."

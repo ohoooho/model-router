@@ -30,8 +30,8 @@ test("normalizeExternalHttpTarget accepts absolute http, https, and CCR plugin U
   assert.equal(normalizeExternalHttpTarget("about:blank"), undefined);
   assert.equal(normalizeExternalHttpTarget(" https://example.com/path?q=1 "), "https://example.com/path?q=1");
   assert.equal(normalizeExternalHttpTarget("http://localhost:3458/"), "http://localhost:3458/");
-  assert.throws(() => normalizeExternalHttpTarget("file:///etc/passwd"), /Only http, https, and CCR plugin URLs/);
-  assert.throws(() => normalizeExternalHttpTarget("javascript:alert(1)"), /Only http, https, and CCR plugin URLs/);
+  assert.throws(() => normalizeExternalHttpTarget("file:///etc/passwd"), /Only http, https, and OMR plugin URLs/);
+  assert.throws(() => normalizeExternalHttpTarget("javascript:alert(1)"), /Only http, https, and OMR plugin URLs/);
   assert.throws(() => normalizeExternalHttpTarget("example.com"), /valid absolute URL/);
 });
 
@@ -45,14 +45,14 @@ test("web RPC ignores Origin and Referer when the auth token is valid", async ()
     startGateway: false
   });
   try {
-    const endpoint = new URL("/api/ccr/rpc", runtime.url);
+    const endpoint = new URL("/api/omr/rpc", runtime.url);
     const response = await fetch(endpoint, {
       body: JSON.stringify({ args: [], method: "getAppInfo" }),
       headers: {
         "content-type": "application/json",
         "origin": "http://127.0.0.1:8000",
         "referer": "http://127.0.0.1:8000/",
-        "x-ccr-web-auth": authToken
+        "x-omr-web-auth": authToken
       },
       method: "POST"
     });
@@ -60,7 +60,7 @@ test("web RPC ignores Origin and Referer when the auth token is valid", async ()
 
     assert.equal(response.status, 200);
     assert.equal(payload.ok, true);
-    assert.equal(payload.value.name, "Claude Code Router");
+    assert.equal(payload.value.name, "OMR");
   } finally {
     await runtime.close();
   }

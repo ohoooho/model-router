@@ -855,7 +855,7 @@ async function resolveLocalEstimateConnector(
   return {
     errors: [],
     meters: meters.filter((meter): meter is ProviderAccountMeter => Boolean(meter)),
-    message: "Local estimate from CCR usage history.",
+    message: "Local estimate from OMR usage history.",
     source: "local-estimate"
   };
 }
@@ -1502,7 +1502,7 @@ async function localAgentProviderAccountCredential(
   if (isLocalCodexProvider(provider)) {
     return await localCodexAccountCredential({
       codexOauth: { refreshIfMissingAccessToken: true },
-      key: "ccr-local-agent-codex-fallback-codex-oauth",
+      key: "omr-local-agent-codex-fallback-codex-oauth",
       providerName: provider.name
     });
   }
@@ -1520,7 +1520,7 @@ function localAgentProviderPluginMatches(plugin: unknown, provider: GatewayProvi
     return false;
   }
   const key = readString(plugin.key)?.toLowerCase() ?? "";
-  if (!key.startsWith("ccr-local-agent-")) {
+  if (!key.startsWith("omr-local-agent-")) {
     return false;
   }
 
@@ -1584,7 +1584,7 @@ function zcodeProviderTextMatches(values: Array<string | undefined>): boolean {
     text.includes("z.ai") ||
     text.includes("bigmodel") ||
     text.includes("open.bigmodel.cn")
-  ) && !text.includes("claude-code-router");
+  ) && !text.includes("omr");
 }
 
 async function localCodexAccountCredential(plugin: Record<string, unknown>): Promise<LocalAgentAccountCredential> {

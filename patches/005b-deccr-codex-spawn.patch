@@ -1,0 +1,77 @@
+From acf6a6d592423e80d88663618e3ba45c77ce7b70 Mon Sep 17 00:00:00 2001
+From: AI Assistant <ai@openclaw.local>
+Date: Wed, 12 Aug 2026 10:15:34 +0800
+Subject: [PATCH 5/6] =?UTF-8?q?fix(omr/fork):=20OMR-FORK-CHANGE-005b=20?=
+ =?UTF-8?q?=E8=A1=A5=E6=BC=8F=209=20=E5=A4=84=20codex/zcode=20spawn=20env?=
+ =?UTF-8?q?=20=E6=AE=8B=E7=95=99?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+commit 97fe211 后 grep 又发现 9 处 app-launch.ts 里 CCR_ZCODE_* 和 CCR_CODEX_* spawn env 写路径漏改。补完。
+---
+ packages/core/src/agents/codex/app-launch.ts | 24 ++++++++++----------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
+
+diff --git a/packages/core/src/agents/codex/app-launch.ts b/packages/core/src/agents/codex/app-launch.ts
+index 14371dd..a17cfd7 100644
+--- a/packages/core/src/agents/codex/app-launch.ts
++++ b/packages/core/src/agents/codex/app-launch.ts
+@@ -412,11 +412,11 @@ function codexProfileEnv(profile: ProfileConfig, appExecutable: string, spec: Co
+   const remoteFrontendMode = normalizeCodexRemoteFrontendMode(profile.remoteFrontendMode);
+   if (spec.kind === "zcode") {
+     return {
+-      ...(profile.model.trim() ? { CCR_ZCODE_MODEL: profile.model.trim() } : {}),
+-      CCR_ZCODE_MODEL_PROVIDER: providerId,
+-      CCR_ZCODE_PROFILE: providerId,
+-      CCR_ZCODE_REMOTE_FRONTEND_MODE: remoteFrontendMode,
+-      CCR_REAL_ZCODE_CLI_PATH: realCliPath,
++      ...(profile.model.trim() ? { OMR_ZCODE_MODEL: profile.model.trim() } : {}),
++      OMR_ZCODE_MODEL_PROVIDER: providerId,
++      OMR_ZCODE_PROFILE: providerId,
++      OMR_ZCODE_REMOTE_FRONTEND_MODE: remoteFrontendMode,
++      OMR_REAL_ZCODE_CLI_PATH: realCliPath,
+       CODEXL_REAL_ZCODE_CLI_PATH: realCliPath,
+       CODEXL_ZCODE_CORE_MODE: remoteFrontendMode,
+       CODEXL_ZCODE_MODEL_PROVIDER: providerId,
+@@ -425,14 +425,14 @@ function codexProfileEnv(profile: ProfileConfig, appExecutable: string, spec: Co
+     };
+   }
+   return {
+-    ...(profile.model.trim() ? { CCR_CODEX_MODEL: profile.model.trim() } : {}),
++    ...(profile.model.trim() ? { OMR_CODEX_MODEL: profile.model.trim() } : {}),
+     ...(process.env.OMR_CODEX_CLI_MIDDLEWARE_LOG?.trim()
+-      ? { CCR_CODEX_CLI_MIDDLEWARE_LOG: process.env.OMR_CODEX_CLI_MIDDLEWARE_LOG.trim() }
++      ? { OMR_CODEX_CLI_MIDDLEWARE_LOG: process.env.OMR_CODEX_CLI_MIDDLEWARE_LOG.trim() }
+       : {}),
+     ...codexSharedChatGptAuthEnv(),
+-    CCR_CODEX_MODEL_PROVIDER: providerId,
+-    CCR_CODEX_PROFILE: providerId,
+-    CCR_CODEX_REMOTE_FRONTEND_MODE: remoteFrontendMode,
++    OMR_CODEX_MODEL_PROVIDER: providerId,
++    OMR_CODEX_PROFILE: providerId,
++    OMR_CODEX_REMOTE_FRONTEND_MODE: remoteFrontendMode,
+     CCR_BUNDLED_CODEX_CLI_PATH: realCliPath,
+     CCR_REAL_CODEX_CLI_PATH: realCliPath,
+     CODEXL_BUNDLED_CODEX_CLI_PATH: realCliPath,
+@@ -472,7 +472,7 @@ function codexAppAgentEnv(
+ ): Record<string, string> {
+   return spec.kind === "zcode"
+     ? {
+-        CCR_ZCODE_MODEL_CATALOG_FILE: modelCatalogFile,
++        OMR_ZCODE_MODEL_CATALOG_FILE: modelCatalogFile,
+         CODEXL_ZCODE_MODEL_CATALOG_FILE: modelCatalogFile,
+         ZCODE_CLI_PATH: launcher,
+         ZCODE_ELECTRON_USER_DATA_PATH: userDataDir,
+@@ -480,7 +480,7 @@ function codexAppAgentEnv(
+         ZCODE_STORAGE_DIR: home
+       }
+     : {
+-        CCR_CODEX_MODEL_CATALOG_FILE: modelCatalogFile,
++        OMR_CODEX_MODEL_CATALOG_FILE: modelCatalogFile,
+         CODEX_CLI_PATH: launcher,
+         CODEX_ELECTRON_USER_DATA_PATH: userDataDir,
+         CODEX_HOME: home,
+-- 
+2.53.0
+

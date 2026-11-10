@@ -205,8 +205,8 @@ async function handleJsonRpcRequest(payload: unknown): Promise<JsonRpcResponse |
           },
           protocolVersion,
           serverInfo: {
-            name: "ccr-fusion-builtins",
-            title: "CCR Fusion Builtins",
+            name: "omr-fusion-builtins",
+            title: "OMR Fusion Builtins",
             version: "1.0.0"
           }
         });
@@ -345,9 +345,9 @@ function scheduleVisionUsageSync(input: {
   response?: Response;
   statusCode?: number;
 }): void {
-  const endpoint = env("CCR_FUSION_USAGE_SYNC_ENDPOINT");
-  const header = env("CCR_FUSION_USAGE_SYNC_HEADER");
-  const token = env("CCR_FUSION_USAGE_SYNC_TOKEN");
+  const endpoint = env("OMR_FUSION_USAGE_SYNC_ENDPOINT");
+  const header = env("OMR_FUSION_USAGE_SYNC_HEADER");
+  const token = env("OMR_FUSION_USAGE_SYNC_TOKEN");
   if (!endpoint || !header || !token) {
     return;
   }

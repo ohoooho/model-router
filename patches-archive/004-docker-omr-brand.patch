@@ -1,0 +1,74 @@
+From 98b896c6dbae9a77b3210cf04741be49ee8aec05 Mon Sep 17 00:00:00 2001
+From: AI Assistant <ai@openclaw.local>
+Date: Mon, 10 Aug 2026 13:33:06 +0800
+Subject: [PATCH 4/7] =?UTF-8?q?chore:=20docker-compose.yml=20+=20scripts?=
+ =?UTF-8?q?=20=E5=93=81=E7=89=8C=20OMR=20=E5=8C=96?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+桃仙 fork OMR 改造续作（commit 4560c6c 基础上）：
+
+docker-compose.yml:
+- services.ccr → services.omr
+- image: claude-code-router:local → ohoooho-model-router:local
+- volume: ccr-data → omr-data
+
+package.json scripts:
+- docker:build 标签 claude-code-router:local → ohoooho-model-router:local
+- docker:run 卷名 ccr-data → omr-data
+
+⚠️ 仍未动（影响 fork 内部代码，需重 build）：
+- Dockerfile ENV CCR_* 内置环境变量（fork cli.js 读取）
+- workspaces 命名 @claude-code-router/core 等（npm 内部）
+- docs/ 目录（上游 astro docs 站源码）
+- dist/renderer 渲染产物（编译后）
+
+本次仅改用户/docker 部署层可见的命名空间。
+---
+ docker-compose.yml | 8 ++++----
+ package.json       | 4 ++--
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/docker-compose.yml b/docker-compose.yml
+index d4a0916..8117888 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -1,15 +1,15 @@
+ services:
+-  ccr:
++  omr:
+     build:
+       context: .
+       dockerfile: Dockerfile
+-    image: claude-code-router:local
++    image: ohoooho-model-router:local
+     ports:
+       # Publish only Nginx. Internal web/gateway listeners stay inside the container.
+       - "3458:8080"
+     volumes:
+-      - ccr-data:/data
++      - omr-data:/data
+     restart: unless-stopped
+ 
+ volumes:
+-  ccr-data:
++  omr-data:
+diff --git a/package.json b/package.json
+index ade2732..f2f1287 100644
+--- a/package.json
++++ b/package.json
+@@ -52,8 +52,8 @@
+     "bench:context-archive-agent": "node benchmarks/run-context-archive-real-agent-benchmark.mjs",
+     "bench:context-archive-real": "node benchmarks/run-context-archive-real-agent-benchmark.mjs",
+     "bench:claude-compact-real": "node benchmarks/claude-code-real-compact.mjs",
+-    "docker:build": "docker build -t claude-code-router:local .",
+-    "docker:run": "docker run --rm -p 3458:8080 -v ccr-data:/data claude-code-router:local",
++    "docker:build": "docker build -t ohoooho-model-router:local .",
++    "docker:run": "docker run --rm -p 3458:8080 -v omr-data:/data ohoooho-model-router:local",
+     "test": "npm run test:packages && npm run test:architecture",
+     "test:packages": "npm run test --workspaces --if-present",
+     "test:core": "npm test -w @claude-code-router/core",
+-- 
+2.53.0
+

@@ -1,0 +1,232 @@
+From 4749c5e42199acca3130042cf255e3841b4054ed Mon Sep 17 00:00:00 2001
+From: AI Assistant <ai@openclaw.local>
+Date: Mon, 10 Aug 2026 15:03:46 +0800
+Subject: [PATCH 5/7] =?UTF-8?q?feat(omr):=20=E5=85=A8=E9=83=A8=20API=20key?=
+ =?UTF-8?q?=20=E5=89=8D=E7=BC=80=20ccr-=20=E2=86=92=20omr-=EF=BC=88?=
+ =?UTF-8?q?=E7=94=A8=E6=88=B7=E6=8B=8D=E6=9D=BF=202026-08-10=2014:56?=
+ =?UTF-8?q?=EF=BC=89?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+用户要求：'omr的key前缀都改掉，不要ccr'
+
+改动（key 前缀相关，用户可见）：
+- profiles/api-key.ts: generateProfileApiKey ccr-profile- → omr-profile-
+- profiles/service.ts: fallbackClientToken ccr-local → omr-local
+- config/config.ts: local-gateway key sk-ccr- → sk-omr-
+- 7 个文件 oauth/local-agent key 前缀 ccr-local-agent- → omr-local-agent-
+  (oauth-plugin.ts / account-service.ts / media/models.ts /
+   gateway/core-runtime/config-compiler.ts / agents/local-providers/{shared,opencode,codex}.ts)
+
+未动（fork 内部文件名，不是 key，用户不感知）：
+- ccr-claude-code-wrapper-* / ccr-codex-cli-* / ccr-model-catalog.json 等
+- MCP server name ccr-toolhub / ccr-browser-automation
+- 临时文件前缀 ccr-request-logs- / ccr-media- 等
+
+部署验证（peach-1 已生效）：
+- 全局包 cli.js 已更新（build:assets 产物覆盖）
+- SQLite api_keys 7 行全部 omr- 前缀，0 残留 ccr-
+- OpenClaw / CC / Codex 配置同步
+- 重启 OMR 后 HTTP 200，33 model
+- CC/Codex/CC-client profile key 全部验证通过
+---
+ packages/core/src/agents/local-providers/codex.ts         | 2 +-
+ packages/core/src/agents/local-providers/opencode.ts      | 2 +-
+ packages/core/src/agents/local-providers/shared.ts        | 6 +++---
+ packages/core/src/config/config.ts                        | 2 +-
+ packages/core/src/gateway/core-runtime/config-compiler.ts | 8 ++++----
+ packages/core/src/media/models.ts                         | 2 +-
+ packages/core/src/profiles/api-key.ts                     | 2 +-
+ packages/core/src/profiles/service.ts                     | 2 +-
+ packages/core/src/providers/account-service.ts            | 4 ++--
+ packages/core/src/providers/oauth-plugin.ts               | 2 +-
+ 10 files changed, 16 insertions(+), 16 deletions(-)
+
+diff --git a/packages/core/src/agents/local-providers/codex.ts b/packages/core/src/agents/local-providers/codex.ts
+index 7e61064..fdcadae 100644
+--- a/packages/core/src/agents/local-providers/codex.ts
++++ b/packages/core/src/agents/local-providers/codex.ts
+@@ -606,7 +606,7 @@ function providerApiKey(provider: GatewayProviderConfig): string {
+ 
+ function codexOauthPlugin(suffix: string, providerName = providerNamePlaceholder): Record<string, unknown> {
+   return {
+-    key: `ccr-local-agent-${providerNameSlugPlaceholder}-${suffix}`,
++    key: `omr-local-agent-${providerNameSlugPlaceholder}-${suffix}`,
+     providerName,
+     request: codexBackendRequestTransform()
+   };
+diff --git a/packages/core/src/agents/local-providers/opencode.ts b/packages/core/src/agents/local-providers/opencode.ts
+index 9249423..2af8b08 100644
+--- a/packages/core/src/agents/local-providers/opencode.ts
++++ b/packages/core/src/agents/local-providers/opencode.ts
+@@ -214,7 +214,7 @@ function openCodeAuthPlugin(
+         removeHeaders: ["authorization", "x-api-key"],
+         strict: true
+       },
+-      key: `ccr-local-agent-${providerNameSlugPlaceholder}-${suffix}`,
++      key: `omr-local-agent-${providerNameSlugPlaceholder}-${suffix}`,
+       providerName
+     };
+   }
+diff --git a/packages/core/src/agents/local-providers/shared.ts b/packages/core/src/agents/local-providers/shared.ts
+index 75ad949..c109372 100644
+--- a/packages/core/src/agents/local-providers/shared.ts
++++ b/packages/core/src/agents/local-providers/shared.ts
+@@ -24,7 +24,7 @@ export type ApiTokenSet = {
+ export const providerNamePlaceholder = "__CCR_PROVIDER_NAME__";
+ export const providerNameSlugPlaceholder = "__CCR_PROVIDER_NAME_SLUG__";
+ export const providerInternalNamePlaceholder = "__CCR_PROVIDER_INTERNAL_NAME__";
+-export const localAgentProviderApiKey = "ccr-local-agent-login";
++export const localAgentProviderApiKey = "omr-local-agent-login";
+ 
+ export function missingCandidate(
+   kind: LocalAgentProviderKind,
+@@ -103,7 +103,7 @@ export function bearerAuthPlugin(
+       removeHeaders: ["x-api-key"],
+       strict: true
+     },
+-    key: `ccr-local-agent-${providerNameSlugPlaceholder}-${suffix}`,
++    key: `omr-local-agent-${providerNameSlugPlaceholder}-${suffix}`,
+     providerName
+   };
+ }
+@@ -121,7 +121,7 @@ export function apiKeyAuthPlugin(
+       removeHeaders: ["authorization"],
+       strict: true
+     },
+-    key: `ccr-local-agent-${providerNameSlugPlaceholder}-${suffix}`,
++    key: `omr-local-agent-${providerNameSlugPlaceholder}-${suffix}`,
+     providerName
+   };
+ }
+diff --git a/packages/core/src/config/config.ts b/packages/core/src/config/config.ts
+index d92d021..cc9e29e 100644
+--- a/packages/core/src/config/config.ts
++++ b/packages/core/src/config/config.ts
+@@ -3947,7 +3947,7 @@ function createGeneratedGatewayApiKey(): ApiKeyConfig {
+   return {
+     createdAt: new Date().toISOString(),
+     id: GENERATED_GATEWAY_API_KEY_ID,
+-    key: `sk-ccr-${randomBytes(32).toString("base64url")}`,
++    key: `sk-omr-${randomBytes(32).toString("base64url")}`,
+     name: "Local Gateway"
+   };
+ }
+diff --git a/packages/core/src/gateway/core-runtime/config-compiler.ts b/packages/core/src/gateway/core-runtime/config-compiler.ts
+index b2c2ca7..0086d10 100644
+--- a/packages/core/src/gateway/core-runtime/config-compiler.ts
++++ b/packages/core/src/gateway/core-runtime/config-compiler.ts
+@@ -229,7 +229,7 @@ function withMissingCodexOauthProviderPlugins(
+       continue;
+     }
+ 
+-    const keyPrefix = `ccr-local-agent-${providerNameSlug(runtimeName)}`;
++    const keyPrefix = `omr-local-agent-${providerNameSlug(runtimeName)}`;
+     additions.push({
+       codexOauth: {
+         accessToken: codexAuth.accessToken,
+@@ -646,7 +646,7 @@ function isLocalCodexOauthProviderPlugin(value: unknown): value is Record<string
+     return false;
+   }
+   const key = stringValue(value.key)?.toLowerCase() ?? "";
+-  return key.startsWith("ccr-local-agent-") && key.includes("codex-oauth");
++  return key.startsWith("omr-local-agent-") && key.includes("codex-oauth");
+ }
+ 
+ 
+@@ -752,7 +752,7 @@ function isLocalGrokOauthProviderPlugin(value: unknown): value is Record<string,
+     return false;
+   }
+   const key = stringValue(value.key)?.toLowerCase() ?? "";
+-  return key.startsWith("ccr-local-agent-") && key.includes("grok-cli-oauth");
++  return key.startsWith("omr-local-agent-") && key.includes("grok-cli-oauth");
+ }
+ 
+ 
+@@ -761,7 +761,7 @@ function isLocalKimiOauthProviderPlugin(value: unknown): value is Record<string,
+     return false;
+   }
+   const key = stringValue(value.key)?.toLowerCase() ?? "";
+-  return key.startsWith("ccr-local-agent-") && key.includes("kimi-cli-oauth");
++  return key.startsWith("omr-local-agent-") && key.includes("kimi-cli-oauth");
+ }
+ 
+ 
+diff --git a/packages/core/src/media/models.ts b/packages/core/src/media/models.ts
+index bb377e3..7ab907a 100644
+--- a/packages/core/src/media/models.ts
++++ b/packages/core/src/media/models.ts
+@@ -6,7 +6,7 @@ import {
+ } from "@ccr/core/contracts/app";
+ import type { GatewayMediaProtocol, GatewayProviderConfig } from "@ccr/core/contracts/app";
+ 
+-const localAgentProviderApiKey = "ccr-local-agent-login";
++const localAgentProviderApiKey = "omr-local-agent-login";
+ 
+ export type GrokMediaKind = "image" | "video";
+ 
+diff --git a/packages/core/src/profiles/api-key.ts b/packages/core/src/profiles/api-key.ts
+index 5cfb826..4351376 100644
+--- a/packages/core/src/profiles/api-key.ts
++++ b/packages/core/src/profiles/api-key.ts
+@@ -99,7 +99,7 @@ export function profileApiKeyName(profile: ProfileApiKeySource): string {
+ }
+ 
+ export function generateProfileApiKey(): string {
+-  return `ccr-profile-${randomBase64Url(24)}`;
++  return `omr-profile-${randomBase64Url(24)}`;
+ }
+ 
+ function randomBase64Url(byteLength: number): string {
+diff --git a/packages/core/src/profiles/service.ts b/packages/core/src/profiles/service.ts
+index 0fd7434..33e9023 100644
+--- a/packages/core/src/profiles/service.ts
++++ b/packages/core/src/profiles/service.ts
+@@ -63,7 +63,7 @@ const managedConfiguredModelPrefix = "# CCR configured model = ";
+ const originalBackupSuffix = ".ccr-original";
+ const originalMissingSuffix = ".ccr-original-missing";
+ const globalProfileTakeoverFile = path.join(CONFIGDIR, "global-profile-takeover.json");
+-const fallbackClientToken = "ccr-local";
++const fallbackClientToken = "omr-local";
+ const privateDirMode = 0o700;
+ const privateExecutableMode = 0o700;
+ const privateFileMode = 0o600;
+diff --git a/packages/core/src/providers/account-service.ts b/packages/core/src/providers/account-service.ts
+index 10d682f..4054534 100644
+--- a/packages/core/src/providers/account-service.ts
++++ b/packages/core/src/providers/account-service.ts
+@@ -1406,7 +1406,7 @@ async function localAgentProviderAccountCredential(
+   if (isLocalCodexProvider(provider)) {
+     return await localCodexAccountCredential({
+       codexOauth: { refreshIfMissingAccessToken: true },
+-      key: "ccr-local-agent-codex-fallback-codex-oauth",
++      key: "omr-local-agent-codex-fallback-codex-oauth",
+       providerName: provider.name
+     });
+   }
+@@ -1424,7 +1424,7 @@ function localAgentProviderPluginMatches(plugin: unknown, provider: GatewayProvi
+     return false;
+   }
+   const key = readString(plugin.key)?.toLowerCase() ?? "";
+-  if (!key.startsWith("ccr-local-agent-")) {
++  if (!key.startsWith("omr-local-agent-")) {
+     return false;
+   }
+ 
+diff --git a/packages/core/src/providers/oauth-plugin.ts b/packages/core/src/providers/oauth-plugin.ts
+index 3720908..ad12d91 100644
+--- a/packages/core/src/providers/oauth-plugin.ts
++++ b/packages/core/src/providers/oauth-plugin.ts
+@@ -3,7 +3,7 @@ import { isRecord, stringValue } from "@ccr/core/gateway/internal/value";
+ export function isLocalClaudeCodeOauthProviderPlugin(value: unknown): value is Record<string, unknown> {
+   if (!isRecord(value)) return false;
+   const key = stringValue(value.key)?.toLowerCase() ?? "";
+-  return key.startsWith("ccr-local-agent-") && key.includes("claude-code-oauth");
++  return key.startsWith("omr-local-agent-") && key.includes("claude-code-oauth");
+ }
+ 
+ export function mergeAnthropicBetaValues(...values: Array<string | undefined>): string {
+-- 
+2.53.0
+

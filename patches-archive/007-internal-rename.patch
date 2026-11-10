@@ -1,0 +1,218 @@
+From 262981ec5c6e4c28d1719c8b1856a67a35fbaa29 Mon Sep 17 00:00:00 2001
+From: AI Assistant <ai@openclaw.local>
+Date: Tue, 11 Aug 2026 10:22:29 +0800
+Subject: [PATCH 7/7] =?UTF-8?q?feat(omr/fork):=20OMR-FORK-CHANGE-002=20ccr?=
+ =?UTF-8?q?-*=20=E2=86=92=20omr-*=20=E5=86=85=E9=83=A8=E5=91=BD=E5=90=8D?=
+ =?UTF-8?q?=E6=B8=85=E7=90=86=EF=BC=88CC=20=E7=BC=96=E7=A8=8B=E5=88=86?=
+ =?UTF-8?q?=E8=BA=AB=E6=89=A7=E8=A1=8C=EF=BC=89?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+范围（10 文件 16 处）：
+- ccr-local-profile → omr-local-profile（app-launch 1 + cli-middleware-runtime 3）
+- ccr-fusion-builtins → omr-fusion-builtins（fusion-vision-mcp 1 + contracts/app 1）
+- ccr-toolhub → omr-toolhub（toolhub-config 1 + toolhub-mcp 1）
+- ccrToolHubSystemInstructionMarker → omrToolHubSystemInstructionMarker + 'CCR ToolHub...' → 'OMR ToolHub...'（claude-code-router-plugin 4）
+- mcp__ccr-toolhub__ → mcp__omr-toolhub__（claude-code-router-plugin）
+- ccr-install-proxy-ca- → omr-install-proxy-ca-（proxy/service 1）
+- .ccr-inbox / .ccr-dead-letter → .omr-inbox / .omr-dead-letter（raw-trace-sync 2）
+- .ccr-plugin/plugin.json → .omr-plugin/plugin.json（management-server 1）
+
+外部契约零改动：HTTP x-ccr-* headers 0 处 / docker image / npm bin / deep link 全保留
+验证：build:assets 2041ms，cli.js 新命名 6 处旧 0，/v1/models 31 模型无前缀，omr-health ok
+
+执行：CC（claude --print MiniMax-M3）源码修改 + 我接管 build/deploy/验证/commit
+---
+ packages/core/src/agents/codex/app-launch.ts             | 2 +-
+ packages/core/src/agents/codex/cli-middleware-runtime.ts | 6 +++---
+ packages/core/src/contracts/app.ts                       | 2 +-
+ packages/core/src/gateway/claude-code-router-plugin.ts   | 8 ++++----
+ packages/core/src/mcp/fusion-vision-mcp.ts               | 2 +-
+ packages/core/src/mcp/toolhub-config.ts                  | 2 +-
+ packages/core/src/mcp/toolhub-mcp.ts                     | 2 +-
+ packages/core/src/observability/raw-trace-sync.ts        | 4 ++--
+ packages/core/src/proxy/service.ts                       | 2 +-
+ packages/core/src/web/management-server.ts               | 2 +-
+ 10 files changed, 16 insertions(+), 16 deletions(-)
+
+diff --git a/packages/core/src/agents/codex/app-launch.ts b/packages/core/src/agents/codex/app-launch.ts
+index 08b7d32..b71fdfb 100644
+--- a/packages/core/src/agents/codex/app-launch.ts
++++ b/packages/core/src/agents/codex/app-launch.ts
+@@ -334,7 +334,7 @@ export function removeLegacyCodexVirtualAuthMarker(codexHome: string): boolean {
+       keys[0] !== "OPENAI_API_KEY" ||
+       keys[1] !== "auth_mode" ||
+       value.auth_mode !== "apikey" ||
+-      value.OPENAI_API_KEY !== "ccr-local-profile"
++      value.OPENAI_API_KEY !== "omr-local-profile"
+     ) {
+       return false;
+     }
+diff --git a/packages/core/src/agents/codex/cli-middleware-runtime.ts b/packages/core/src/agents/codex/cli-middleware-runtime.ts
+index 209c473..56d6278 100644
+--- a/packages/core/src/agents/codex/cli-middleware-runtime.ts
++++ b/packages/core/src/agents/codex/cli-middleware-runtime.ts
+@@ -399,7 +399,7 @@ function createEphemeralCodexApiKeyBootstrap(runtimeAgent) {
+     fs.mkdirSync(path.dirname(authFile), { recursive: true, mode: 0o700 });
+     fs.writeFileSync(temporary, JSON.stringify({
+       auth_mode: "apikey",
+-      OPENAI_API_KEY: "ccr-local-profile"
++      OPENAI_API_KEY: "omr-local-profile"
+     }, null, 2) + "\n", { mode: 0o600 });
+     fs.renameSync(temporary, authFile);
+     active = true;
+@@ -426,7 +426,7 @@ function createEphemeralCodexApiKeyBootstrap(runtimeAgent) {
+         keys[0] === "OPENAI_API_KEY" &&
+         keys[1] === "auth_mode" &&
+         value.auth_mode === "apikey" &&
+-        value.OPENAI_API_KEY === "ccr-local-profile"
++        value.OPENAI_API_KEY === "omr-local-profile"
+       ) {
+         fs.unlinkSync(authFile);
+         active = false;
+@@ -4685,7 +4685,7 @@ function mockAccountRead() {
+ 
+ function mockAuthStatus(includeToken) {
+   const result = { authMethod: "amazonBedrock", authToken: null, requiresOpenaiAuth: false };
+-  if (includeToken) result.authToken = "ccr-local-profile";
++  if (includeToken) result.authToken = "omr-local-profile";
+   return result;
+ }
+ 
+diff --git a/packages/core/src/contracts/app.ts b/packages/core/src/contracts/app.ts
+index 129469d..93fbdc9 100644
+--- a/packages/core/src/contracts/app.ts
++++ b/packages/core/src/contracts/app.ts
+@@ -105,7 +105,7 @@ export type AppUpdateStatus = {
+   supported: boolean;
+ };
+ 
+-export const BUILTIN_FUSION_TOOL_SERVER_NAME = "ccr-fusion-builtins";
++export const BUILTIN_FUSION_TOOL_SERVER_NAME = "omr-fusion-builtins";
+ export const BUILTIN_FUSION_VISION_TOOL_NAME = "vision_understand";
+ export const BUILTIN_FUSION_WEB_SEARCH_TOOL_NAME = "web_search";
+ export const BUILTIN_FUSION_IMAGE_GENERATION_TOOL_NAME = "image_generation";
+diff --git a/packages/core/src/gateway/claude-code-router-plugin.ts b/packages/core/src/gateway/claude-code-router-plugin.ts
+index c4db5be..4715788 100644
+--- a/packages/core/src/gateway/claude-code-router-plugin.ts
++++ b/packages/core/src/gateway/claude-code-router-plugin.ts
+@@ -740,7 +740,7 @@ const ccrSubagentPromptFieldInstruction =
+ type ClaudeCodeSubagentToolKind = "subagent" | "workflow";
+ const claudeCodeAgentToolNames = new Set(["agent", "task"]);
+ const claudeCodeWorkflowToolNames = new Set(["workflow"]);
+-const ccrToolHubSystemInstructionMarker = "CCR ToolHub tool resolution is enabled.";
++const omrToolHubSystemInstructionMarker = "OMR ToolHub tool resolution is enabled.";
+ 
+ function claudeCodeToolName(tool: Record<string, unknown>): string | undefined {
+   const functionSpec = isRecord(tool.function) ? tool.function : undefined;
+@@ -761,7 +761,7 @@ function injectClaudeCodeToolHubInstructions(body: Record<string, unknown>, conf
+   }
+   const invokeName = toolNames.invoke ?? "tool_hub.invoke";
+   appendSystemInstruction(body, [
+-    ccrToolHubSystemInstructionMarker,
++    omrToolHubSystemInstructionMarker,
+     `The ToolHub search/resolution tool is ${toolNames.resolve}; call this actual tool, do not merely mention its name in text.`,
+     `You MUST call the ToolHub search/resolution tool ${toolNames.resolve} before answering any request that asks about external services, installed MCP capabilities, business APIs, orders, coupons, stores, accounts, available tools, or capabilities that are not already obvious from the eager tools.`,
+     `Do this even if the user did not mention ToolHub or ${toolNames.resolve}. Only skip the ToolHub search/resolution tool when the request is clearly local code/file/shell work or simple conversation that does not need an external or MCP capability.`,
+@@ -801,7 +801,7 @@ function shouldUseClaudeCodeToolHubName(current: string | undefined, candidate:
+ 
+ function claudeCodeToolHubNameScore(name: string): number {
+   const normalized = name.toLowerCase();
+-  if (normalized.startsWith("mcp__ccr-toolhub__") || normalized.startsWith("mcp__ccr_toolhub__")) {
++  if (normalized.startsWith("mcp__omr-toolhub__") || normalized.startsWith("mcp__omr_toolhub__")) {
+     return 3;
+   }
+   if (normalized.startsWith("mcp__") && normalized.includes("toolhub")) {
+@@ -814,7 +814,7 @@ function claudeCodeToolHubNameScore(name: string): number {
+ }
+ 
+ function appendSystemInstruction(body: Record<string, unknown>, instruction: string): void {
+-  if (systemContainsInstruction(body.system, ccrToolHubSystemInstructionMarker)) {
++  if (systemContainsInstruction(body.system, omrToolHubSystemInstructionMarker)) {
+     return;
+   }
+   if (typeof body.system === "string") {
+diff --git a/packages/core/src/mcp/fusion-vision-mcp.ts b/packages/core/src/mcp/fusion-vision-mcp.ts
+index 8645ccc..3a1ba5e 100644
+--- a/packages/core/src/mcp/fusion-vision-mcp.ts
++++ b/packages/core/src/mcp/fusion-vision-mcp.ts
+@@ -199,7 +199,7 @@ async function handleJsonRpcRequest(payload: unknown): Promise<JsonRpcResponse |
+           },
+           protocolVersion,
+           serverInfo: {
+-            name: "ccr-fusion-builtins",
++            name: "omr-fusion-builtins",
+             title: "CCR Fusion Builtins",
+             version: "1.0.0"
+           }
+diff --git a/packages/core/src/mcp/toolhub-config.ts b/packages/core/src/mcp/toolhub-config.ts
+index 08e5585..68df7c9 100644
+--- a/packages/core/src/mcp/toolhub-config.ts
++++ b/packages/core/src/mcp/toolhub-config.ts
+@@ -2,7 +2,7 @@ import { join as pathJoin } from "node:path";
+ import { CONFIGDIR } from "@ccr/core/config/constants";
+ import type { AppConfig, GatewayMcpServerConfig } from "@ccr/core/contracts/app";
+ 
+-export const TOOL_HUB_MCP_SERVER_NAME = "ccr-toolhub";
++export const TOOL_HUB_MCP_SERVER_NAME = "omr-toolhub";
+ export const TOOL_HUB_MCP_RUNTIME_FILE_NAME = "toolhub-mcp.js";
+ export const BROWSER_AUTOMATION_MCP_SERVER_NAME = "ccr-browser-automation";
+ export const BROWSER_AUTOMATION_MCP_PATH = "/__ccr/browser-automation/mcp";
+diff --git a/packages/core/src/mcp/toolhub-mcp.ts b/packages/core/src/mcp/toolhub-mcp.ts
+index 78bcc42..d63e9e7 100644
+--- a/packages/core/src/mcp/toolhub-mcp.ts
++++ b/packages/core/src/mcp/toolhub-mcp.ts
+@@ -181,7 +181,7 @@ type ResolveOutput = {
+ };
+ 
+ const protocolVersion = "2024-11-05";
+-const toolHubServerName = "ccr-toolhub";
++const toolHubServerName = "omr-toolhub";
+ const resolveToolName = "tool_hub.resolve";
+ const invokeToolName = "tool_hub.invoke";
+ const defaultRequestTimeoutMs = 60_000;
+diff --git a/packages/core/src/observability/raw-trace-sync.ts b/packages/core/src/observability/raw-trace-sync.ts
+index 16a8ad3..14b0800 100644
+--- a/packages/core/src/observability/raw-trace-sync.ts
++++ b/packages/core/src/observability/raw-trace-sync.ts
+@@ -108,8 +108,8 @@ type RawTraceStorageLimits = {
+   inboxMaxBytes: number;
+ };
+ 
+-const rawTraceInboxDirectoryName = ".ccr-inbox";
+-const rawTraceDeadLetterDirectoryName = ".ccr-dead-letter";
++const rawTraceInboxDirectoryName = ".omr-inbox";
++const rawTraceDeadLetterDirectoryName = ".omr-dead-letter";
+ const rawTraceStagingDirectoryName = ".ccr-staging";
+ const rawTraceDeliveryFileName = ".ccr-delivery.json";
+ const rawTraceReadyFileName = ".ccr-ready.json";
+diff --git a/packages/core/src/proxy/service.ts b/packages/core/src/proxy/service.ts
+index 1a71ff4..bc0939d 100644
+--- a/packages/core/src/proxy/service.ts
++++ b/packages/core/src/proxy/service.ts
+@@ -1580,7 +1580,7 @@ async function windowsCurrentUserRootContainsCertificateThumbprint(thumbprint: s
+ }
+ 
+ async function openMacosTerminalCertificateInstaller(): Promise<string> {
+-  const installerFile = path.join(os.tmpdir(), `ccr-install-proxy-ca-${randomUUID()}.command`);
++  const installerFile = path.join(os.tmpdir(), `omr-install-proxy-ca-${randomUUID()}.command`);
+   writeFileSync(installerFile, `${macosTerminalCertificateInstallScript()}\n`, "utf8");
+   chmodSync(installerFile, 0o700);
+   await execFilePromise("/usr/bin/open", [installerFile]);
+diff --git a/packages/core/src/web/management-server.ts b/packages/core/src/web/management-server.ts
+index 0fcad0e..03a2c46 100644
+--- a/packages/core/src/web/management-server.ts
++++ b/packages/core/src/web/management-server.ts
+@@ -793,7 +793,7 @@ function inspectPluginDirectory(directory: string): PluginDirectorySelection {
+   const manifest = readFirstJson([
+     path.join(directory, "plugin.json"),
+     path.join(directory, "ccr-plugin.json"),
+-    path.join(directory, ".ccr-plugin", "plugin.json"),
++    path.join(directory, ".omr-plugin", "plugin.json"),
+     path.join(directory, ".codex-plugin", "plugin.json")
+   ]);
+   const packageJsonManifest = readFirstJson([path.join(directory, "package.json")]);
+-- 
+2.53.0
+

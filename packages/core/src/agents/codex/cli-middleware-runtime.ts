@@ -21,7 +21,7 @@ const BOT_RUNTIME_STATE_VERSION = 1;
 const REQUEST_TIMEOUT_MS = numberEnv("CCR_CODEX_APP_REQUEST_TIMEOUT_MS", 10 * 60 * 1000);
 const TURN_IDLE_TIMEOUT_MS = numberEnv("CCR_CODEX_CLAUDE_TURN_IDLE_TIMEOUT_MS", 10 * 60 * 1000);
 const CONFIG_DIR = resolveConfigDir();
-const LOG_PATH = process.env.CCR_CODEX_CLI_MIDDLEWARE_LOG || "";
+const LOG_PATH = process.env.OMR_CODEX_CLI_MIDDLEWARE_LOG || "";
 const CLAUDE_CODE_MCP_CONFIG_ENV = "CCR_CLAUDE_CODE_MCP_CONFIG";
 const CODEXL_CLAUDE_CODE_MCP_CONFIG_ENV = "CODEXL_CLAUDE_CODE_MCP_CONFIG";
 const CLAUDE_CODE_CHINA_TIME_ZONES = new Set([
@@ -73,17 +73,28 @@ function isClaudeCodeChinaTimeZone(timeZone) {
 }
 
 function resolveConfigDir() {
-  const configured = nonEmptyEnv("CODEXL_HOME") || nonEmptyEnv("CCR_CONFIG_DIR");
+  const configured = nonEmptyEnv("CODEXL_HOME")
+    || nonEmptyEnv("OMR_CONFIG_DIR")
+    || nonEmptyEnv("CCR_CONFIG_DIR")
+    || nonEmptyEnv("OMR_DATA_DIR");
   if (configured) {
     return expandHome(configured);
   }
   if (process.platform === "win32") {
     const appData = process.env.APPDATA || process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Roaming");
-    const current = path.join(appData, "claude-code-router");
-    const legacy = path.join(appData, "Claude Code Router");
-    return fs.existsSync(current) || !fs.existsSync(legacy) ? current : legacy;
+    const current = path.join(appData, "omr");
+    const legacyCcr = path.join(appData, "claude-code-router");
+    const legacyApp = path.join(appData, "Claude Code Router");
+    if (fs.existsSync(current)) return current;
+    if (fs.existsSync(legacyCcr)) return legacyCcr;
+    if (fs.existsSync(legacyApp)) return legacyApp;
+    return current;
   }
-  return path.join(os.homedir(), ".claude-code-router");
+  const newPath = path.join(os.homedir(), ".omr");
+  const legacyPath = path.join(os.homedir(), ".claude-code-router");
+  if (fs.existsSync(newPath)) return newPath;
+  if (fs.existsSync(legacyPath)) return legacyPath;
+  return newPath;
 }
 
 function botBridge() {
@@ -95,23 +106,23 @@ function botBridge() {
 
 async function main() {
   const args = directProfileDispatchArgs(process.argv.slice(2));
-  if (process.env.CCR_PI_WRAPPER === "1") {
+  if (process.env.OMR_PI_WRAPPER === "1" || process.env.CCR_PI_WRAPPER === "1") {
     await runPiCliWrapper(args);
     return;
   }
-  if (process.env.CCR_OPENCODE_BOT_WORKER === "1" || args[0] === "opencode-bot-worker") {
+  if (process.env.OMR_OPENCODE_BOT_WORKER === "1" || process.env.CCR_OPENCODE_BOT_WORKER === "1" || args[0] === "opencode-bot-worker") {
     await runOpenCodeBotWorker(args);
     return;
   }
-  if (process.env.CCR_CLAUDE_CODE_BOT_WORKER === "1" || args[0] === "claude-bot-worker") {
+  if (process.env.OMR_CLAUDE_CODE_BOT_WORKER === "1" || process.env.CCR_CLAUDE_CODE_BOT_WORKER === "1" || args[0] === "claude-bot-worker") {
     await runClaudeCodeBotWorker(args);
     return;
   }
-  if (process.env.CCR_CODEX_BOT_WORKER === "1" || args[0] === "codex-bot-worker") {
+  if (process.env.OMR_CODEX_BOT_WORKER === "1" || process.env.CCR_CODEX_BOT_WORKER === "1" || args[0] === "codex-bot-worker") {
     await runCodexBotWorker(args);
     return;
   }
-  if (process.env.CCR_CLAUDE_CODE_WRAPPER === "1") {
+  if (process.env.OMR_CLAUDE_CODE_WRAPPER === "1" || process.env.CCR_CLAUDE_CODE_WRAPPER === "1") {
     await runClaudeCodeCliWrapper(args);
     return;
   }
@@ -123,7 +134,7 @@ async function main() {
 }
 
 function directProfileDispatchArgs(args) {
-  if (process.env.CCR_CLI_DIRECT_PROFILE_DISPATCH !== "1") {
+  if (process.env.OMR_CLI_DIRECT_PROFILE_DISPATCH !== "1" && process.env.CCR_CLI_DIRECT_PROFILE_DISPATCH !== "1") {
     return args;
   }
   const forwarded = args.slice(1);
@@ -137,12 +148,12 @@ function directProfileDispatchArgs(args) {
 }
 
 async function runPiCliWrapper(args) {
-  const realCli = expandHome(nonEmptyEnv("CCR_REAL_PI_BIN") || "pi");
+  const realCli = expandHome(nonEmptyEnv("OMR_REAL_PI_BIN") || nonEmptyEnv("CCR_REAL_PI_BIN") || "pi");
   const child = spawnAgentCli(realCli, [
-    "--provider", nonEmptyEnv("CCR_PI_PROVIDER") || "claude-code-router",
-    "--model", nonEmptyEnv("CCR_PI_MODEL"), ...args
+    "--provider", nonEmptyEnv("OMR_PI_PROVIDER") || nonEmptyEnv("CCR_PI_PROVIDER") || "omr",
+    "--model", nonEmptyEnv("OMR_PI_MODEL") || nonEmptyEnv("CCR_PI_MODEL"), ...args
   ], {
-    env: withoutKeys(process.env, ["CCR_PI_WRAPPER", "CCR_REAL_PI_BIN", "CCR_PI_PROVIDER", "CCR_PI_MODEL", "CCR_CLI_DIRECT_PROFILE_DISPATCH"]),
+    env: withoutKeys(process.env, ["OMR_PI_WRAPPER", "OMR_REAL_PI_BIN", "OMR_PI_PROVIDER", "OMR_PI_MODEL", "CCR_PI_WRAPPER", "CCR_REAL_PI_BIN", "CCR_PI_PROVIDER", "CCR_PI_MODEL", "CCR_CLI_DIRECT_PROFILE_DISPATCH", "OMR_CLI_DIRECT_PROFILE_DISPATCH"]),
     stdio: "inherit"
   });
   child.on("error", (error) => {
@@ -153,7 +164,7 @@ async function runPiCliWrapper(args) {
 }
 
 async function runClaudeCodeCliWrapper(args) {
-  const realCli = expandHome(nonEmptyEnv("CCR_REAL_CLAUDE_CODE_BIN") || nonEmptyEnv("CCR_CLAUDE_CODE_BIN") || nonEmptyEnv("CODEXL_CLAUDE_CODE_BIN") || "claude");
+  const realCli = expandHome(nonEmptyEnv("OMR_REAL_CLAUDE_CODE_BIN") || nonEmptyEnv("CCR_REAL_CLAUDE_CODE_BIN") || nonEmptyEnv("OMR_CLAUDE_CODE_BIN") || nonEmptyEnv("CCR_CLAUDE_CODE_BIN") || nonEmptyEnv("CODEXL_CLAUDE_CODE_BIN") || "claude");
   const realArgs = claudeCodeCliWrapperArgs(args);
   log("claude_code_wrapper_start", { realCli, args, realArgs });
   const captureStdout = shouldCaptureClaudeCodeCliStdout(args);
@@ -161,7 +172,7 @@ async function runClaudeCodeCliWrapper(args) {
     args,
     cwd: process.cwd(),
     mode: "claude-cli",
-    title: nonEmptyEnv("CCR_REMOTE_SYNC_PROFILE_NAME") || "Claude Code"
+    title: nonEmptyEnv("OMR_REMOTE_SYNC_PROFILE_NAME") || nonEmptyEnv("CCR_REMOTE_SYNC_PROFILE_NAME") || "Claude Code"
   });
   const injectRemoteStdin = boolEnv("CCR_REMOTE_SYNC_INJECT_STDIN");
   const child = spawnAgentCli(realCli, realArgs, {
@@ -181,8 +192,8 @@ async function runClaudeCodeCliWrapper(args) {
       child.stdin.write(text + "\n");
       return;
     }
-    if (boolEnv("CCR_REMOTE_SYNC_NOTIFY_INBOUND") || !process.env.CCR_REMOTE_SYNC_NOTIFY_INBOUND) {
-      process.stdout.write("\n[CCR remote] " + text + "\n");
+    if (boolEnv("CCR_REMOTE_SYNC_NOTIFY_INBOUND") || !process.env.OMR_REMOTE_SYNC_NOTIFY_INBOUND) {
+      process.stdout.write("\n[OMR remote]" + text + "\n");
     }
   });
   child.on("error", (error) => {
@@ -421,7 +432,7 @@ function createEphemeralCodexApiKeyBootstrap(runtimeAgent) {
     fs.mkdirSync(path.dirname(authFile), { recursive: true, mode: 0o700 });
     fs.writeFileSync(temporary, JSON.stringify({
       auth_mode: "apikey",
-      OPENAI_API_KEY: "ccr-local-profile"
+      OPENAI_API_KEY: "omr-local-profile"
     }, null, 2) + "\n", { mode: 0o600 });
     fs.renameSync(temporary, authFile);
     active = true;
@@ -448,7 +459,7 @@ function createEphemeralCodexApiKeyBootstrap(runtimeAgent) {
         keys[0] === "OPENAI_API_KEY" &&
         keys[1] === "auth_mode" &&
         value.auth_mode === "apikey" &&
-        value.OPENAI_API_KEY === "ccr-local-profile"
+        value.OPENAI_API_KEY === "omr-local-profile"
       ) {
         fs.unlinkSync(authFile);
         active = false;
@@ -1041,7 +1052,7 @@ function customAppServerLineResponse(line) {
       requestId: value.requestId || value.id || uuid(),
       status: 501,
       ok: false,
-      body: JSON.stringify({ error: "Transcribe is not available in CCR middleware." }),
+      body: JSON.stringify({ error: "Transcribe is not available in OMR middleware." }),
       headers: { "content-type": "application/json" }
     };
   }
@@ -4093,7 +4104,7 @@ function emitReasoningDelta(work, stream, text) {
 }
 
 function claudeCommand(work) {
-  const command = nonEmptyEnv("CCR_CLAUDE_CODE_BIN") || nonEmptyEnv("CODEXL_CLAUDE_CODE_BIN") || "claude";
+  const command = nonEmptyEnv("OMR_CLAUDE_CODE_BIN") || nonEmptyEnv("CCR_CLAUDE_CODE_BIN") || nonEmptyEnv("CODEXL_CLAUDE_CODE_BIN") || "claude";
   if (work.claudeConfigDir) {
     ensureClaudeSessionConfig(work.claudeConfigDir);
   }
@@ -4572,7 +4583,7 @@ function modelItemId(item) {
 }
 
 function codexModelItem(model, selectedModel) {
-  const provider = modelProviderFromSelector(model) || agentEnv(codexRuntimeAgent(), "MODEL_PROVIDER") || "claude-code-router";
+  const provider = modelProviderFromSelector(model) || agentEnv(codexRuntimeAgent(), "MODEL_PROVIDER") || "omr";
   const displayName = modelDisplayName(model);
   return {
     id: model,
@@ -4583,7 +4594,7 @@ function codexModelItem(model, selectedModel) {
     providerName: provider,
     modelProvider: provider,
     displayName,
-    description: "CCR model",
+    description: "OMR model",
     hidden: false,
     isDefault: model === selectedModel,
     contextWindow: 0,
@@ -4680,7 +4691,7 @@ function modelCatalogConfigItem(model, priority) {
   return {
     slug: model,
     display_name: model,
-    description: "CCR gateway model " + model,
+    description: "OMR gateway model " + model,
     default_reasoning_level: null,
     supported_reasoning_levels: [],
     shell_type: "shell_command",
@@ -4912,7 +4923,7 @@ function mockAccountRead() {
 
 function mockAuthStatus(includeToken) {
   const result = { authMethod: "amazonBedrock", authToken: null, requiresOpenaiAuth: false };
-  if (includeToken) result.authToken = "ccr-local-profile";
+  if (includeToken) result.authToken = "omr-local-profile";
   return result;
 }
 
@@ -5020,7 +5031,7 @@ function writeLine(stream, value) {
 
 function createRemoteSyncClient(options) {
   const endpoint = normalizeRemoteSyncEndpoint(nonEmptyEnv("CCR_REMOTE_SYNC_ENDPOINT"));
-  const enabled = endpoint && !["0", "false", "no", "off"].includes(String(process.env.CCR_REMOTE_SYNC_ENABLED || "1").trim().toLowerCase());
+  const enabled = endpoint && !["0", "false", "no", "off"].includes(String(process.env.OMR_REMOTE_SYNC_ENABLED || "1").trim().toLowerCase());
   if (!enabled || typeof fetch !== "function") {
     return {
       postEvent: async () => {},
@@ -5033,9 +5044,9 @@ function createRemoteSyncClient(options) {
     cwd: options.cwd || process.cwd(),
     endpoint,
     mode: options.mode || "agent",
-    title: options.title || "CCR Remote",
+    title: options.title || "OMR Remote",
     profileId: nonEmptyEnv("CCR_REMOTE_SYNC_PROFILE_ID"),
-    profileName: nonEmptyEnv("CCR_REMOTE_SYNC_PROFILE_NAME")
+    profileName: nonEmptyEnv("OMR_REMOTE_SYNC_PROFILE_NAME") || nonEmptyEnv("CCR_REMOTE_SYNC_PROFILE_NAME")
   });
 }
 
@@ -5156,7 +5167,7 @@ class RemoteSyncClient {
         signal: controller.signal
       });
       if (!response.ok) {
-        throw new Error("HTTP " + response.status + " from CCR remote sync");
+        throw new Error("HTTP " + response.status + " from OMR remote sync");
       }
       return await response.json();
     } finally {
@@ -5270,7 +5281,7 @@ function readBotGatewayBridgeConfig() {
     platform,
     pollIntervalMs: numberEnv("CCR_BOT_GATEWAY_POLL_INTERVAL_MS", 2000),
     profileId: nonEmptyEnv("CCR_BOT_PROFILE_ID") || agentEnv(codexRuntimeAgent(), "PROFILE") || "default",
-    profileName: nonEmptyEnv("CCR_BOT_PROFILE_NAME") || agentEnv(codexRuntimeAgent(), "WORKSPACE_NAME") || "CCR",
+    profileName: nonEmptyEnv("CCR_BOT_PROFILE_NAME") || agentEnv(codexRuntimeAgent(), "WORKSPACE_NAME") || "OMR",
     requestTimeoutMs: numberEnv("CCR_BOT_GATEWAY_REQUEST_TIMEOUT_MS", 600000),
     sessionIdleMinutes: numberEnv("CCR_BOT_GATEWAY_SESSION_IDLE_MINUTES", 0),
     shellEnabled: boolEnv("CCR_BOT_GATEWAY_SHELL_ENABLED"),
@@ -6073,7 +6084,7 @@ function evaluateHandoffPresence(config) {
     }
   }
   if (config.phoneWifiTargets.length || config.phoneBluetoothTargets.length) {
-    evidence.push("phone target checks are configured but not available in CCR middleware");
+    evidence.push("phone target checks are configured but not available in OMR middleware");
   }
   return { away: reasons.length > 0, reasons, evidence };
 }
@@ -6234,10 +6245,10 @@ function localizeBotReply(text, language) {
   if (language !== "zh-CN") return text;
   const replacements = [
     ["Unknown Bot command. Send /project or /session to see available commands.", "未知的 Bot 命令。发送 /project 或 /session 查看可用命令。"],
-    ["CCR App project commands", "CCR App 项目命令"],
-    ["CCR App session commands", "CCR App 会话命令"],
-    ["Projects are managed separately with /project. The relay is available only while this App is opened through CCR.", "项目通过 /project 单独管理。只有通过 CCR 打开此 App 时，消息接力才在线。"],
-    ["Sessions are managed separately with /session. The relay is available only while this App is opened through CCR.", "会话通过 /session 单独管理。只有通过 CCR 打开此 App 时，消息接力才在线。"],
+    ["OMR App project commands", "OMR App 项目命令"],
+    ["OMR App session commands", "OMR App 会话命令"],
+    ["Projects are managed separately with /project. The relay is available only while this App is opened through OMR.", "项目通过 /project 单独管理。只有通过 OMR 打开此 App 时，消息接力才在线。"],
+    ["Sessions are managed separately with /session. The relay is available only while this App is opened through OMR.", "会话通过 /session 单独管理。只有通过 OMR 打开此 App 时，消息接力才在线。"],
     [" - list Agent projects", " - 列出 Agent 项目"],
     [" - search Agent projects", " - 搜索 Agent 项目"],
     [" - show the selected project", " - 显示当前项目"],
@@ -6359,20 +6370,20 @@ function parseBotCommand(text) {
 
 function projectCommandHelpText(agentName) {
   return [
-    "CCR App project commands (" + agentName + "):",
+    "OMR App project commands (" + agentName + "):",
     "/project list - list Agent projects",
     "/project find <text> - search Agent projects",
     "/project current - show the selected project",
     "/project use <n> - select a listed project",
     "/project name <label> - set a Bot display label for the current project",
     "",
-    "Sessions are managed separately with /session. The relay is available only while this App is opened through CCR."
+    "Sessions are managed separately with /session. The relay is available only while this App is opened through OMR."
   ].join("\n");
 }
 
 function sessionCommandHelpText(agentName) {
   return [
-    "CCR App session commands (" + agentName + "):",
+    "OMR App session commands (" + agentName + "):",
     "/session list - list sessions in the current project",
     "/session find <text> - search sessions in the current project",
     "/session current - show the selected session",
@@ -6398,7 +6409,7 @@ function sessionCommandHelpText(agentName) {
     "/session doctor - show Bot connection and delivery diagnostics",
     "/session deliveries - show recent outbound delivery results",
     "",
-    "Projects are managed separately with /project. The relay is available only while this App is opened through CCR."
+    "Projects are managed separately with /project. The relay is available only while this App is opened through OMR."
   ].join("\n");
 }
 
@@ -6701,9 +6712,12 @@ function claudeConfigSourceDirs(template, order) {
 
 function inferBaseClaudeConfigDirFromSession(value) {
   const text = String(value || "");
-  const marker = path.sep + ".claude-code-router" + path.sep;
-  const index = text.indexOf(marker);
-  return index > 0 ? text.slice(0, index) : "";
+  const newMarker = path.sep + ".omr" + path.sep;
+  const legacyMarker = path.sep + ".claude-code-router" + path.sep;
+  const newIndex = text.indexOf(newMarker);
+  if (newIndex > 0) return text.slice(0, newIndex);
+  const legacyIndex = text.indexOf(legacyMarker);
+  return legacyIndex > 0 ? text.slice(0, legacyIndex) : "";
 }
 
 function uniqueExistingDirs(values) {
