@@ -32,10 +32,10 @@ type Rpc = (method: string, ...args: unknown[]) => Promise<unknown>;
 type TierProfile = { healthy?: boolean; models?: string[] } & Record<string, unknown>;
 
 const TIERS_DEFAULT = [
-  { id: "daily", label: "日常", virtualId: "doubao-2.0", desc: "聊天、问答、写作", icon: "☀️", color: "sky" },
-  { id: "office", label: "办公", virtualId: "qwen3.8-max", desc: "文档、表格、邮件", icon: "📋", color: "emerald" },
-  { id: "code", label: "编程", virtualId: "baozi", desc: "代码、调试、重构", icon: "⌨️", color: "amber" },
-  { id: "team", label: "团队", virtualId: "team", desc: "自定义档位", icon: "👥", color: "zinc" },
+  { id: "chat", label: "日常", virtualId: "chat-auto", desc: "聊天、问答、写作", icon: "☀️", color: "sky" },
+  { id: "assist", label: "办公", virtualId: "assist-auto", desc: "文档、表格、邮件", icon: "📋", color: "emerald" },
+  { id: "code", label: "编程", virtualId: "coding-auto", desc: "代码、调试、重构", icon: "⌨️", color: "amber" },
+  { id: "team", label: "团队", virtualId: "team-auto", desc: "自定义档位", icon: "👥", color: "zinc" },
 ];
 
 type Tier = (typeof TIERS_DEFAULT)[number];
@@ -129,7 +129,7 @@ function ProviderRow({ provider, onToggle }: { provider: any; onToggle: (name: s
 export default function VirtualRoutes({ rpc }: { rpc: Rpc }) {
   const [tab, setTab] = useState("home"); // home | route | provider
   const [state, setState] = useState<any>({ providers: [], virtualModelProfile: {}, gateway: {} });
-  const [activeTier, setActiveTier] = useState("daily");
+  const [activeTier, setActiveTier] = useState("chat");
   const [reloading, setReloading] = useState(false);
   const [reloadResult, setReloadResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -213,7 +213,7 @@ export default function VirtualRoutes({ rpc }: { rpc: Rpc }) {
         <div>
           <h2 className="text-2xl font-semibold text-white mb-2">模型路由</h2>
           <p className="text-sm text-zinc-400 mb-6">
-            4 个虚拟档位, 一键切换底层模型. 你的代码永远只引用虚拟 ID, 例如 <code className="px-1.5 py-0.5 bg-zinc-800 rounded text-xs font-mono">doubao-2.0</code>
+            4 个虚拟档位, 一键切换底层模型. 你的代码永远只引用虚拟 ID, 例如 <code className="px-1.5 py-0.5 bg-zinc-800 rounded text-xs font-mono">chat-auto</code>
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {TIERS_DEFAULT.map((t) => (

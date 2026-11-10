@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-10T07:14:37.824Z",
+  "generatedAt": "2026-11-10T07:22:01.314Z",
   "generatedBy": "scripts/generate-models-json.mjs",
   "sources": [
     {
@@ -20,25 +20,25 @@
     }
   ],
   "summary": {
-    "modelCount": 5558,
-    "rawProviderModelCount": 13393,
-    "duplicateProviderModelRecordsMerged": 7835,
+    "modelCount": 5559,
+    "rawProviderModelCount": 13395,
+    "duplicateProviderModelRecordsMerged": 7836,
     "providerCount": 258,
     "availabilityProviderCount": 355,
     "sourceCounts": {
-      "models.dev": 3394,
+      "models.dev": 3395,
       "litellm": 2883,
       "openrouter": 465
     },
-    "pricingOfferCount": 13927,
-    "modelsWithPricing": 5345,
+    "pricingOfferCount": 13929,
+    "modelsWithPricing": 5346,
     "modelsWithoutPricing": 213,
-    "modelsWith1MContext": 1572,
-    "modelsWithImageInput": 2717,
+    "modelsWith1MContext": 1573,
+    "modelsWithImageInput": 2718,
     "modelsWithImageOutput": 207,
     "modelsWithAudioInput": 510,
-    "modelsWithToolCalling": 3821,
-    "modelsWithReasoning": 3058
+    "modelsWithToolCalling": 3822,
+    "modelsWithReasoning": 3059
   },
   "models": [
     {
@@ -250346,6 +250346,114 @@
                 "values": [
                   "none",
                   "low",
+                  "high"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "crossmodel/hy4",
+      "provider": "crossmodel",
+      "model": "hy4",
+      "displayName": "Hy4",
+      "family": "Hy",
+      "sources": [
+        "models.dev"
+      ],
+      "providers": [
+        "crossmodel"
+      ],
+      "aliases": [
+        "crossmodel/tencent/hy4"
+      ],
+      "mergedProviderModelRecords": 1,
+      "limits": {
+        "contextTokens": 1048576,
+        "inputTokens": 983010,
+        "outputTokens": 65536,
+        "supports1MContext": true
+      },
+      "modalities": {
+        "input": [
+          "image",
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "capabilities": {
+        "attachments": true,
+        "audioInput": false,
+        "audioOutput": false,
+        "imageInput": true,
+        "imageOutput": false,
+        "openWeights": false,
+        "pdfInput": false,
+        "reasoning": true,
+        "highReasoningEffort": true,
+        "noneReasoningEffort": true,
+        "structuredOutput": true,
+        "temperature": true,
+        "toolCalling": true,
+        "videoInput": false,
+        "supports1MContext": true
+      },
+      "pricing": {
+        "currency": "USD",
+        "normalizedUnit": "per1MTokens values are USD per 1,000,000 tokens; non-token values keep the unit named by their object key.",
+        "offers": [
+          {
+            "source": "models.dev",
+            "provider": "crossmodel",
+            "model": "tencent/hy4",
+            "sourceUrl": "https://models.dev/api.json",
+            "sourceUnit": "usd_per_1m_tokens",
+            "per1MTokens": {
+              "cacheRead": 0.048,
+              "cacheWrite": 0.96,
+              "cacheWrite5m": 0.96,
+              "input": 0.96,
+              "output": 2.88
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "displayNames": [
+          "Hy4"
+        ],
+        "families": [
+          "Hy"
+        ],
+        "releaseDate": "2026-11-04",
+        "lastUpdated": "2026-11-04",
+        "providerModelRecordCount": 1
+      },
+      "sourceRecords": [
+        {
+          "source": "models.dev",
+          "sourceUrl": "https://models.dev/api.json",
+          "provider": "crossmodel",
+          "providerName": "CrossModel",
+          "providerApi": "https://api.crossmodel.ai/v1",
+          "providerDoc": "https://www.crossmodel.ai/docs",
+          "model": "tencent/hy4",
+          "modelKey": "tencent/hy4",
+          "displayName": "Hy4",
+          "family": "Hy",
+          "metadata": {
+            "lastUpdated": "2026-11-04",
+            "openWeights": false,
+            "releaseDate": "2026-11-04",
+            "reasoningOptions": [
+              {
+                "type": "effort",
+                "values": [
+                  "none",
                   "high"
                 ]
               }
@@ -668918,6 +669026,7 @@
         "cloudflare-ai-gateway",
         "commandcode",
         "cortecs",
+        "crossmodel",
         "edenai",
         "github-copilot",
         "github_copilot",
@@ -668946,6 +669055,7 @@
         "cloudflare-ai-gateway/openai/gpt-6.1-terra",
         "commandcode/gpt-6.1-terra",
         "cortecs/gpt-6.1-terra",
+        "crossmodel/openai/gpt-6.1-terra",
         "edenai/openai/gpt-6.1-terra",
         "github-copilot/gpt-6.1-terra",
         "github_copilot/gpt-6.1-terra",
@@ -668963,7 +669073,7 @@
         "vercel/openai/gpt-6.1-terra",
         "vivgrid/gpt-6.1-terra"
       ],
-      "mergedProviderModelRecords": 27,
+      "mergedProviderModelRecords": 28,
       "limits": {
         "contextTokens": 1050000,
         "inputTokens": 1050000,
@@ -669181,6 +669291,39 @@
               "cacheWrite5m": 1.47,
               "input": 1.176,
               "output": 5.882
+            }
+          },
+          {
+            "source": "models.dev",
+            "provider": "crossmodel",
+            "model": "openai/gpt-6.1-terra",
+            "sourceUrl": "https://models.dev/api.json",
+            "sourceUnit": "usd_per_1m_tokens",
+            "per1MTokens": {
+              "cacheRead": 0.05,
+              "cacheWrite": 1.25,
+              "cacheWrite5m": 1.25,
+              "input": 1,
+              "output": 5
+            },
+            "tiered": {
+              "contextOver200K": {
+                "input": 2,
+                "output": 7.5,
+                "cache_read": 0.1,
+                "cache_write": 2.5
+              },
+              "tiers": [
+                {
+                  "input": 2,
+                  "output": 7.5,
+                  "cache_read": 0.1,
+                  "cache_write": 2.5,
+                  "tier": {
+                    "size": 272000
+                  }
+                }
+              ]
             }
           },
           {
@@ -669861,7 +670004,7 @@
           "/v1/chat/completions",
           "/v1/responses"
         ],
-        "providerModelRecordCount": 27
+        "providerModelRecordCount": 28
       },
       "sourceRecords": [
         {
@@ -670035,6 +670178,37 @@
                   "low",
                   "medium",
                   "high"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "source": "models.dev",
+          "sourceUrl": "https://models.dev/api.json",
+          "provider": "crossmodel",
+          "providerName": "CrossModel",
+          "providerApi": "https://api.crossmodel.ai/v1",
+          "providerDoc": "https://www.crossmodel.ai/docs",
+          "model": "openai/gpt-6.1-terra",
+          "modelKey": "openai/gpt-6.1-terra",
+          "displayName": "GPT-6.1 Terra",
+          "family": "gpt-terra",
+          "metadata": {
+            "knowledgeCutoff": "2026-06-01",
+            "lastUpdated": "2026-10-26",
+            "openWeights": false,
+            "releaseDate": "2026-10-26",
+            "reasoningOptions": [
+              {
+                "type": "effort",
+                "values": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
                 ]
               }
             ]

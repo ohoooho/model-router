@@ -263,6 +263,24 @@ const unsupportedUpdateStatus: AppUpdateStatus = {
   supported: false
 };
 
+function configStateVirtualModelProfiles(config: AppConfig): Record<string, { healthy: boolean; models: string[] }> {
+  const result: Record<string, { healthy: boolean; models: string[] }> = {};
+  for (const profile of config.virtualModelProfiles ?? []) {
+    if (!profile || profile.enabled === false) {
+      continue;
+    }
+    const fixedModel = profile.baseModel?.fixedModel?.trim();
+    const models = fixedModel ? [fixedModel] : [];
+    const names = [profile.id, ...(profile.match?.exactAliases ?? [])]
+      .map((name) => name?.trim())
+      .filter((name): name is string => Boolean(name));
+    for (const name of names) {
+      result[name] = { healthy: true, models };
+    }
+  }
+  return result;
+}
+
 const rpcHandlers: Record<string, RpcHandler> = {
   applyClaudeAppGateway: async (config?: unknown) => {
     const previousConfig = await loadAppConfig();
@@ -357,7 +375,7 @@ const rpcHandlers: Record<string, RpcHandler> = {
         enabled: p.enabled !== false,
         baseUrl: p.baseUrl || p.baseurl || p.api_base_url || "",
       })),
-      virtualModelProfile: (config as Record<string, unknown>).virtualModelProfile || {},
+      virtualModelProfile: configStateVirtualModelProfiles(config),
       gateway: {
         state: gatewayStatus.state,
         host: config.gateway?.host || "127.0.0.1",
