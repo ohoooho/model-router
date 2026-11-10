@@ -526,7 +526,7 @@ function buildGatewayDiscoverableModelIds(config: AppConfig, profile?: ProfileCo
   //          (3) suffix 不带 provider 前缀 (4) exactAliases 不带 Fusion 前缀
   // 内部 routing 仍按 providerName 走（baseEntries 仍含 providerName，仅不暴露给 /v1/models）
   // gatewayModelOwner() 检测不到 `/` 时回退到 "ccr"，所以 owned_by 也自动变成 "ccr"
-  const ids = baseEntries.map((entry) => entry.modelName);
+  const virtualIds: string[] = [];
   for (const virtualProfile of config.virtualModelProfiles ?? []) {
     if (!isVisibleVirtualModelProfile(virtualProfile)) {
       continue;
@@ -536,13 +536,13 @@ function buildGatewayDiscoverableModelIds(config: AppConfig, profile?: ProfileCo
       for (const prefix of virtualProfile.match?.prefixes ?? []) {
         const normalizedPrefix = prefix.trim();
         if (normalizedPrefix) {
-          ids.push(`${normalizedPrefix}${entry.modelName}`);
+          virtualIds.push(`${normalizedPrefix}${entry.modelName}`);
         }
       }
       for (const suffix of virtualProfile.match?.suffixes ?? []) {
         const normalizedSuffix = suffix.trim();
         if (normalizedSuffix) {
-          ids.push(`${entry.modelName}${normalizedSuffix}`);
+          virtualIds.push(`${entry.modelName}${normalizedSuffix}`);
         }
       }
     }
@@ -552,9 +552,18 @@ function buildGatewayDiscoverableModelIds(config: AppConfig, profile?: ProfileCo
       if (!normalizedAlias) {
         continue;
       }
-      ids.push(normalizedAlias);
+      virtualIds.push(normalizedAlias);
     }
   }
+
+  // Taoxian exposes virtual aliases by default. Provider base models remain
+  // routable by explicit selector, but are hidden from discovery so private
+  // providers and partial provider catalogs do not leak into every client.
+  // Local operators can opt into the full provider catalog when needed.
+  const exposeProviderModels = process.env.OMR_EXPOSE_PROVIDER_MODELS === "1";
+  const ids = exposeProviderModels || virtualIds.length === 0
+    ? [...baseEntries.map((entry) => entry.modelName), ...virtualIds]
+    : virtualIds;
 
   return filterModelIdsForProfile(config, uniqueStrings(ids), profile);
 }

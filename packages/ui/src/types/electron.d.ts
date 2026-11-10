@@ -91,6 +91,7 @@ import type { ProviderPreset } from "@ccr/core/providers/presets/types";
 declare global {
   interface Window {
     ccr?: {
+      rpc: (method: string, ...args: unknown[]) => Promise<unknown>;
       applyClaudeAppGateway: (config?: AppConfig) => Promise<ClaudeAppGatewayApplyResult>;
       applyProfile: () => Promise<ProfileApplyResult>;
       cancelBotGatewayQrLogin: (request: BotGatewayQrLoginCancelRequest) => Promise<BotGatewayQrLoginCancelResult>;

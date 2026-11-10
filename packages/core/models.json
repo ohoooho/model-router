@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-10T07:22:01.314Z",
+  "generatedAt": "2026-11-10T09:45:05.973Z",
   "generatedBy": "scripts/generate-models-json.mjs",
   "sources": [
     {
@@ -20,25 +20,25 @@
     }
   ],
   "summary": {
-    "modelCount": 5559,
-    "rawProviderModelCount": 13395,
+    "modelCount": 5560,
+    "rawProviderModelCount": 13396,
     "duplicateProviderModelRecordsMerged": 7836,
     "providerCount": 258,
     "availabilityProviderCount": 355,
     "sourceCounts": {
-      "models.dev": 3395,
+      "models.dev": 3396,
       "litellm": 2883,
       "openrouter": 465
     },
-    "pricingOfferCount": 13929,
-    "modelsWithPricing": 5346,
+    "pricingOfferCount": 13930,
+    "modelsWithPricing": 5347,
     "modelsWithoutPricing": 213,
     "modelsWith1MContext": 1573,
-    "modelsWithImageInput": 2718,
+    "modelsWithImageInput": 2719,
     "modelsWithImageOutput": 207,
     "modelsWithAudioInput": 510,
-    "modelsWithToolCalling": 3822,
-    "modelsWithReasoning": 3059
+    "modelsWithToolCalling": 3823,
+    "modelsWithReasoning": 3060
   },
   "models": [
     {
@@ -3597,7 +3597,7 @@
         "reasoning": true,
         "highReasoningEffort": true,
         "noneReasoningEffort": true,
-        "structuredOutput": false,
+        "structuredOutput": true,
         "temperature": true,
         "toolCalling": true,
         "videoInput": false,
@@ -302927,9 +302927,9 @@
             "sourceUrl": "https://models.dev/api.json",
             "sourceUnit": "usd_per_1m_tokens",
             "per1MTokens": {
-              "cacheRead": 0.018,
-              "input": 0.051,
-              "output": 0.567
+              "cacheRead": 0.005,
+              "input": 0.006,
+              "output": 0.5
             }
           },
           {
@@ -303374,9 +303374,9 @@
             "sourceUrl": "https://openrouter.ai/api/v1/models",
             "sourceUnit": "usd_per_token_for_token_fields",
             "per1MTokens": {
-              "cacheRead": 0.018,
-              "input": 0.051,
-              "output": 0.567
+              "cacheRead": 0.005,
+              "input": 0.006,
+              "output": 0.5
             }
           }
         ]
@@ -396412,9 +396412,9 @@
             "sourceUrl": "https://models.dev/api.json",
             "sourceUnit": "usd_per_1m_tokens",
             "per1MTokens": {
-              "cacheRead": 0.017,
-              "input": 0.034,
-              "output": 0.103
+              "cacheRead": 0.015,
+              "input": 0.03,
+              "output": 0.09
             }
           },
           {
@@ -396435,9 +396435,9 @@
             "sourceUrl": "https://models.dev/api.json",
             "sourceUnit": "usd_per_1m_tokens",
             "per1MTokens": {
-              "cacheRead": 0.016,
-              "input": 0.032,
-              "output": 0.095
+              "cacheRead": 0.015,
+              "input": 0.03,
+              "output": 0.089
             }
           },
           {
@@ -397540,9 +397540,9 @@
             "sourceUrl": "https://models.dev/api.json",
             "sourceUnit": "usd_per_1m_tokens",
             "per1MTokens": {
-              "cacheRead": 0.016,
-              "input": 0.032,
-              "output": 0.095
+              "cacheRead": 0.015,
+              "input": 0.03,
+              "output": 0.089
             }
           }
         ]
@@ -534062,9 +534062,9 @@
             "sourceUrl": "https://models.dev/api.json",
             "sourceUnit": "usd_per_1m_tokens",
             "per1MTokens": {
-              "cacheRead": 0.18,
-              "input": 0.1824,
-              "output": 10.1489
+              "cacheRead": 0.15,
+              "input": 0.152,
+              "output": 10.5601
             }
           },
           {
@@ -534088,9 +534088,9 @@
             "sourceUrl": "https://models.dev/api.json",
             "sourceUnit": "usd_per_1m_tokens",
             "per1MTokens": {
-              "cacheRead": 0.18,
-              "input": 0.1824,
-              "output": 10.1489
+              "cacheRead": 0.15,
+              "input": 0.152,
+              "output": 10.5601
             }
           },
           {
@@ -555698,6 +555698,111 @@
                 "type": "effort",
                 "values": [
                   "none",
+                  "medium",
+                  "high"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "nano-gpt/nex-n2.6",
+      "provider": "nano-gpt",
+      "model": "nex-n2.6",
+      "displayName": "Nex N2.6",
+      "family": "agi",
+      "sources": [
+        "models.dev"
+      ],
+      "providers": [
+        "nano-gpt"
+      ],
+      "aliases": [
+        "nano-gpt/nex-agi/nex-n2.6"
+      ],
+      "mergedProviderModelRecords": 1,
+      "limits": {
+        "contextTokens": 262144,
+        "inputTokens": 262144,
+        "outputTokens": 262144,
+        "supports1MContext": false
+      },
+      "modalities": {
+        "input": [
+          "image",
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "capabilities": {
+        "attachments": true,
+        "audioInput": false,
+        "audioOutput": false,
+        "imageInput": true,
+        "imageOutput": false,
+        "openWeights": false,
+        "pdfInput": false,
+        "reasoning": true,
+        "mediumReasoningEffort": true,
+        "highReasoningEffort": true,
+        "structuredOutput": true,
+        "toolCalling": true,
+        "videoInput": false,
+        "supports1MContext": false
+      },
+      "pricing": {
+        "currency": "USD",
+        "normalizedUnit": "per1MTokens values are USD per 1,000,000 tokens; non-token values keep the unit named by their object key.",
+        "offers": [
+          {
+            "source": "models.dev",
+            "provider": "nano-gpt",
+            "model": "nex-agi/nex-n2.6",
+            "sourceUrl": "https://models.dev/api.json",
+            "sourceUnit": "usd_per_1m_tokens",
+            "per1MTokens": {
+              "cacheRead": 0.03,
+              "input": 0.15,
+              "output": 0.5
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "displayNames": [
+          "Nex N2.6"
+        ],
+        "families": [
+          "agi"
+        ],
+        "releaseDate": "2026-11-10",
+        "lastUpdated": "2026-11-10",
+        "providerModelRecordCount": 1
+      },
+      "sourceRecords": [
+        {
+          "source": "models.dev",
+          "sourceUrl": "https://models.dev/api.json",
+          "provider": "nano-gpt",
+          "providerName": "NanoGPT",
+          "providerApi": "https://nano-gpt.com/api/v1",
+          "providerDoc": "https://docs.nano-gpt.com",
+          "model": "nex-agi/nex-n2.6",
+          "modelKey": "nex-agi/nex-n2.6",
+          "displayName": "Nex N2.6",
+          "family": "agi",
+          "metadata": {
+            "lastUpdated": "2026-11-10",
+            "openWeights": false,
+            "releaseDate": "2026-11-10",
+            "reasoningOptions": [
+              {
+                "type": "effort",
+                "values": [
                   "medium",
                   "high"
                 ]
@@ -843674,9 +843779,9 @@
             "sourceUrl": "https://models.dev/api.json",
             "sourceUnit": "usd_per_1m_tokens",
             "per1MTokens": {
-              "cacheRead": 0.1,
-              "input": 0.5,
-              "output": 2
+              "cacheRead": 0.11,
+              "input": 0.55,
+              "output": 2.2
             }
           },
           {
@@ -844919,9 +845024,9 @@
             "sourceUrl": "https://models.dev/api.json",
             "sourceUnit": "usd_per_1m_tokens",
             "per1MTokens": {
-              "cacheRead": 0.1,
-              "input": 0.5,
-              "output": 2
+              "cacheRead": 0.11,
+              "input": 0.55,
+              "output": 2.2
             }
           }
         ]
@@ -845014,9 +845119,9 @@
             "sourceUrl": "https://models.dev/api.json",
             "sourceUnit": "usd_per_1m_tokens",
             "per1MTokens": {
-              "cacheRead": 0.5,
-              "input": 1,
-              "output": 3
+              "cacheRead": 0.11,
+              "input": 0.55,
+              "output": 2.2
             }
           }
         ]
@@ -860662,8 +860767,8 @@
             "sourceUrl": "https://openrouter.ai/api/v1/models",
             "sourceUnit": "usd_per_token_for_token_fields",
             "per1MTokens": {
-              "cacheRead": 0.005,
-              "input": 0.006,
+              "cacheRead": 0.0331,
+              "input": 0.0341,
               "output": 6.8
             }
           }

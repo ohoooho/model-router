@@ -486,7 +486,8 @@ async function runConsole(options: ConsoleCliOptions): Promise<void> {
     return;
   }
 
-  const url = token ? baseUrl + "?omr_web_token=" + encodeURIComponent(token) : baseUrl;
+  const consoleUrl = token ? baseUrl + "?omr_web_token=" + encodeURIComponent(token) + "#v2" : baseUrl + "#v2";
+  const url = consoleUrl;
   process.stdout.write(`OMR 控制台: ${url}\n`);
   if (token) {
     process.stdout.write(`链接带 token, 打开一次浏览器就记住了, 之后直接开 ${baseUrl} 即可。\n`);

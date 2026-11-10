@@ -16,62 +16,41 @@ const TAOXIAN_VIRTUAL_MODELS = {
   'coding-auto': {
     display_name: 'Coding Auto (编程通用)',
     strategy: 'manual',
+    defaultBaseModel: 'baozi/coding-auto',
     match: { exactAliases: ['coding-auto'] },
     key_id: 'baozi-coding-auto',
   },
   'assist-auto': {
     display_name: 'Assist Auto (通用助手)',
     strategy: 'auto-balance',
+    defaultBaseModel: 'baozi/assist-auto',
+    allowedBaseModels: ['baozi/assist-auto', 'baozi/trial-auto'],
     match: { exactAliases: ['assist-auto'] },
     key_id: 'baozi-assist-auto',
   },
   'chat-auto': {
     display_name: 'Chat Auto (日常聊天)',
     strategy: 'auto-balance',
+    defaultBaseModel: 'baozi/chat-auto',
     match: { exactAliases: ['chat-auto'] },
     key_id: 'baozi-chat-auto',
   },
   'team-auto': {
     display_name: 'Team Auto (团队协作)',
     strategy: 'priority',
+    defaultBaseModel: 'baozi/team-auto',
     match: { exactAliases: ['team-auto'] },
     key_id: 'baozi-team-auto',
   },
+  'trial-auto': {
+    display_name: 'Trial Auto (体验配额)',
+    strategy: 'auto-balance',
+    defaultBaseModel: 'baozi/trial-auto',
+    allowedBaseModels: ['baozi/trial-auto', 'baozi/assist-auto'],
+    match: { exactAliases: ['trial-auto'] },
+    key_id: 'baozi-assist-auto',
+  },
 };
-
-function providerModelName(model) {
-  if (typeof model === 'string') return model.trim();
-  if (model && typeof model === 'object') return String(model.id || model.name || '').trim();
-  return '';
-}
-
-function providerIsTextModel(model) {
-  return model && !/image|video|seedance|seedream|wan|vision|embed|rerank/i.test(model);
-}
-
-function providerModelSelectors(provider) {
-  return (Array.isArray(provider?.models) ? provider.models : [])
-    .map(providerModelName)
-    .filter(providerIsTextModel)
-    .map((model) => `${provider.name}/${model}`);
-}
-
-function buildBaseModelSelectors(providers) {
-  const list = Array.isArray(providers) ? providers : [];
-  const baozi = list.filter((provider) => provider && provider.name === MANAGED_PROVIDER);
-  // Baozi wins even when the user disabled it or its key is a placeholder.
-  // Only fall back to enabled providers when no Baozi provider exists at all.
-  const source = baozi.length > 0
-    ? baozi
-    : list.filter((provider) => provider && provider.enabled !== false && provider.name);
-  return source.flatMap(providerModelSelectors);
-}
-
-function pickBaseModel(selectors, patterns) {
-  return selectors.find((selector) => patterns.some((pattern) => pattern.test(selector)))
-    || selectors[0]
-    || 'baozi/MiniMax-M3';
-}
 
 /**
  * Enable Taoxian's managed Baozi provider when it exists. User-owned providers
@@ -89,20 +68,11 @@ function applyManagedProviderVisibility(providers) {
 
 /**
  * Merge the four Taoxian scene profiles into `defaultConfig` without touching
- * user-owned fields. Existing profiles win, except that their fixed base model
- * is forced back to Baozi so the Taoxian aliases keep the default route.
+ * user-owned fields. Existing profiles win, except that each managed alias
+ * must keep its matching Baozi auto model (assist-auto may use trial-auto).
  * Returns a new profiles array and whether anything changed.
  */
 function mergeVirtualModelProfiles(defaultConfig, virtualModels = TAOXIAN_VIRTUAL_MODELS) {
-  const providers = applyManagedProviderVisibility(defaultConfig?.Providers);
-  const selectors = buildBaseModelSelectors(providers);
-  const sceneBaseModels = {
-    'coding-auto': pickBaseModel(selectors, [/deepseek/i, /kimi/i, /claude/i, /code/i]),
-    'chat-auto': pickBaseModel(selectors, [/doubao/i, /qwen/i, /glm/i, /minimax/i]),
-    'assist-auto': pickBaseModel(selectors, [/qwen/i, /glm/i, /doubao/i, /minimax/i]),
-    'team-auto': pickBaseModel(selectors, [/claude/i, /gpt/i, /qwen/i, /doubao/i]),
-  };
-
   const existingProfiles = Array.isArray(defaultConfig?.virtualModelProfiles)
     ? [...defaultConfig.virtualModelProfiles]
     : [];
@@ -119,7 +89,7 @@ function mergeVirtualModelProfiles(defaultConfig, virtualModels = TAOXIAN_VIRTUA
       name: scene.display_name,
       displayName: scene.display_name,
       enabled: true,
-      baseModel: { mode: 'fixed', fixedModel: sceneBaseModels[id] },
+      baseModel: { mode: 'fixed', fixedModel: scene.defaultBaseModel },
       strategy: scene.strategy,
       key: scene.key_id,
       match: scene.match,
@@ -132,17 +102,18 @@ function mergeVirtualModelProfiles(defaultConfig, virtualModels = TAOXIAN_VIRTUA
       existingProfiles.push(generated);
       profileById.set(id, generated);
       changed = true;
-    } else if (!existing.baseModel) {
-      existing.baseModel = generated.baseModel;
-      changed = true;
-    } else if (
-      existing.baseModel.mode === 'fixed'
-      && !String(existing.baseModel.fixedModel || '').startsWith(`${MANAGED_PROVIDER}/`)
-    ) {
-      // Repair tai/* and other fixed routes. The alias table is Taoxian-owned;
-      // user-owned fields on the profile are preserved.
-      existing.baseModel = { ...existing.baseModel, fixedModel: generated.baseModel.fixedModel };
-      changed = true;
+    } else {
+      const currentModel = existing.baseModel?.mode === 'fixed'
+        ? String(existing.baseModel.fixedModel || '').trim()
+        : '';
+      const allowedModels = [scene.defaultBaseModel, ...(scene.allowedBaseModels || [])];
+      if (!allowedModels.includes(currentModel)) {
+        // Taoxian owns the four public aliases. They must route to the matching
+        // Baozi auto model; assist-auto may also use the trial-auto model.
+        // User-owned providers and user-created virtual profiles are untouched.
+        existing.baseModel = { ...existing.baseModel, mode: 'fixed', fixedModel: scene.defaultBaseModel };
+        changed = true;
+      }
     }
   }
 

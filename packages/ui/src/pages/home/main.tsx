@@ -13,11 +13,12 @@ if (!container) {
 
 // 老 UI 的 RPC 桥: window.ccr.rpc(method, ...args) → Promise
 function bridgeRpc(method: string, ...args: unknown[]): Promise<unknown> {
-  const win = window as unknown as { ccr?: { rpc?: (m: string, ...a: unknown[]) => Promise<unknown> } };
-  if (!win.ccr?.rpc) {
+  const win = window as unknown as { ccr?: { rpc?: (m: string, ...a: unknown[]) => Promise<unknown> }; omr?: { rpc?: (m: string, ...a: unknown[]) => Promise<unknown> } };
+  const bridge = win.omr?.rpc ? win.omr : win.ccr;
+  if (!bridge?.rpc) {
     return Promise.reject(new Error("OMR web RPC bridge not ready. Run 'omr serve' first."));
   }
-  return win.ccr.rpc(method, ...args);
+  return bridge.rpc(method, ...args);
 }
 
 const isV2 = typeof window !== "undefined" && window.location.hash.startsWith("#v2");

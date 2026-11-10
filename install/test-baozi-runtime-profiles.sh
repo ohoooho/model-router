@@ -32,7 +32,7 @@ const config = {
       enabled: false,
       baseUrl: 'https://llm.ohoooho.com/v1',
       apiKey: 'fake_baozi_***',
-      models: ['MiniMax-M3', 'claude-sonnet-4-5', 'kimi-k2.6', 'kimi-k2.7-code', 'deepseek-v3', 'qwen3-max', 'glm-4.6'],
+      models: ['coding-auto', 'assist-auto', 'chat-auto', 'team-auto', 'trial-auto'],
     },
     {
       name: 'tai',
@@ -70,12 +70,22 @@ if (config.preferredProvider !== 'tai') throw new Error(`user preferredProvider 
 if (JSON.stringify(config.Router.fallback.models) !== JSON.stringify(['tai/glm-5.3-flash'])) {
   throw new Error(`user fallback was changed to ${JSON.stringify(config.Router.fallback.models)}`);
 }
-const aliases = ['coding-auto', 'chat-auto', 'assist-auto', 'team-auto'];
-for (const id of aliases) {
+const aliases = {
+  'coding-auto': 'baozi/coding-auto',
+  'chat-auto': 'baozi/chat-auto',
+  'assist-auto': 'baozi/assist-auto',
+  'team-auto': 'baozi/team-auto',
+  'trial-auto': 'baozi/trial-auto',
+};
+for (const [id, expected] of Object.entries(aliases)) {
   const profile = config.virtualModelProfiles.find((item) => item.id === id);
   if (!profile) throw new Error(`missing profile ${id}`);
   const fixed = profile.baseModel && profile.baseModel.fixedModel;
-  if (!fixed || !fixed.startsWith('baozi/')) throw new Error(`${id} is ${fixed}`);
+  if (fixed !== expected) throw new Error(`${id} is ${fixed}, expected ${expected}`);
+}
+if (!baozi.models.includes('trial-auto')) throw new Error('baozi trial-auto model was not added');
+if (config.virtualModelProfiles.find((item) => item.id === 'trial-auto').key !== 'baozi-assist-auto') {
+  throw new Error('trial-auto must share the assist scene key');
 }
 const coding = config.virtualModelProfiles.find((item) => item.id === 'coding-auto');
 if (coding.custom !== 1) throw new Error('user-owned profile field was lost');

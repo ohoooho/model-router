@@ -55,6 +55,11 @@ const SCENE_KEYS = {
   'assist-auto': resolveSceneKey(process.env.BAOZI_ASSIST_KEY, 'assist'),
   'team-auto':   resolveSceneKey(process.env.BAOZI_TEAM_KEY,   'team'),
 };
+// trial-auto is the alternate Baozi quota pool for assist-auto. It shares the
+// assist scene key unless the operator explicitly supplies a trial key.
+SCENE_KEYS['trial-auto'] = process.env.BAOZI_TRIAL_KEY
+  ? resolveSceneKey(process.env.BAOZI_TRIAL_KEY, 'trial')
+  : SCENE_KEYS['assist-auto'];
 const BAOZI_KEY = process.env.BAOZI_KEY || SCENE_KEYS['chat-auto'];
 const PERSONA_BAOZI_KEY = process.env.PERSONA_BAOZI_KEY || BAOZI_KEY;
 const BUTLER_BAOZI_KEY = process.env.BUTLER_BAOZI_KEY || BAOZI_KEY;
@@ -186,7 +191,7 @@ let defaultConfig = {};
 if (defaultRow?.value_json) {
   try { defaultConfig = JSON.parse(defaultRow.value_json); } catch { defaultConfig = {}; }
 }
-const providerModels = ['MiniMax-M3', 'claude-sonnet-4-5', 'kimi-k2.6', 'kimi-k2.7-code', 'deepseek-v3', 'qwen3-max', 'glm-4.6'];
+const providerModels = ['coding-auto', 'assist-auto', 'chat-auto', 'team-auto', 'trial-auto'];
 const existingProviders = Array.isArray(defaultConfig.Providers) ? defaultConfig.Providers : [];
 const existingBaoziProvider = existingProviders.find((provider) => provider && provider.name === 'baozi') || {};
 const incomingBaoziKey = process.env.BUTLER_BAOZI_KEY || '';
@@ -232,7 +237,7 @@ upsertConfig.run('default', JSON.stringify({
     ...router,
     fallback: {
       ...fallback,
-      models: fallbackModels.length > 0 ? fallbackModels : ['baozi/MiniMax-M3'],
+      models: fallbackModels.length > 0 ? fallbackModels : ['baozi/chat-auto'],
     },
   },
   gateway: {

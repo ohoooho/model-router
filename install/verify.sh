@@ -131,11 +131,11 @@ process.stdout.write(row?.encrypted_key || '');
 
 # 失职 259: 不再 hardcode "Bearer ***" (永远 401)
 
-# 失职 267 立刻认: K-261 锁点 — 4 场景独立测为默认行为, 不需要 OMR_BAOZI_KEY gate
+# K-261: 五个 public scene 独立测为默认行为, 不需要 OMR_BAOZI_KEY gate
 # 每个场景 OMR_BAOZI_<SCENE>_KEY env, 没设用 fake_<scene>_*** 占位
 SCENE_OK=0
 SCENE_FAIL=0
-for SCENE in chat-auto coding-auto assist-auto team-auto; do
+for SCENE in chat-auto coding-auto assist-auto team-auto trial-auto; do
     SCENE_KEY_VAR="OMR_BAOZI_$(echo ${SCENE%-*} | tr 'a-z' 'A-Z')_KEY"
     SCENE_KEY=$(eval echo "\${${SCENE_KEY_VAR}:-}")
     if [ -z "${SCENE_KEY}" ] && [ -f "${CONFIG_DB}" ]; then
@@ -171,15 +171,15 @@ process.stdout.write(row?.encrypted_key || '');
         echo "  ⚠️ ${SCENE} POST = ${SCENE_CODE}"
     fi
 done
-if [ ${SCENE_OK} -ge 3 ]; then
+if [ ${SCENE_OK} -ge 4 ]; then
     UPSTREAM_READY=1
-    echo "  ✅ upstream_ready 4 场景 ${SCENE_OK}/4 通过 (3+ 算通)"
+    echo "  ✅ upstream_ready 5 场景 ${SCENE_OK}/5 通过 (4+ 算通)"
 elif [ ${SCENE_OK} -ge 1 ]; then
     UPSTREAM_READY=0
-    echo "  ⚠️ upstream_ready 4 场景 ${SCENE_OK}/4 通过 (<3 不算通, 但路由层 OK)"
+    echo "  ⚠️ upstream_ready 5 场景 ${SCENE_OK}/5 通过 (<4 不算通, 但路由层 OK)"
 else
     UPSTREAM_READY=0
-    echo "  ⚠️ upstream_ready 4 场景全 401/fail (路由层 OK, 等真 baozi_key 物料)"
+    echo "  ⚠️ upstream_ready 5 场景全 401/fail (路由层 OK, 等真 baozi_key 物料)"
 fi
 
 # === 汇总 ===
@@ -188,7 +188,7 @@ echo "==> OMR 4 状态汇总 (契约 §7.3)"
 echo "    installed:       $([ ${INSTALLED} -eq 1 ] && echo "✅ passed" || echo "❌ failed")"
 echo "    configured:      $([ ${CONFIGURED} -eq 1 ] && echo "✅ passed" || echo "❌ failed")"
 echo "    healthy:         $([ ${HEALTHY} -eq 1 ] && echo "✅ passed" || echo "❌ failed")"
-echo "    upstream_ready:  $([ ${UPSTREAM_READY} -eq 1 ] && echo "✅ passed" || echo "⚠️ skipped (4 场景测了, 等真 baozi_key 物料, K-261 锁点)")"
+echo "    upstream_ready:  $([ ${UPSTREAM_READY} -eq 1 ] && echo "✅ passed" || echo "⚠️ skipped (5 场景测了, 等真 baozi_key 物料, K-261 锁点)")"
 
 if [ -n "${FAIL_LIST}" ]; then
     echo ""

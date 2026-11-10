@@ -105,6 +105,7 @@ function normalizeExternalHttpUrl(value: string): string {
 }
 
 const webClientBridge: CcrApi = {
+  rpc: (method, ...args) => rpc(method, args),
   applyClaudeAppGateway: (config) => rpc("applyClaudeAppGateway", [config]) as ReturnType<CcrApi["applyClaudeAppGateway"]>,
   applyProfile: () => rpc("applyProfile") as ReturnType<CcrApi["applyProfile"]>,
   cancelBotGatewayQrLogin: (request) => rpc("cancelBotGatewayQrLogin", [request]) as ReturnType<CcrApi["cancelBotGatewayQrLogin"]>,
