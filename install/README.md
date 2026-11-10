@@ -64,14 +64,14 @@ npm rebuild --prefix "$(npm root -g)/@ohoooho/model-router" \
 发行流程先校验 SHA-256，再通过 `OMR_TARBALL` 传入本地包：
 
 ```bash
-OMR_INSTALL_MODE=offline OMR_TARBALL=./omr-0.1.0-fork3.0.18+p5.tgz ./install.sh --offline
+OMR_INSTALL_MODE=offline OMR_TARBALL=./omr-0.1.0-fork3.1.3+p1.tgz ./install.sh --offline
 ```
 
 默认只固定包体（包本身从 tarball 安装），npm 依赖仍从 registry 解析。需要完全断网时，
 先把依赖预热到 npm cache，再设置 `OMR_STRICT_OFFLINE=1`：
 
 ```bash
-OMR_STRICT_OFFLINE=1 OMR_INSTALL_MODE=offline OMR_TARBALL=./omr-0.1.0-fork3.0.18+p5.tgz ./install.sh --offline
+OMR_STRICT_OFFLINE=1 OMR_INSTALL_MODE=offline OMR_TARBALL=./omr-0.1.0-fork3.1.3+p1.tgz ./install.sh --offline
 ```
 
 完全离线物料（含跨平台依赖缓存）仍是发行前工作；未预热 cache 时脚本会明确失败，不会

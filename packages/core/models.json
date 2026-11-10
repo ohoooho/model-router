@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-10T07:01:30.827Z",
+  "generatedAt": "2026-11-10T07:14:37.824Z",
   "generatedBy": "scripts/generate-models-json.mjs",
   "sources": [
     {
@@ -534055,7 +534055,7 @@
             "per1MTokens": {
               "cacheRead": 0.18,
               "input": 0.1824,
-              "output": 10.1489
+              "output": 9.3388
             }
           }
         ]
@@ -865218,9 +865218,9 @@
             "sourceUrl": "https://openrouter.ai/api/v1/models",
             "sourceUnit": "usd_per_token_for_token_fields",
             "per1MTokens": {
-              "cacheRead": 0.194,
-              "input": 0.573,
-              "output": 1.169
+              "cacheRead": 0.178,
+              "input": 0.527,
+              "output": 1.075
             }
           }
         ]

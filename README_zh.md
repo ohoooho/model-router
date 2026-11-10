@@ -108,7 +108,7 @@ npm run build:assets
 
 ## Fork 来源
 
-OMR fork 自 [claude-code-router](https://github.com/musistudio/claude-code-router) v3.0.18（MIT License，© 2025 musistudio）。保留上游 MIT 许可并追加我们自己的版权声明，详见 [LICENSE](LICENSE)。
+OMR fork 自 [claude-code-router](https://github.com/musistudio/claude-code-router) v3.1.3（MIT License，© 2025 musistudio）。保留上游 MIT 许可并追加我们自己的版权声明，详见 [LICENSE](LICENSE)。
 
 ## License
 

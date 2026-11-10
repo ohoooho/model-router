@@ -22,6 +22,7 @@ const REQUEST_TIMEOUT_MS = numberEnv("CCR_CODEX_APP_REQUEST_TIMEOUT_MS", 10 * 60
 const TURN_IDLE_TIMEOUT_MS = numberEnv("CCR_CODEX_CLAUDE_TURN_IDLE_TIMEOUT_MS", 10 * 60 * 1000);
 const CONFIG_DIR = resolveConfigDir();
 const LOG_PATH = process.env.OMR_CODEX_CLI_MIDDLEWARE_LOG || "";
+const OMR_CLAUDE_CODE_MCP_CONFIG_ENV = "OMR_CLAUDE_CODE_MCP_CONFIG";
 const CLAUDE_CODE_MCP_CONFIG_ENV = "CCR_CLAUDE_CODE_MCP_CONFIG";
 const CODEXL_CLAUDE_CODE_MCP_CONFIG_ENV = "CODEXL_CLAUDE_CODE_MCP_CONFIG";
 const CLAUDE_CODE_CHINA_TIME_ZONES = new Set([
@@ -232,7 +233,7 @@ function claudeCodeCliWrapperArgs(args) {
 }
 
 function claudeCodeArgsWithMcpConfig(args, env) {
-  const mcpConfig = nonEmptyEnvFrom(env, CLAUDE_CODE_MCP_CONFIG_ENV) || nonEmptyEnvFrom(env, CODEXL_CLAUDE_CODE_MCP_CONFIG_ENV);
+  const mcpConfig = nonEmptyEnvFrom(env, OMR_CLAUDE_CODE_MCP_CONFIG_ENV) || nonEmptyEnvFrom(env, CLAUDE_CODE_MCP_CONFIG_ENV) || nonEmptyEnvFrom(env, CODEXL_CLAUDE_CODE_MCP_CONFIG_ENV);
   if (!mcpConfig || claudeCodeArgsHaveMcpConfig(args) || claudeCodeArgsShouldSkipModelInjection(args)) {
     return args;
   }

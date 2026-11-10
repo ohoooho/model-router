@@ -102,7 +102,7 @@ Desktop app packages (macOS / Windows / Linux) can be built with `npm run build:
 
 ## Fork source
 
-OMR is a fork of [claude-code-router](https://github.com/musistudio/claude-code-router) v3.0.18 (MIT License, © 2025 musistudio). We keep the upstream MIT license and add our own copyright notice. See [LICENSE](LICENSE).
+OMR is a fork of [claude-code-router](https://github.com/musistudio/claude-code-router) v3.1.3 (MIT License, © 2025 musistudio). We keep the upstream MIT license and add our own copyright notice. See [LICENSE](LICENSE).
 
 ## License
 

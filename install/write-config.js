@@ -60,7 +60,7 @@ const PERSONA_BAOZI_KEY = process.env.PERSONA_BAOZI_KEY || BAOZI_KEY;
 const BUTLER_BAOZI_KEY = process.env.BUTLER_BAOZI_KEY || BAOZI_KEY;
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 const LICENSE_JSON = process.env.LICENSE_JSON || '';
-const OMR_VERSION = process.env.OMR_VERSION || '0.1.0-fork3.0.18+p5';
+const OMR_VERSION = process.env.OMR_VERSION || '0.1.0-fork3.1.3+p1';
 
 // 3. mkdir 数据目录 (0700 受保护)
 fs.mkdirSync(OMR_DATA_DIR, { recursive: true, mode: 0o700 });
@@ -131,8 +131,8 @@ const upsertConfig = db.prepare(`
 const OMR_CONFIG = {
   version: OMR_VERSION,
   fork_of: 'claude-code-router',
-  fork_base: 'v3.0.18',
-  patches_count: 5,
+  fork_base: 'v3.1.3',
+  patches_count: 6,
   patches: ['K-251', 'K-272', 'K-273', 'K-294', 'K-295'],
   // 双 baozi_key 引用 (实际 key 在 api_keys 表加密存)
   baozi: {

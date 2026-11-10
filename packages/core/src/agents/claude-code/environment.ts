@@ -1,4 +1,5 @@
 export const CLAUDE_CODE_MCP_CONFIG_ENV = "OMR_CLAUDE_CODE_MCP_CONFIG";
+export const CCR_CLAUDE_CODE_MCP_CONFIG_ENV = "CCR_CLAUDE_CODE_MCP_CONFIG";
 export const CODEXL_CLAUDE_CODE_MCP_CONFIG_ENV = "CODEXL_CLAUDE_CODE_MCP_CONFIG";
 export const CLAUDE_CODE_MODEL_ENV = "ANTHROPIC_MODEL";
 export const CCR_CLAUDE_CODE_MODEL_ENV = "OMR_CLAUDE_CODE_MODEL";
@@ -43,6 +44,7 @@ export function claudeCodeMcpConfigEnv(configFile: string | undefined): Record<s
   return configFile
     ? {
         [CLAUDE_CODE_MCP_CONFIG_ENV]: configFile,
+        [CCR_CLAUDE_CODE_MCP_CONFIG_ENV]: configFile,
         [CODEXL_CLAUDE_CODE_MCP_CONFIG_ENV]: configFile
       }
     : {};

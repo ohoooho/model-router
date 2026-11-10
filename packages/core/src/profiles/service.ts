@@ -8,6 +8,7 @@ import { updatePersistedApiKeys } from "@ccr/core/config/config-repository";
 import { botGatewayProfileEnv } from "@ccr/core/agents/bot-gateway/env";
 import {
   CLAUDE_CODE_MCP_CONFIG_ENV,
+  CCR_CLAUDE_CODE_MCP_CONFIG_ENV,
   CODEXL_CLAUDE_CODE_MCP_CONFIG_ENV,
   type ClaudeCodeModelSelection,
   claudeCodeModelEnv,
@@ -61,24 +62,24 @@ import {
 import { getProviderCatalogModels } from "@ccr/core/providers/model-catalog";
 import { resolveUsageModelAttribution } from "@ccr/core/usage/model-attribution";
 
-const managedRootStart = "# BEGIN OMR managed profile";
-const managedRootEnd = "# END OMR managed profile";
-const managedProviderStart = "# BEGIN OMR managed Codex provider";
-const managedProviderEnd = "# END OMR managed Codex provider";
-const managedToolHubMcpStart = "# BEGIN OMR managed ToolHub MCP";
-const managedToolHubMcpEnd = "# END OMR managed ToolHub MCP";
-const managedContextArchiveMcpStart = "# BEGIN OMR managed Context Archive MCP";
-const managedContextArchiveMcpEnd = "# END OMR managed Context Archive MCP";
-const managedConfiguredModelPrefix = "# OMR configured model = ";
-const legacyManagedRootStart = "# BEGIN CCR managed profile";
-const legacyManagedRootEnd = "# END CCR managed profile";
-const legacyManagedProviderStart = "# BEGIN CCR managed Codex provider";
-const legacyManagedProviderEnd = "# END CCR managed Codex provider";
-const legacyManagedToolHubMcpStart = "# BEGIN CCR managed ToolHub MCP";
-const legacyManagedToolHubMcpEnd = "# END CCR managed ToolHub MCP";
-const legacyManagedContextArchiveMcpStart = "# BEGIN CCR managed Context Archive MCP";
-const legacyManagedContextArchiveMcpEnd = "# END CCR managed Context Archive MCP";
-const legacyManagedConfiguredModelPrefix = "# CCR configured model = ";
+const managedRootStart = "# BEGIN CCR managed profile";
+const managedRootEnd = "# END CCR managed profile";
+const managedProviderStart = "# BEGIN CCR managed Codex provider";
+const managedProviderEnd = "# END CCR managed Codex provider";
+const managedToolHubMcpStart = "# BEGIN CCR managed ToolHub MCP";
+const managedToolHubMcpEnd = "# END CCR managed ToolHub MCP";
+const managedContextArchiveMcpStart = "# BEGIN CCR managed Context Archive MCP";
+const managedContextArchiveMcpEnd = "# END CCR managed Context Archive MCP";
+const managedConfiguredModelPrefix = "# CCR configured model = ";
+const legacyManagedRootStart = "# BEGIN OMR managed profile";
+const legacyManagedRootEnd = "# END OMR managed profile";
+const legacyManagedProviderStart = "# BEGIN OMR managed Codex provider";
+const legacyManagedProviderEnd = "# END OMR managed Codex provider";
+const legacyManagedToolHubMcpStart = "# BEGIN OMR managed ToolHub MCP";
+const legacyManagedToolHubMcpEnd = "# END OMR managed ToolHub MCP";
+const legacyManagedContextArchiveMcpStart = "# BEGIN OMR managed Context Archive MCP";
+const legacyManagedContextArchiveMcpEnd = "# END OMR managed Context Archive MCP";
+const legacyManagedConfiguredModelPrefix = "# OMR configured model = ";
 const originalBackupSuffix = ".ccr-original";
 const originalMissingSuffix = ".ccr-original-missing";
 const legacyOriginalBackupSuffix = ".omr-original";
@@ -337,7 +338,7 @@ function cleanupClaudeCodeToolHubSettingsFile(file: string, options: { backup: b
 
 function deleteClaudeCodeToolHubEnv(env: Record<string, unknown>): boolean {
   let changed = false;
-  for (const key of [CLAUDE_CODE_MCP_CONFIG_ENV, CODEXL_CLAUDE_CODE_MCP_CONFIG_ENV]) {
+  for (const key of [CLAUDE_CODE_MCP_CONFIG_ENV, CCR_CLAUDE_CODE_MCP_CONFIG_ENV, CODEXL_CLAUDE_CODE_MCP_CONFIG_ENV]) {
     if (key in env) {
       delete env[key];
       changed = true;
@@ -447,6 +448,7 @@ function applyClaudeCodeProfile(config: AppConfig, profile: ProfileConfig, token
       managedProfileEnvKeys
     );
     delete settingsEnv[CLAUDE_CODE_MCP_CONFIG_ENV];
+    delete settingsEnv[CCR_CLAUDE_CODE_MCP_CONFIG_ENV];
     delete settingsEnv[CODEXL_CLAUDE_CODE_MCP_CONFIG_ENV];
     const env = {
       ...settingsEnv,
@@ -2075,7 +2077,7 @@ function buildKimiProfileConfigToml(
   const firstTableIndex = firstTomlTableIndex(preserved);
   const rootSource = firstTableIndex === -1 ? preserved : preserved.slice(0, firstTableIndex);
   const restSource = firstTableIndex === -1 ? "" : preserved.slice(firstTableIndex);
-  const providerId = "omr";
+  const providerId = profile.providerId?.trim() || "claude-code-router";
   const baseUrl = `${gatewayEndpoint(config).replace(/\/+$/g, "")}/v1`;
   const headers = kimiProfileCustomHeaderEntries(profile);
   const providerBlock = [
@@ -3296,6 +3298,7 @@ function claudeCodeManagedSettingsEnvKeys(
     ...Object.keys(wifEnv),
     ...Object.keys(timezoneEnv),
     CLAUDE_CODE_MCP_CONFIG_ENV,
+    CCR_CLAUDE_CODE_MCP_CONFIG_ENV,
     CODEXL_CLAUDE_CODE_MCP_CONFIG_ENV
   ]);
 }
@@ -3308,6 +3311,7 @@ function isManagedClaudeCodeSettingsEnvKey(key: string): boolean {
     isClaudeCodeWifEnvKey(key) ||
     key === CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY_ENV ||
     key === CLAUDE_CODE_MCP_CONFIG_ENV ||
+    key === CCR_CLAUDE_CODE_MCP_CONFIG_ENV ||
     key === CODEXL_CLAUDE_CODE_MCP_CONFIG_ENV ||
     isClaudeCodeManagedModelEnvKey(key) ||
     isBotGatewayEnvKey(key);
@@ -3583,11 +3587,11 @@ function disabledProfileStatus(profile: ProfileConfig): ProfileClientApplyStatus
 
 export function restoreInactiveGlobalProfileConfigs(profiles: ProfileConfig[]): ProfileClientApplyStatus[] {
   const statuses: ProfileClientApplyStatus[] = [];
-  if (!profiles.some((profile) => profile.agent === "claude-code" && profile.enabled && isGlobalProfile(profile))) {
+  const claudeCodeProfiles = profiles.filter((profile) => profile.agent === "claude-code");
+  if (claudeCodeProfiles.length > 0 && !claudeCodeProfiles.some((profile) => profile.enabled && isGlobalProfile(profile))) {
     for (const file of uniqueResolvedPaths([
       "~/.claude/settings.json",
-      ...profiles
-        .filter((profile) => profile.agent === "claude-code")
+      ...claudeCodeProfiles
         .map((profile) => profile.settingsFile || "")
         .filter(Boolean)
     ])) {
