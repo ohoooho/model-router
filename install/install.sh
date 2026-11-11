@@ -73,19 +73,36 @@ sha256_file() {
 }
 
 # A component script must also be safe when called without the Taoxian
-# detector. Never replace an existing package behind the user's back.
+# detector. Never replace an existing package unless the caller explicitly
+# requests an upgrade.
+OMR_UPGRADE_EXISTING="${OMR_UPGRADE_EXISTING:-0}"
 SKIPPED_EXISTING=0
+UPGRADING_EXISTING=0
 INSTALLED_VERSION=""
 if [ -f "${INSTALL_DIR}/package.json" ]; then
     INSTALLED_VERSION=$(node -e 'console.log(require(process.argv[1]).version)' "${INSTALL_DIR}/package.json")
-    echo "==> OMR 已安装（version=${INSTALLED_VERSION}），跳过覆盖/升级"
-    SKIPPED_EXISTING=1
+    if [ "${OMR_UPGRADE_EXISTING}" = "1" ]; then
+        echo "==> OMR 已安装（version=${INSTALLED_VERSION}），升级到 ${OMR_VERSION}"
+        UPGRADING_EXISTING=1
+    else
+        echo "==> OMR 已安装（version=${INSTALLED_VERSION}），跳过覆盖/升级"
+        SKIPPED_EXISTING=1
+    fi
+fi
+
+if [ "${UPGRADING_EXISTING}" -eq 1 ]; then
+    echo "==> 升级模式：保留现有 Provider / Key / virtual_models，只替换软件包"
 fi
 
 # 已安装时默认不跑 configure：重装/重复部署不应覆盖现有 Provider、Key、
 # virtual_models 或用户手写的模型列表。需要改配置时显式 --reconfigure。
 if [ "${SKIPPED_EXISTING}" -eq 1 ] && [ "${OMR_RECONFIGURE_EXISTING}" != "1" ]; then
     echo "==> 保护现有配置：跳过 configure（需要重配请加 --reconfigure 或 OMR_RECONFIGURE_EXISTING=1）"
+    OMR_SKIP_CONFIGURE=1
+fi
+
+if [ "${UPGRADING_EXISTING}" -eq 1 ] && [ "${OMR_RECONFIGURE_EXISTING}" != "1" ]; then
+    echo "==> 升级模式：保留现有配置，不自动 reconfigure"
     OMR_SKIP_CONFIGURE=1
 fi
 
@@ -159,17 +176,19 @@ NODE_BIN="${INSTALL_DIR}/dist/main/cli.js"
 [ -f "${NODE_BIN}" ] || { echo "ERR: ${NODE_BIN} 不存在"; exit 4; }
 node "${NODE_BIN}" --help >/dev/null || { echo "ERR: OMR CLI 不可执行"; exit 5; }
 
-# p5 stopgap: keep older offline tarballs usable until the next OMR artifact
-# contains the CLI/web naming fixes. Idempotent; unknown builds are untouched.
-if [ -f "${SCRIPT_DIR}/compat-cli.mjs" ]; then
-    OMR_CLI_FILE="${NODE_BIN}" node "${SCRIPT_DIR}/compat-cli.mjs" || {
-        echo "WARN: OMR CLI compatibility patch failed; omr start may report a false readiness error" >&2
-    }
-fi
+# p5 stopgap: only old fork3.0.18 offline tarballs need the CLI/web branding
+# patch. The fork3.1.3 artifact already contains the source fixes.
+case "${OMR_VERSION}" in
+    *fork3.0.18*)
+        if [ -f "${SCRIPT_DIR}/compat-cli.mjs" ]; then
+            OMR_CLI_FILE="${NODE_BIN}" node "${SCRIPT_DIR}/compat-cli.mjs" || {
+                echo "WARN: OMR CLI compatibility patch failed; omr start may report a false readiness error" >&2
+            }
+        fi
+        ;;
+esac
 
-if [ -z "${INSTALLED_VERSION}" ]; then
-    INSTALLED_VERSION=$(node -e 'console.log(require(process.argv[1]).version)' "${INSTALL_DIR}/package.json" 2>/dev/null || echo "${OMR_VERSION}")
-fi
+INSTALLED_VERSION=$(node -e 'console.log(require(process.argv[1]).version)' "${INSTALL_DIR}/package.json" 2>/dev/null || echo "${OMR_VERSION}")
 echo "    installed_version: ${INSTALLED_VERSION}"
 
 # resolved_version vs installed_version 必须一致 (契约 §3.4 死规)
