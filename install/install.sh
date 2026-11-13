@@ -209,7 +209,7 @@ NODE_BIN="${INSTALL_DIR}/dist/main/cli.js"
 node "${NODE_BIN}" --help >/dev/null || { echo "ERR: OMR CLI 不可执行"; exit 5; }
 
 # p5 stopgap: only old fork3.0.18 offline tarballs need the CLI/web branding
-# patch. The fork3.1.3 artifact already contains the source fixes.
+# patch. The 0.2.0 artifact (fork base 3.1.3) already contains the source fixes.
 case "${OMR_VERSION}" in
     *fork3.0.18*)
         if [ -f "${SCRIPT_DIR}/compat-cli.mjs" ]; then

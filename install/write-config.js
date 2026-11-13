@@ -65,7 +65,7 @@ const PERSONA_BAOZI_KEY = process.env.PERSONA_BAOZI_KEY || BAOZI_KEY;
 const BUTLER_BAOZI_KEY = process.env.BUTLER_BAOZI_KEY || BAOZI_KEY;
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 const LICENSE_JSON = process.env.LICENSE_JSON || '';
-const OMR_VERSION = process.env.OMR_VERSION || '0.1.0-fork3.1.3+p2';
+const OMR_VERSION = process.env.OMR_VERSION || '0.2.0';
 
 // 3. mkdir 数据目录 (0700 受保护)
 fs.mkdirSync(OMR_DATA_DIR, { recursive: true, mode: 0o700 });

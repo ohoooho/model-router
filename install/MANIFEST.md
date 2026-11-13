@@ -8,16 +8,18 @@
 
 | channel | version | 状态 |
 |---|---|---|
-| stable | `0.1.0-fork3.1.3+p2` | 当前默认 (已装 123 端) |
-| beta | `0.2.0-fork3.1.3+p3` | 占位 (未发布) |
+| stable | `0.2.0` | 当前默认；替代历史版本 `0.1.0-fork3.1.3+p2` |
+| beta | `0.3.0` | 占位 (未发布) |
 
-semver 命名规则 (老板 14:29 建议):
+命名规则 (老板 2026-11-12 拍板):
 ```
-omr-<semver>-fork<base>+p<n>
-  ├─ <semver>: 自家 semver
-  ├─ fork<base>: 上游 fork base (claude-code-router)
-  └─ +p<n>: 自家 patch 数 (5 个 K-251/272/273/294/295)
+omr-<MAJOR>.<MINOR>.<PATCH>.tgz
 ```
+
+- 可安装版本只使用纯 SemVer，不再把 `fork<上游版本>` 或 `+p<n>` 写进版本号和物料文件名。
+- 上游 fork base（当前 `claude-code-router v3.1.3`）和自家 patch 清单只作为
+  `install/write-config.js` 写入的配置元数据（`fork_base` / `patches`），不参与版本比较。
+- 历史版本 `0.1.0-fork3.1.3+p2` 仍可被识别；安装器按数字版本比较，`0.2.0` 会正常升级旧 p2。
 
 ## 物料清单 (BOM) — 契约 §4 标准结构
 

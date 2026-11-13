@@ -23,6 +23,17 @@
 
 ## Fork 后变更（OMR 专属）
 
+### OMR-RELEASE-0.2.0 — 2026-11-13
+- **类型**: chore
+- **标题**: 可安装版本改为纯 SemVer `0.2.0`
+- **改动**:
+  - `packages/cli/package.json`、`package.json`、`package-lock.json`
+  - `install/component.yaml`、`install/component.context.json`、`install/write-config.js`
+  - `install/MANIFEST.md`、`install/README.md`
+- **原因**: 老板拍板不再使用 `0.1.0-fork3.1.3+p2` 形式；版本号只用于升级对齐，
+  fork base 和 patch 清单保留在配置元数据里。
+- **兼容**: 旧 p2 安装按数字版本比较，可正常升级到 `0.2.0`。
+
 ### OMR-FORK-CHANGE-005c — 2026-08-12
 - **commit**: `1906ed3`
 - **类型**: bug-fix
