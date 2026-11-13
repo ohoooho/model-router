@@ -170,6 +170,38 @@ if [ "${SKIPPED_EXISTING}" -eq 0 ] && [ "${OMR_INSTALL_MODE}" = "offline" ]; the
     fi
 fi
 
+# Taoxian bundle default: preserve the pre-p2 no-license startup behavior.
+# OMR p2 added K-251 (RS256 Taoxian License v1.2) to start/serve/console, but
+# the Taoxian installer has not issued OMR licenses. Wrapping the CLI entry
+# makes every caller (installer child, systemd unit, manual `omr`) use the same
+# default without relying on an exported environment variable. The wrapper is
+# idempotent and re-applied after every package upgrade.
+apply_taoxian_license_default() {
+    local cli="${INSTALL_DIR}/dist/main/cli.js"
+    local real="${INSTALL_DIR}/dist/main/cli-real.js"
+    [ -f "${cli}" ] || return 0
+    if grep -Fq 'TAOXIAN_OMR_LICENSE_DEFAULT' "${cli}" 2>/dev/null; then
+        return 0
+    fi
+    cp -p "${cli}" "${real}.tmp" || {
+        echo "WARN: 无法备份 OMR CLI，license 默认值未应用" >&2
+        return 0
+    }
+    mv -f "${real}.tmp" "${real}" || {
+        echo "WARN: 无法写入 OMR CLI 备份，license 默认值未应用" >&2
+        return 0
+    }
+    cat > "${cli}" <<'JS'
+#!/usr/bin/env node
+"use strict";
+// Taoxian bundle: OMR p2 license gate is not enabled until licenses are issued.
+process.env.TAOXIAN_LICENSE_SKIP = process.env.TAOXIAN_LICENSE_SKIP || "1";
+require("./cli-real.js");
+JS
+    chmod 755 "${cli}"
+}
+apply_taoxian_license_default
+
 # ===== 4. 验证装好 + 回显 installed_version (契约 §3.4) =====
 echo "==> 2) verify install (契约 §7.3: installed 状态)"
 NODE_BIN="${INSTALL_DIR}/dist/main/cli.js"
