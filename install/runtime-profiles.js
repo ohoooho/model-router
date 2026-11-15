@@ -52,6 +52,62 @@ const TAOXIAN_VIRTUAL_MODELS = {
   },
 };
 
+const TAOXIAN_MANAGED_MODELS = Object.keys(TAOXIAN_VIRTUAL_MODELS);
+
+// REMOVAL BLACKLIST — these names are never added to a provider. The
+// pre-0.2.0 installer and OMR's built-in default config seeded them; they are
+// stale now that Baozi exposes the five `*-auto` aliases. `normalizeBaoziModels`
+// filters them out while preserving user-added models.
+const LEGACY_BAOZI_MODELS_TO_REMOVE = [
+  'MiniMax-M3',
+  'claude-sonnet-4-5',
+  'kimi-k2.6',
+  'kimi-k2.7-code',
+  'deepseek-v3',
+  'qwen3-max',
+  'glm-4.6',
+];
+
+// One concrete upstream model is useful in the UI as a non-auto example.
+// `minimax-m3` is present in the current Baozi catalog. Operators can override
+// it with BAOZI_EXAMPLE_MODEL (set to `none` to omit the example).
+const DEFAULT_BAOZI_EXAMPLE_MODEL = 'minimax-m3';
+
+function uniqueModelNames(values) {
+  return Array.from(new Set(
+    (Array.isArray(values) ? values : [])
+      .filter((value) => typeof value === 'string' && value.trim())
+      .map((value) => value.trim()),
+  ));
+}
+
+function normalizeBaoziModels(existingModels, options = {}) {
+  const requestedExample = String(
+    options.exampleModel ?? process.env.BAOZI_EXAMPLE_MODEL ?? DEFAULT_BAOZI_EXAMPLE_MODEL,
+  ).trim();
+  const exampleModels = requestedExample && requestedExample.toLowerCase() !== 'none'
+    ? [requestedExample]
+    : [];
+  const legacy = new Set(LEGACY_BAOZI_MODELS_TO_REMOVE);
+  const preserved = uniqueModelNames(existingModels).filter((model) => !legacy.has(model));
+  return uniqueModelNames([...preserved, ...TAOXIAN_MANAGED_MODELS, ...exampleModels]);
+}
+
+function isLegacyBaoziModelRef(value) {
+  const text = String(value || '').trim();
+  if (!text) return false;
+  return LEGACY_BAOZI_MODELS_TO_REMOVE.some((model) =>
+    text === model || text === `baozi/${model}` || text === `baozi,${model}`,
+  );
+}
+
+function normalizeFallbackModels(models) {
+  const next = uniqueModelNames(models).map((model) =>
+    isLegacyBaoziModelRef(model) ? 'baozi/chat-auto' : model,
+  );
+  return next.length > 0 ? next : ['baozi/chat-auto'];
+}
+
 /**
  * Enable Taoxian's managed Baozi provider when it exists. User-owned providers
  * are left exactly as the user configured them.
@@ -123,6 +179,11 @@ function mergeVirtualModelProfiles(defaultConfig, virtualModels = TAOXIAN_VIRTUA
 module.exports = {
   MANAGED_PROVIDER,
   TAOXIAN_VIRTUAL_MODELS,
+  TAOXIAN_MANAGED_MODELS,
+  LEGACY_BAOZI_MODELS_TO_REMOVE,
+  DEFAULT_BAOZI_EXAMPLE_MODEL,
   applyManagedProviderVisibility,
   mergeVirtualModelProfiles,
+  normalizeBaoziModels,
+  normalizeFallbackModels,
 };

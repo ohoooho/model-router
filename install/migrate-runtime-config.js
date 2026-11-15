@@ -13,6 +13,8 @@ const {
   TAOXIAN_VIRTUAL_MODELS,
   applyManagedProviderVisibility,
   mergeVirtualModelProfiles,
+  normalizeBaoziModels,
+  normalizeFallbackModels,
 } = require('./runtime-profiles');
 
 const OMR_DATA_DIR = (process.env.OMR_DATA_DIR && process.env.OMR_DATA_DIR.trim())
@@ -58,9 +60,21 @@ try {
     process.exit(1);
   }
 
-  const managedProviders = Array.isArray(config.Providers)
-    ? applyManagedProviderVisibility(config.Providers)
+  // Upgrade path: remove the old Baozi base-model names that the pre-0.2.0
+  // installer/OMR default seeded, keep user-added models, and ensure the five
+  // aliases plus one current example model exist. This is what makes an
+  // already-installed backend stop showing stale models in the agent picker.
+  const normalizedProviders = Array.isArray(config.Providers)
+    ? config.Providers.map((provider) => {
+      if (!provider || provider.name !== 'baozi') return provider;
+      const nextModels = normalizeBaoziModels(provider.models);
+      if (JSON.stringify(nextModels) === JSON.stringify(provider.models)) return provider;
+      return { ...provider, models: nextModels };
+    })
     : config.Providers;
+  const managedProviders = Array.isArray(normalizedProviders)
+    ? applyManagedProviderVisibility(normalizedProviders)
+    : normalizedProviders;
   const providersChanged = Array.isArray(config.Providers)
     && JSON.stringify(managedProviders) !== JSON.stringify(config.Providers);
   const hasBaozi = Array.isArray(managedProviders)
@@ -76,17 +90,35 @@ try {
   const fallbackModels = Array.isArray(fallback.models)
     ? fallback.models.filter((model) => typeof model === 'string' && model.trim())
     : [];
-  const nextFallbackModels = hasBaozi && fallbackModels.length === 0
-    ? ['baozi/MiniMax-M3']
+  const nextFallbackModels = hasBaozi
+    ? normalizeFallbackModels(fallbackModels)
     : fallbackModels;
   const routerChanged = JSON.stringify(nextFallbackModels) !== JSON.stringify(fallback.models ?? []);
   // Preserve a user-selected preferred provider; only seed Baozi when the
   // default is unset.
   const preferredProvider = config.preferredProvider || (hasBaozi ? 'baozi' : config.preferredProvider);
   const preferredChanged = preferredProvider !== config.preferredProvider;
+  const onboardingRow = db.prepare(
+    "SELECT 1 FROM app_config WHERE key='onboardingFinishedAt'",
+  ).get();
+  const onboardingChanged = !onboardingRow;
 
-  if (!changed && !providersChanged && !routerChanged && !preferredChanged) {
+  if (!changed && !providersChanged && !routerChanged && !preferredChanged && !onboardingChanged) {
     console.log('omr migrate: runtime virtual-model profiles already current');
+    process.exit(0);
+  }
+
+  const markOnboardingFinished = () => {
+    db.prepare(`
+      INSERT INTO app_config (key, value_json, updated_at)
+      VALUES ('onboardingFinishedAt', ?, datetime('now'))
+      ON CONFLICT(key) DO NOTHING
+    `).run(JSON.stringify(new Date().toISOString()));
+  };
+
+  if (!changed && !providersChanged && !routerChanged && !preferredChanged && onboardingChanged) {
+    markOnboardingFinished();
+    console.log('omr migrate: onboarding marked finished');
     process.exit(0);
   }
 
@@ -105,6 +137,9 @@ try {
         },
       },
     }));
+  if (onboardingChanged) {
+    markOnboardingFinished();
+  }
   console.log(`omr migrate: updated Baozi-backed virtual-model profiles and provider visibility (backup: ${backup})`);
 } finally {
   db.close();

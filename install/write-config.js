@@ -22,6 +22,8 @@ const {
   TAOXIAN_VIRTUAL_MODELS,
   applyManagedProviderVisibility,
   mergeVirtualModelProfiles,
+  normalizeBaoziModels,
+  normalizeFallbackModels,
 } = require('./runtime-profiles');
 
 // 1. 路径品牌化: OMR_DATA_DIR env 优先, 默认 ~/.omr (跟 cli.js getOMRDataDir() 对齐)
@@ -191,13 +193,16 @@ let defaultConfig = {};
 if (defaultRow?.value_json) {
   try { defaultConfig = JSON.parse(defaultRow.value_json); } catch { defaultConfig = {}; }
 }
-const providerModels = ['coding-auto', 'assist-auto', 'chat-auto', 'team-auto', 'trial-auto'];
 const existingProviders = Array.isArray(defaultConfig.Providers) ? defaultConfig.Providers : [];
 const existingBaoziProvider = existingProviders.find((provider) => provider && provider.name === 'baozi') || {};
 const incomingBaoziKey = process.env.BUTLER_BAOZI_KEY || '';
 const existingBaoziModels = Array.isArray(existingBaoziProvider.models)
   ? existingBaoziProvider.models.filter((model) => typeof model === 'string' && model.trim())
   : [];
+// Drop the pre-0.2.0 upstream names, keep user-added models, and seed the
+// five Taoxian aliases plus one current Baozi example. Override the example
+// with BAOZI_EXAMPLE_MODEL; set it to `none` to keep only the aliases.
+const providerModels = normalizeBaoziModels(existingBaoziModels);
 const existingBaoziKey = typeof existingBaoziProvider.apiKey === 'string' ? existingBaoziProvider.apiKey : '';
 const baoziProvider = {
   ...existingBaoziProvider,
@@ -207,8 +212,8 @@ const baoziProvider = {
   // 重配时如果没给真 key，不要用空串/fake 覆盖现有 key，否则模型立即失效。
   baseUrl: process.env.BAOZI_API_BASE || existingBaoziProvider.baseUrl || 'https://llm.ohoooho.com/v1',
   apiKey: isPlaceholderSecret(incomingBaoziKey) && existingBaoziKey ? existingBaoziKey : incomingBaoziKey,
-  // 保留用户手写的模型，并补上安装器默认模型；不要整表覆盖。
-  models: Array.from(new Set([...existingBaoziModels, ...providerModels])),
+  // 保留用户手写的模型，清理旧版上游模型，并补上安装器默认模型；不要整表覆盖。
+  models: providerModels,
 };
 const otherProviders = existingProviders.filter((provider) => provider && provider.name !== 'baozi');
 // 对客户端只暴露虚拟别名：启用 baozi，隐藏 tai。
@@ -237,7 +242,7 @@ upsertConfig.run('default', JSON.stringify({
     ...router,
     fallback: {
       ...fallback,
-      models: fallbackModels.length > 0 ? fallbackModels : ['baozi/chat-auto'],
+      models: normalizeFallbackModels(fallbackModels),
     },
   },
   gateway: {
@@ -246,6 +251,15 @@ upsertConfig.run('default', JSON.stringify({
     port: parseInt(process.env.OMR_GATEWAY_PORT || defaultConfig.gateway?.port || '3456', 10),
   },
 }));
+
+// The installer already configured the provider and virtual routes. Mark the
+// first-run wizard finished so a fresh backend opens the normal Overview page
+// instead of the "Connect agent" onboarding step. Keep an existing timestamp.
+db.prepare(`
+  INSERT INTO app_config (key, value_json, updated_at)
+  VALUES ('onboardingFinishedAt', ?, datetime('now'))
+  ON CONFLICT(key) DO NOTHING
+`).run(JSON.stringify(new Date().toISOString()));
 
 // 6. 写 api_keys: 加密存 (OMR fork 默认用 'plain', 失职 232 立刻修: 真加密用 libsodium)
 // 只在新行写入默认 limits；已有行的 limits_json 保持不动，避免安装器覆盖用户配置。

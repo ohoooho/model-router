@@ -65,15 +65,28 @@ db.prepare("UPDATE app_config SET value_json=? WHERE key='virtual_models'").run(
 db.close();
 NODE
 
-before="$(sha_file "${DATA_DIR}/config.sqlite")"
-
-# 3. Plain configure must skip an existing config (repeat deploy path).
+# 3. Plain configure must skip a full reconfigure, but the idempotent runtime
+# migration may update installer-managed fields (Baozi aliases, stale models,
+# onboarding state) without touching user-owned providers/models/keys.
 TX_CONTEXT_FILE="${CONTEXT_FILE}" bash "${SCRIPT_DIR}/configure.sh" >/dev/null
-after_skip="$(sha_file "${DATA_DIR}/config.sqlite")"
-[ "${before}" = "${after_skip}" ] || {
-  echo "FAIL: plain configure changed existing config" >&2
-  exit 1
-}
+
+node - "${DATA_DIR}/config.sqlite" <<'NODE'
+const { DatabaseSync } = require('node:sqlite');
+const db = new DatabaseSync(process.argv[2], { readOnly: true });
+const config = JSON.parse(db.prepare("SELECT value_json FROM app_config WHERE key='default'").get().value_json);
+const baozi = config.Providers.find((provider) => provider.name === 'baozi');
+if (!baozi) throw new Error('baozi provider missing after migration');
+if (!baozi.models.includes('my-custom-model')) throw new Error('custom baozi model was removed by migration');
+if (!baozi.models.includes('minimax-m3')) throw new Error('managed baozi example model was not added');
+if (!config.Providers.some((provider) => provider.name === 'my-provider')) throw new Error('custom provider was removed by migration');
+const virtual = JSON.parse(db.prepare("SELECT value_json FROM app_config WHERE key='virtual_models'").get().value_json);
+if (!virtual['my-virtual']) throw new Error('custom virtual model was removed by migration');
+const persona = db.prepare("SELECT encrypted_key FROM api_keys WHERE id='baozi-persona'").get();
+if (persona?.encrypted_key !== 'real-persona') throw new Error('persona key changed by migration');
+const onboarding = db.prepare("SELECT value_json FROM app_config WHERE key='onboardingFinishedAt'").get();
+if (!onboarding?.value_json) throw new Error('onboarding state was not marked finished');
+db.close();
+NODE
 
 # 4. Explicit reconfigure without keys must preserve existing keys/provider/models.
 TX_CONTEXT_FILE="${CONTEXT_FILE}" OMR_RECONFIGURE_EXISTING=1 \
