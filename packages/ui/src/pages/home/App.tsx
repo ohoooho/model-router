@@ -3210,6 +3210,7 @@ function App() {
                 onChangeProfile: updateProfileDraft,
                 onChangeProvider: updateProviderDraft,
                 onSelectStep: setOnboardingStep,
+                onSkip: completeOnboarding,
                 onSubmitProfile: submitProfileDraft,
                 onSubmitProvider: submitProviderDraft,
                 profileDraft,

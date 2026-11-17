@@ -8,6 +8,7 @@ import {
   LEGACY_API_KEYS_DB_FILES,
   LEGACY_CONFIG_FILE,
   LEGACY_WINDOWS_CONFIG_FILE,
+  AGENT_SETUP_COMPLETED_AT_SETTING_KEY,
   ONBOARDING_FINISHED_AT_SETTING_KEY,
   ONBOARDING_FINISHED_FILE
 } from "@ccr/core/config/constants";
@@ -426,6 +427,9 @@ function migrateLegacyOnboardingMarker(database: SqlDatabase, removeFile: (file:
     if (!existing) {
       const finishedAt = statSync(ONBOARDING_FINISHED_FILE).mtime.toISOString();
       replaceAppConfigRow(database, ONBOARDING_FINISHED_AT_SETTING_KEY, finishedAt);
+      // The legacy marker predates agent-setup tracking. Treat it as already
+      // confirmed so an existing user does not get the first-run wizard again.
+      replaceAppConfigRow(database, AGENT_SETUP_COMPLETED_AT_SETTING_KEY, finishedAt);
     }
     insertLegacyBackups(database, [backup]);
   });

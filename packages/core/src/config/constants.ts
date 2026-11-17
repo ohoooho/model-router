@@ -16,6 +16,7 @@ export const LEGACY_WINDOWS_CONFIG_FILE = path.join(LEGACY_WINDOWS_CONFIGDIR, "c
 export const LEGACY_ACTIVE_CONFIG_FILE = path.join(CONFIGDIR, "config.json");
 export const ONBOARDING_FINISHED_FILE = path.join(CONFIGDIR, ".onboard_finished");
 export const ONBOARDING_FINISHED_AT_SETTING_KEY = "onboardingFinishedAt";
+export const AGENT_SETUP_COMPLETED_AT_SETTING_KEY = "agentSetupCompletedAt";
 export const DATADIR = resolveRuntimeDataDir();
 export const APP_CONFIG_DB_FILE = path.join(CONFIGDIR, "config.sqlite");
 export const LEGACY_API_KEYS_DB_FILE = path.join(DATADIR, "api-keys.sqlite");

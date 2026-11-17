@@ -33,6 +33,7 @@ test("Onboarding provider step renders only the active provider setup section", 
         onChangeProvider={() => undefined}
         onComplete={() => undefined}
         onSelectStep={() => undefined}
+        onSkip={() => undefined}
         onSubmitProfile={async () => false}
         onSubmitProvider={async () => false}
         profileDraft={createProfileDraft()}
@@ -89,6 +90,7 @@ test("Onboarding profile step does not prompt to save before continuing", () => 
         onChangeProvider={() => undefined}
         onComplete={() => undefined}
         onSelectStep={() => undefined}
+        onSkip={() => undefined}
         onSubmitProfile={async () => false}
         onSubmitProvider={async () => false}
         profileDraft={createProfileDraft()}

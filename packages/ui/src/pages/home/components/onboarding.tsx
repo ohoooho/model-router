@@ -50,6 +50,7 @@ export function OnboardingView({
   onChangeProvider,
   onComplete,
   onSelectStep,
+  onSkip,
   onSubmitProfile,
   onSubmitProvider,
   profileDraft,
@@ -74,6 +75,7 @@ export function OnboardingView({
   onChangeProvider: (patch: Partial<AddProviderDraft>, resetProbe?: boolean) => void;
   onComplete: () => void | Promise<void>;
   onSelectStep: (step: OnboardingStepId) => void;
+  onSkip: () => void | Promise<void>;
   onSubmitProfile: () => Promise<boolean>;
   onSubmitProvider: () => Promise<boolean>;
   profileDraft: AddProfileDraft;
@@ -321,7 +323,10 @@ export function OnboardingView({
                 </div>
               </div>
 
-              <div className="mt-5 flex shrink-0 items-center justify-end gap-3 border-t border-border/60 pt-4 max-[640px]:items-stretch">
+              <div className="mt-5 flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4 max-[640px]:items-stretch">
+                <Button onClick={() => void onSkip()} type="button" variant="ghost">
+                  {t("Skip setup")}
+                </Button>
                 <Button disabled={nextDisabled} onClick={() => void goToNextStep()} type="button">
                   {providerSubmitLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : activeStep === "enter" ? <Check className="h-4 w-4" /> : null}
                   {providerSubmitLoading ? t("Loading") : activeStep === "enter" ? t("Let's start") : t("Next step")}
