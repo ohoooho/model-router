@@ -12,8 +12,10 @@ CCR_PUBLIC_PORT="${CCR_PUBLIC_PORT:-3458}"
 CCR_PUBLIC_BASE_URL="${CCR_PUBLIC_BASE_URL:-http://${CCR_PUBLIC_HOST}:${CCR_PUBLIC_PORT}}"
 CCR_NO_GATEWAY="${CCR_NO_GATEWAY:-0}"
 
+CCR_WEB_AUTH_TOKEN_GENERATED=0
 if [ -z "${CCR_WEB_AUTH_TOKEN:-}" ]; then
   CCR_WEB_AUTH_TOKEN="$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('base64url'))")"
+  CCR_WEB_AUTH_TOKEN_GENERATED=1
 fi
 CCR_WEB_AUTH_TOKEN_QUERY="$(node -e "process.stdout.write(encodeURIComponent(process.argv[1] || ''))" "${CCR_WEB_AUTH_TOKEN}")"
 
@@ -141,22 +143,21 @@ server {
 
   client_max_body_size 8m;
 
+  # The management token is never put in a response. A token the user supplies
+  # in the query string is passed on to the page, which reads it from the URL.
   location = / {
-    return 302 /pages/home/index.html?ccr_web_token=${CCR_WEB_AUTH_TOKEN_QUERY};
+    return 302 /pages/home/index.html\$is_args\$args;
   }
 
   location = /pages/home/index.html {
-    if (\$arg_ccr_web_token = "") {
-      return 302 /pages/home/index.html?ccr_web_token=${CCR_WEB_AUTH_TOKEN_QUERY};
-    }
     try_files /pages/home/index.html =404;
   }
 
   location = /api/ccr/rpc {
     proxy_http_version 1.1;
     proxy_set_header Host ${CCR_WEB_HOST}:${CCR_WEB_PORT};
-    proxy_set_header Origin http://${CCR_WEB_HOST}:${CCR_WEB_PORT};
-    proxy_set_header Referer http://${CCR_WEB_HOST}:${CCR_WEB_PORT}/;
+    proxy_set_header Origin \$http_origin;
+    proxy_set_header Referer \$http_referer;
     proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Host \$host;
     proxy_set_header X-Forwarded-Proto \$scheme;
@@ -192,12 +193,23 @@ server {
 }
 EOF
 
-if [ "$#" -gt 0 ]; then
-  exec "$@"
+# A generated token is only reachable through the container logs.
+if [ "${CCR_WEB_AUTH_TOKEN_GENERATED}" = "1" ]; then
+  echo "CCR management UI: ${CCR_PUBLIC_BASE_URL%/}/?ccr_web_token=${CCR_WEB_AUTH_TOKEN_QUERY}"
 fi
 
-if [ -x /app/node_modules/.bin/pm2-runtime ]; then
-  exec /app/node_modules/.bin/pm2-runtime docker/pm2.config.cjs
+if [ "$#" -eq 0 ]; then
+  PM2_RUNTIME=/app/packages/core/node_modules/.bin/pm2-runtime
+  if [ -x /app/node_modules/.bin/pm2-runtime ]; then
+    PM2_RUNTIME=/app/node_modules/.bin/pm2-runtime
+  fi
+  set -- "${PM2_RUNTIME}" docker/pm2.config.cjs
 fi
 
-exec /app/packages/core/node_modules/.bin/pm2-runtime docker/pm2.config.cjs
+# Bootstrap config as root, then hand the data volume and all services to ccr.
+# An explicit docker --user is respected.
+if [ "$(id -u)" = "0" ]; then
+  chown -R ccr:ccr "${CCR_DATA_DIR}" /run/nginx /var/lib/nginx /var/log/nginx
+  exec setpriv --reuid=ccr --regid=ccr --init-groups -- "$@"
+fi
+exec "$@"

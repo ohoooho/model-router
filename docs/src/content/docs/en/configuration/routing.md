@@ -118,7 +118,7 @@ Each execution receives its own read-only `input` object:
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `input.body` | `Record<string, unknown>` | Complete JSON request body. |
+| `input.body` | `Record<string, unknown>` | JSON request body, bounded to 2 MiB. |
 | `input.headers` | `Record<string, string \| string[]>` | Complete request headers, potentially including authentication, cookies, API keys, and CCR-internal headers. |
 | `input.method` | `string` | HTTP method, such as `POST`. |
 | `input.url` | `string` | Gateway-relative request URL, such as `/v1/messages`. |
@@ -132,6 +132,8 @@ Each execution receives its own read-only `input` object:
 | `input.summary.messageCount` | `number` | Number of elements in `body.messages`. |
 | `input.summary.toolNames` | `string[]` | Tool names extracted from `body.tools`, limited to 128 entries. |
 | `input.summary.hasImage` | `boolean` | Whether image content was detected anywhere in the request body. |
+
+Requests whose serialized body exceeds 2 MiB expose `{ __ccrBodyTruncated: true, model }` as `input.body` to protect the isolated worker heap. `input.summary` and `input.tokenCount` still describe the original request; the forwarded request body is unchanged. Check `input.body.__ccrBodyTruncated` before accessing messages directly.
 
 Header names should normally be read in lowercase. A value can be an array of strings, so handle both forms when needed:
 
@@ -532,3 +534,18 @@ Load [`examples/routing/jev.js`](https://github.com/musistudio/claude-code-route
 Set `CCR_JEV_ROUTING_ENABLED=1`, `CCR_JEV_FAST_MODEL=provider/fast-model`, `CCR_JEV_REASONING_MODEL=provider/reasoning-model`, and `TYPESAFE_API_KEY` in the environment that starts CCR. Select the script file in a rule, initially use a 1500 ms timeout, and put a static fallback rule for `auto` after it. Only requests whose model is `auto` are classified. Explicit models, images, missing configuration, uncertain answers, errors, and timeouts continue to later rules.
 
 `CCR_JEV_ENDPOINT` accepts a full endpoint URL for a compatible service; a local service need not require a key. `CCR_JEV_MODEL` selects the classifier model. Enabling the script sends up to 8192 characters of the latest user text, the input token count, and tool count to that service, and cloud calls incur its charges. Headers and system content are excluded. `CCR_JEV_MIN_CONFIDENCE` defaults to `0.75`; evaluate that example threshold on your tasks. Tests cover the contract and fallback behavior, without measuring live classification accuracy or latency.
+
+### Script prefilters and pass-through conditions
+
+A script rule can use the existing `condition` field as an optional prefilter. CCR evaluates it before serializing the request or invoking a worker; a miss continues to the next rule. The editor exposes this as **Prefilter (optional)**; leave the field blank to run the script for every request. A matching condition rule with no rewrites keeps the request unchanged and skips later rules. Remove every rewrite row in the editor to use this behavior.
+
+```json
+{
+  "type": "script",
+  "enabled": true,
+  "id": "lane-routing",
+  "name": "Lane routing",
+  "condition": { "left": "request.body.model", "operator": "starts-with", "right": "lane/" },
+  "script": { "apiVersion": 1, "language": "javascript", "file": "/data/route.js", "timeoutMs": 2000 }
+}
+```

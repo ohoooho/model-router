@@ -13,7 +13,7 @@ const readline = require("node:readline");
 const { pathToFileURL } = require("node:url");
 
 const VERSION = "3.0.0";
-const DEFAULT_MODEL = "claude-sonnet-4-5";
+const DEFAULT_MODEL = "claude-sonnet-4-6";
 const PROTOCOL_VERSION = "2025-06-18";
 const BOT_SESSION_ENTRY_VERSION = 3;
 const OPENCODE_BOT_SESSION_STORE_VERSION = 3;
@@ -24,6 +24,7 @@ const CONFIG_DIR = resolveConfigDir();
 const LOG_PATH = process.env.CCR_CODEX_CLI_MIDDLEWARE_LOG || "";
 const CLAUDE_CODE_MCP_CONFIG_ENV = "CCR_CLAUDE_CODE_MCP_CONFIG";
 const CODEXL_CLAUDE_CODE_MCP_CONFIG_ENV = "CODEXL_CLAUDE_CODE_MCP_CONFIG";
+const MODEL_CATALOG_CAPABILITIES = new WeakMap();
 const CLAUDE_CODE_CHINA_TIME_ZONES = new Set([
   "asia/chongqing",
   "asia/chungking",
@@ -348,7 +349,6 @@ async function runCodexCliMiddleware(args) {
 
   const requestMap = new Map();
   const current = { cwd: "" };
-  const chatGptAuth = loadChatGptAuth();
   const stdinRl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity, terminal: false });
   stdinRl.on("line", (line) => {
     const custom = customAppServerLineResponse(line);
@@ -367,7 +367,7 @@ async function runCodexCliMiddleware(args) {
   const stdoutRl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity, terminal: false });
   stdoutRl.on("line", (line) => {
     cleanupAuthBootstrap();
-    const rewritten = rewriteCodexStdoutLine(line, requestMap, chatGptAuth);
+    const rewritten = rewriteCodexStdoutLine(line, requestMap);
     botBridge().handleJsonRpcLine(rewritten);
     if (!shouldSuppressBotBridgeLine(rewritten)) {
       process.stdout.write(rewritten + "\n");
@@ -602,7 +602,7 @@ function cliConfigString(key, value) {
   return key + "=\"" + tomlEscape(value) + "\"";
 }
 
-function rewriteCodexStdoutLine(line, requestMap, chatGptAuth) {
+function rewriteCodexStdoutLine(line, requestMap) {
   let value;
   try {
     value = JSON.parse(line);
@@ -618,6 +618,15 @@ function rewriteCodexStdoutLine(line, requestMap, chatGptAuth) {
       log("app_server_list_error", { method: request.method, error: value.error });
     }
     return line;
+  }
+  let chatGptAuth;
+  if (request.method === "account/read" || request.method === "getAuthStatus") {
+    const fresh = loadChatGptAuth();
+    const prior = request.chatGptAuth;
+    const identity = auth => auth && (auth.accountId || auth.email || auth.authToken);
+    // Follow the official owner's atomic token refresh, while an in-flight
+    // account request keeps its identity if the login changes underneath it.
+    chatGptAuth = prior && identity(prior) !== identity(fresh) ? prior : fresh;
   }
   if (request.method === "account/read") {
     value.result = codexAppAccountRead(chatGptAuth, value.result);
@@ -1016,6 +1025,7 @@ function trackRequestLine(line, requestMap, current) {
     params.codexlWorkspaceCwd = current.cwd;
   }
   requestMap.set(id, {
+    ...(["account/read", "getAuthStatus"].includes(method) ? { chatGptAuth: loadChatGptAuth() } : {}),
     includeToken: Boolean(value.params && value.params.includeToken),
     method,
     params
@@ -4466,7 +4476,9 @@ function codexModelListItemFromCatalog(item, selectedModel) {
   const id = normalizeModelSelector(modelItemId(item));
   if (!id) return undefined;
   if (!item || typeof item !== "object") {
-    return codexModelItem(id, selectedModel);
+    const output = codexModelItem(id, selectedModel);
+    MODEL_CATALOG_CAPABILITIES.set(output, {});
+    return output;
   }
   const base = codexModelItem(id, selectedModel);
   const displayName = stringValue(item.displayName) || stringValue(item.display_name) || base.displayName;
@@ -4486,7 +4498,7 @@ function codexModelListItemFromCatalog(item, selectedModel) {
   const contextWindow = positiveInteger(item.contextWindow ?? item.context_window) ?? base.contextWindow;
   const inputModalities = readArrayValue(item.inputModalities) ?? readArrayValue(item.input_modalities) ?? base.inputModalities;
   const supportedReasoningEfforts = readArrayValue(item.supportedReasoningEfforts) ?? readArrayValue(item.supported_reasoning_efforts) ?? base.supportedReasoningEfforts;
-  return {
+  const output = {
     ...base,
     ...item,
     id: stringValue(item.id) || id,
@@ -4513,11 +4525,35 @@ function codexModelListItemFromCatalog(item, selectedModel) {
     defaultServiceTier,
     default_service_tier: defaultServiceTier
   };
+  MODEL_CATALOG_CAPABILITIES.set(output, item);
+  return output;
 }
 
 function mergeCatalogModelListItem(existingItem, catalogItem) {
   if (!catalogItem || typeof catalogItem !== "object") return existingItem;
   const output = { ...catalogItem, ...existingItem };
+  const capabilities = MODEL_CATALOG_CAPABILITIES.get(catalogItem) ?? catalogItem;
+  for (const [camelKey, snakeKey] of [
+    ["inputModalities", "input_modalities"],
+    ["supportedReasoningEfforts", "supported_reasoning_efforts"]
+  ]) {
+    const catalogValue = readArrayValue(capabilities[camelKey]) ?? readArrayValue(capabilities[snakeKey]);
+    if (catalogValue) {
+      output[camelKey] = catalogValue;
+      output[snakeKey] = catalogValue;
+    }
+  }
+  for (const [camelKey, snakeKey] of [
+    ["defaultReasoningEffort", "default_reasoning_effort"]
+  ]) {
+    if (capabilities[camelKey] !== undefined || capabilities[snakeKey] !== undefined) {
+      const catalogValue = capabilities[camelKey] !== undefined
+        ? capabilities[camelKey]
+        : capabilities[snakeKey];
+      output[camelKey] = catalogValue;
+      output[snakeKey] = catalogValue;
+    }
+  }
   for (const [camelKey, snakeKey] of [
     ["additionalSpeedTiers", "additional_speed_tiers"],
     ["serviceTiers", "service_tiers"]
@@ -4727,6 +4763,10 @@ function loadChatGptAuth() {
     nonEmptyEnv("CODEXL_CODEX_WORKSPACE_NAME") ||
     nonEmptyEnv("CODEXL_CODEX_INSTANCE_NAME") ||
     agentEnv("codex", "PROFILE");
+  // Isolation must apply before reading either profile or shared credentials.
+  if (boolEnv("CCR_CODEX_ISOLATED_IDENTITY") || boolEnv("CODEXL_CODEX_ISOLATED_IDENTITY")) {
+    return virtualChatGptAuth(workspaceName);
+  }
   const seen = new Set();
   for (const authFile of [
     path.join(codexRuntimeHome(), "auth.json"),
@@ -4745,11 +4785,9 @@ function loadChatGptAuth() {
 function defaultCodexChatGptAuthFallback() {
   // The desktop app validates the app-server token against real chatgpt.com
   // endpoints that cannot be redirected (statsig, webview session linking), so
-  // a synthetic token is rejected there. Bridge the user's real default codex
-  // login by default; credits enforcement stays virtual because the desktop
-  // API base points at the local net responder. Set CCR_CODEX_ISOLATED_IDENTITY
-  // to keep the fully synthetic token.
-  if (boolEnv("CCR_CODEX_ISOLATED_IDENTITY") || boolEnv("CODEXL_CODEX_ISOLATED_IDENTITY")) return "";
+  // a synthetic token is rejected there. Sharing a separate default login is
+  // explicit; CCR profiles must not silently borrow the personal identity.
+  if (!boolEnv("CCR_CODEX_SHARE_CHATGPT_AUTH") && !boolEnv("CODEXL_CODEX_SHARE_CHATGPT_AUTH")) return "";
   if (codexRuntimeAgent() === "zcode") return "";
   const fallback = path.join(os.homedir(), ".codex", "auth.json");
   return fallback === path.join(codexRuntimeHome(), "auth.json") ? "" : fallback;
@@ -4839,6 +4877,30 @@ function codexAppAccountRead(auth, existingResult) {
     planType: auth.planType || "unknown"
   };
   result.requiresOpenaiAuth = true;
+  if (auth.accountId && auth.accountId !== "ccr-virtual-account" && !isPlainObject(result.workspaceRouting)) {
+    // A custom model provider may make app-server report null even for a real
+    // account. Account APIs belong on the desktop's own Chromium connection.
+    result.workspaceRouting = {
+      chatgptAccountId: auth.accountId,
+      backendOrigin: "https://chatgpt.com",
+      accountRoutingOverride: "NO_CONSTRAINT"
+    };
+  }
+  if (auth.accountId === "ccr-virtual-account" && result.workspaceRouting == null) {
+    const origin = nonEmptyEnv("CCR_CODEX_WORKSPACE_BACKEND_ORIGIN");
+    try {
+      const url = new URL(origin);
+      if (url.protocol === "https:" && url.hostname === "localhost" && url.origin === origin) {
+        // 0.155+ requires explicit routing even for local API-key profiles.
+        // Keep the synthetic identity and desktop requests on our TLS listener.
+        result.workspaceRouting = {
+          chatgptAccountId: auth.accountId,
+          backendOrigin: origin,
+          accountRoutingOverride: "NO_CONSTRAINT"
+        };
+      }
+    } catch {}
+  }
   return result;
 }
 

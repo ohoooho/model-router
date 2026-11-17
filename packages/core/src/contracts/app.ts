@@ -170,6 +170,16 @@ export type GatewayProviderConfig = {
   credentials?: ProviderCredentialConfig[];
   extraBody?: unknown;
   extraHeaders?: unknown;
+  /**
+   * Keep vendor `thinking` / `reasoning_split` request parameters on OpenAI-protocol requests
+   * instead of stripping them. Required by upstreams such as Ark that use `thinking` to toggle
+   * reasoning; leave off for strict OpenAI-compatible upstreams that reject unknown parameters.
+   *
+   * Must be a JSON boolean; the string `"true"` is ignored, like the other boolean fields.
+   */
+  forwardThinkingParameters?: boolean;
+  /** Set false for upstreams that reject defer_loading tool declarations. */
+  supportsDeferredTools?: boolean;
   icon?: string;
   id?: string;
   enabled?: boolean;
@@ -237,6 +247,8 @@ export type ProviderModelMetadata = {
   maxOutputTokens?: number;
   openRouterDiscountRouting?: ProviderModelOpenRouterDiscountRoutingConfig;
   pricing?: ProviderModelPricing;
+  reasoningEffortMap?: Record<string, string>;
+  reasoningRequired?: boolean;
   serviceTiers?: unknown[];
   supportsFastMode?: boolean;
   supportedReasoningLevels?: ProviderReasoningLevel[];
@@ -1870,6 +1882,11 @@ export type AppConfig = {
 
 export type AppSaveConfigOptions = {
   applyProfile?: boolean;
+};
+
+export type GlobalProfileRecoveryResult = {
+  config: AppConfig;
+  status: ProfileClientApplyStatus;
 };
 
 export type ClaudeAppGatewayApplyResult = {
