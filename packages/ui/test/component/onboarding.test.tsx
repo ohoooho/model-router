@@ -108,5 +108,71 @@ test("Onboarding profile step does not prompt to save before continuing", () => 
   assert.doesNotMatch(html, /Save this agent profile to continue/);
   assert.doesNotMatch(html, /Choose an agent, model, and required profile settings/);
   assert.doesNotMatch(html, /provider identity/);
+  assert.doesNotMatch(html, /Use default agent/);
   assert.match(html, /Models, paths, routing, bot, compact, Claude settings, and env/);
+});
+
+test("Onboarding profile step lets users reuse an enabled default agent", () => {
+  const config = appConfigFixture();
+  config.Providers = [{
+    api_base_url: "https://gateway.example/v1",
+    api_key: "sk-test",
+    models: ["example-model"],
+    name: "Example Provider",
+    type: "openai_chat_completions"
+  }];
+  config.profile.profiles = [
+    {
+      agent: "claude-code",
+      enabled: true,
+      id: "default-claude-code",
+      model: "",
+      name: "Claude Code"
+    },
+    {
+      agent: "codex",
+      enabled: true,
+      id: "default-codex",
+      model: "",
+      name: "Codex"
+    }
+  ];
+  const providerDraft = {
+    ...createProviderDraft([]),
+    baseUrl: "https://gateway.example/v1",
+    modelsText: "example-model",
+    name: "Example Provider"
+  };
+  const html = renderToStaticMarkup(
+    <AppI18nContext.Provider value={appCopy.en}>
+      <OnboardingView
+        activeStep="profile"
+        canSubmitProfile
+        canSubmitProvider={false}
+        config={config}
+        endpoint="http://127.0.0.1:3456"
+        gatewayStatus={fallbackGatewayStatus}
+        onCheckProvider={async () => ({ failed: [], passed: [], results: [] })}
+        onChangeProfile={() => undefined}
+        onChangeProvider={() => undefined}
+        onComplete={() => undefined}
+        onSelectStep={() => undefined}
+        onSkip={() => undefined}
+        onUseDefaultProfile={() => undefined}
+        onSubmitProfile={async () => false}
+        onSubmitProvider={async () => false}
+        profileDraft={createProfileDraft()}
+        profileError=""
+        providerConnectivityLoading={false}
+        providerDraft={providerDraft}
+        providerError=""
+        providerProbeLoading={false}
+      />
+    </AppI18nContext.Provider>
+  );
+
+  assert.match(html, /Use an existing agent/);
+  assert.match(html, /Use default agent/);
+  assert.match(html, /Claude Code/);
+  assert.match(html, /Codex/);
 });
