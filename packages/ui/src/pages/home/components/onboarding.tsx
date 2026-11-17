@@ -51,6 +51,7 @@ export function OnboardingView({
   onComplete,
   onSelectStep,
   onSkip,
+  onUseDefaultProfile,
   onSubmitProfile,
   onSubmitProvider,
   profileDraft,
@@ -76,6 +77,7 @@ export function OnboardingView({
   onComplete: () => void | Promise<void>;
   onSelectStep: (step: OnboardingStepId) => void;
   onSkip: () => void | Promise<void>;
+  onUseDefaultProfile: () => void;
   onSubmitProfile: () => Promise<boolean>;
   onSubmitProvider: () => Promise<boolean>;
   profileDraft: AddProfileDraft;
@@ -95,6 +97,7 @@ export function OnboardingView({
   const [providerSetupStep, setProviderSetupStep] = useState<ProviderSetupStepId>("provider");
   const providerReady = isOnboardingProviderReady(config);
   const profileReady = isOnboardingProfileReady(config, readiness);
+  const enabledProfiles = (config.profile?.profiles ?? []).filter((profile) => profile.enabled);
   const serviceReady = gatewayStatus.state === "running";
   const routeReady = providerReady && profileReady;
   const activeIndex = Math.max(0, onboardingStepOrder.indexOf(activeStep));
@@ -285,6 +288,31 @@ export function OnboardingView({
                   className={cn("onboarding-step-panel flex min-w-0 flex-1 flex-col gap-3", activeStep === "profile" && "onboarding-step-panel-active")}
                 >
                   <div className="mx-auto w-full max-w-[720px]">
+                    {enabledProfiles.length > 0 ? (
+                      <div className="mb-3 rounded-lg border border-border bg-background/70 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-[13px] font-medium">{t("Use an existing agent")}</div>
+                            <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
+                              {t("These agents are already configured. Use one now, or add another below.")}
+                            </p>
+                          </div>
+                          <Button onClick={onUseDefaultProfile} type="button" variant="secondary">
+                            {t("Use default agent")}
+                          </Button>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {enabledProfiles.map((profile) => (
+                            <span
+                              className="rounded-md border border-border bg-muted/40 px-2 py-1 text-[12px] text-muted-foreground"
+                              key={profile.id}
+                            >
+                              {profile.name} · {profile.agent}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                     <AddProfileForm
                       agentOptions={agentOptions}
                       botConfigs={[]}

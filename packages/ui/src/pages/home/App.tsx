@@ -2646,6 +2646,11 @@ function App() {
     setActiveView("overview");
   }
 
+  function useDefaultOnboardingProfile() {
+    setOnboardingProfileConfirmed(true);
+    setOnboardingStep("enter");
+  }
+
   function selectNavigationItem(id: NavigationId) {
     setActiveView(id);
   }
@@ -3211,6 +3216,7 @@ function App() {
                 onChangeProvider: updateProviderDraft,
                 onSelectStep: setOnboardingStep,
                 onSkip: completeOnboarding,
+                onUseDefaultProfile: useDefaultOnboardingProfile,
                 onSubmitProfile: submitProfileDraft,
                 onSubmitProvider: submitProviderDraft,
                 profileDraft,
