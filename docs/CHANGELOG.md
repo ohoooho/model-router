@@ -23,6 +23,24 @@
 
 ## Fork 后变更（OMR 专属）
 
+### OMR-RELEASE-0.2.1 — 2026-11-17
+- **类型**: bug-fix
+- **标题**: 首次打开管理控制台时引导配置 Agent
+- **改动**:
+  - `packages/core/src/config/constants.ts` — 新增 `agentSetupCompletedAt`
+  - `packages/core/src/config/onboarding-state.ts` — onboarding 同时要求
+    `onboardingFinishedAt` 和 `agentSetupCompletedAt`
+  - `packages/core/src/config/config-repository.ts` — 旧 `.onboard_finished`
+    迁移时同时写入两个标记，避免老用户重复看到引导
+  - `packages/ui/src/pages/home/components/onboarding.tsx` — 增加“跳过设置”
+  - `packages/ui/src/pages/home/App.tsx`、`shared/i18n.tsx`
+  - 版本号与离线物料 `omr-0.2.1.tgz`
+- **原因**: 安装器写入 `onboardingFinishedAt` 后，用户首次打开会直接进入
+  Overview，看不到已有的“接入 Agent”步骤；新用户不知道如何配置模型和 Agent。
+- **行为**: 新装用户首次打开进入 `Connect agent` 步骤；完成或点击“跳过设置”
+  后写入两个标记，之后正常进入 Overview。存量用户升级后看到一次引导，可跳过。
+- **兼容**: 安装脚本 `install.sh` 字节不变，0.3.10 feed 的安装脚本哈希继续有效。
+
 ### OMR-RELEASE-0.2.0 — 2026-11-13
 - **类型**: chore
 - **标题**: 可安装版本改为纯 SemVer `0.2.0`
