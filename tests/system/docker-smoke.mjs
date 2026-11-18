@@ -35,13 +35,15 @@ try {
     "--name",
     containerName,
     "-p",
-    `${hostPort}:8080`,
+    `127.0.0.1:${hostPort}:8080`,
     "-e",
     `CCR_WEB_AUTH_TOKEN=${token}`,
     "-e",
     "CCR_PUBLIC_HOST=127.0.0.1",
     "-e",
     `CCR_PUBLIC_PORT=${hostPort}`,
+    "-e",
+    "CCR_WEB_ALLOWED_ORIGINS=https://trusted.example",
     "-v",
     `${volumeName}:/data`,
     imageName
@@ -61,13 +63,19 @@ try {
   const redirect = await fetch(baseUrl, { redirect: "manual" });
   assert.equal(redirect.status, 302);
   const redirectLocation = redirect.headers.get("location");
-  assert.equal(redirectLocation, `/pages/home/index.html?ccr_web_token=${encodeURIComponent(token)}`);
+  assert.equal(redirectLocation, "/pages/home/index.html", "An unauthenticated request must not be handed the management token");
 
-  const page = await fetch(`${baseUrl}${redirectLocation}`);
+  const page = await fetch(`${baseUrl}${redirectLocation}`, { redirect: "manual" });
   assert.equal(page.status, 200);
   const pageHtml = await page.text();
   assert.match(pageHtml, /Claude Code Router/);
   assert.match(pageHtml, /web-client-bridge\.js/);
+
+  const suppliedToken = `/pages/home/index.html?ccr_web_token=${encodeURIComponent(token)}`;
+  const tokenRedirect = await fetch(`${baseUrl}/?ccr_web_token=${encodeURIComponent(token)}`, { redirect: "manual" });
+  assert.equal(tokenRedirect.status, 302);
+  assert.equal(tokenRedirect.headers.get("location"), suppliedToken, "A token supplied by the user must survive the root redirect");
+  assert.equal((await fetch(`${baseUrl}${suppliedToken}`, { redirect: "manual" })).status, 200);
 
   const bridge = await fetch(`${baseUrl}/assets/web-client-bridge.js`);
   assert.equal(bridge.status, 200);
@@ -81,6 +89,14 @@ try {
   const unauthorized = await rpc(baseUrl, "getAppInfo");
   assert.equal(unauthorized.status, 401);
   assert.equal((await unauthorized.json()).ok, false);
+
+  const hostileOrigin = await rpc(baseUrl, "getConfig", token, [], { origin: "https://evil.example" });
+  assert.equal(hostileOrigin.status, 403, "Nginx must forward the real browser origin");
+  const hostileReferer = await rpc(baseUrl, "getConfig", token, [], { referer: "https://evil.example/page" });
+  assert.equal(hostileReferer.status, 403, "Nginx must forward the real browser referer");
+  const trustedOrigin = await rpc(baseUrl, "getAppInfo", token, [], { origin: "https://trusted.example", referer: "https://trusted.example/page" });
+  assert.equal(trustedOrigin.status, 200);
+  assert.equal(trustedOrigin.headers.get("access-control-allow-origin"), "https://trusted.example");
 
   const appInfo = await rpc(baseUrl, "getAppInfo", token);
   assert.equal(appInfo.status, 200);
@@ -134,7 +150,16 @@ try {
   };
   const savedConfig = await rpc(baseUrl, "saveConfig", token, [openRouterConfig, { applyProfile: false }]);
   assert.equal(savedConfig.status, 200);
-  assert.equal((await savedConfig.json()).ok, true);
+  const savedPayload = await savedConfig.json();
+  assert.equal(savedPayload.ok, true);
+  assert.ok(!JSON.stringify(savedPayload.value).includes("test-openrouter-key"));
+  const redactedConfig = await (await rpc(baseUrl, "getConfig", token)).json();
+  assert.ok(!JSON.stringify(redactedConfig.value).includes("test-openrouter-key"));
+  const roundTrip = await rpc(baseUrl, "saveConfig", token, [redactedConfig.value, { applyProfile: false }]);
+  assert.equal(roundTrip.status, 200);
+  assert.equal((await roundTrip.json()).ok, true);
+  const storedKey = run("docker", ["exec", containerId, "node", "-e", "const Database=require('better-sqlite3');const db=new Database('/data/.claude-code-router/config.sqlite');const config=JSON.parse(db.prepare(\"select value_json from app_config where key = 'default'\").get().value_json);process.stdout.write(config.Providers[0].apiKey || config.Providers[0].api_key || '');db.close();"]);
+  assert.equal(storedKey, "test-openrouter-key", "a masked config round trip must preserve the upstream key");
 
   const startedGateway = await rpc(baseUrl, "startGateway", token);
   assert.equal(startedGateway.status, 200);
@@ -162,6 +187,21 @@ try {
   assert.equal(runningGatewayHealthPayload.status, "ok");
   assert.equal(typeof runningGatewayHealthPayload.runtimeId, "string");
   assert.ok(runningGatewayHealthPayload.runtimeId.length > 0);
+
+  const processUids = JSON.parse(run("docker", ["exec", containerId, "node", "-e", `
+    const fs=require('node:fs');
+    const rows=fs.readdirSync('/proc').filter(p=>/^\\d+$/.test(p)).flatMap(p=>{
+      try { const cmd=fs.readFileSync('/proc/'+p+'/cmdline','utf8');
+        if (!/(server\\.js|gateway-bootstrap|next-ai-gateway|nginx|[Pp][Mm]2)/.test(cmd) || cmd.includes('const fs=')) return [];
+        return [{cmd,uid:fs.readFileSync('/proc/'+p+'/status','utf8').match(/^Uid:\\s+(.+)$/m)[1].trim().split(/\\s+/).map(Number)}];
+      } catch { return []; }
+    }); process.stdout.write(JSON.stringify(rows));
+  `]));
+  for (const role of [/pm2/i, /server\.js/, /nginx/, /gateway-bootstrap|next-ai-gateway/]) {
+    assert.ok(processUids.some(process => role.test(process.cmd)), `missing service process: ${role}`);
+  }
+  for (const process of processUids) assert.ok(process.uid.every(uid => uid === 10001), JSON.stringify(process));
+  console.log(`Verified ${processUids.length} service processes run as UID 10001.`);
 
   const configStorage = dockerConfigStorage(containerId);
   assert.equal(configStorage.configDatabase, true);
@@ -207,11 +247,12 @@ fs.writeFileSync(path.join(configDir, "config.json"), JSON.stringify(config, nul
   run("docker", ["run", "--rm", "-v", `${volume}:/data`, "--entrypoint", "node", imageName, "-e", script]);
 }
 
-async function rpc(baseUrl, method, authToken, args = []) {
+async function rpc(baseUrl, method, authToken, args = [], sourceHeaders = {}) {
   return fetch(`${baseUrl}/api/ccr/rpc`, {
     body: JSON.stringify({ args, method }),
     headers: {
       "content-type": "application/json",
+      ...sourceHeaders,
       ...(authToken ? { "x-ccr-web-auth": authToken } : {})
     },
     method: "POST"

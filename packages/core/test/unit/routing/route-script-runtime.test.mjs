@@ -68,6 +68,50 @@ function scriptInput(script, body = {}) {
   });
 }
 
+test("#1868 script condition skips serialization and worker execution on a miss", async (t) => {
+  const body = { model: "Provider/alpha", messages: [{ role: "user", content: "x".repeat(2 * 1024 * 1024) }] };
+  let snapshots = 0;
+  const stringify = JSON.stringify;
+  t.mock.method(JSON, "stringify", function (value, ...args) {
+    if (value === body) snapshots += 1;
+    return stringify.call(this, value, ...args);
+  });
+  let executions = 0;
+  const runtime = { execute: async () => { executions += 1; return { status: "ok", value: { model: "Provider/beta" } }; } };
+  const plugin = new ClaudeCodeRouterPlugin(routingConfig([scriptRule("filtered", routeScript('return { model: "Provider/beta" };'), {
+    condition: { left: "request.body.model", operator: "starts-with", right: "lane/" }
+  })]), { scriptRuntime: runtime });
+  const result = await plugin.routeRequest(routingInput(body));
+  assert.equal(result.decision.model, "Provider/alpha");
+  assert.equal(executions, 0);
+  assert.equal(snapshots, 0);
+});
+
+test("#1868 a matching script prefilter still executes the isolated worker", async () => {
+  const runtime = new RouteScriptRuntime({ workerCount: 1, workerFile });
+  try {
+    const plugin = new ClaudeCodeRouterPlugin(routingConfig([scriptRule("filtered", routeScript('return { model: "Provider/beta" };'), {
+      condition: { left: "request.body.model", operator: "==", right: "Provider/alpha" }
+    })]), { scriptRuntime: runtime });
+    const result = await plugin.routeRequest(routingInput({ model: "Provider/alpha" }));
+    assert.equal(result.decision.model, "Provider/beta");
+  } finally { await runtime.close(); }
+});
+
+test("#1868 a condition with no rewrites passes through and bypasses later scripts", async () => {
+  const runtime = new RouteScriptRuntime({ workerCount: 1, workerFile });
+  try {
+    const plugin = new ClaudeCodeRouterPlugin(routingConfig([
+      { id: "pass", name: "Pass", enabled: true, type: "condition", condition: { left: "request.body.model", operator: "not-contains", right: "lane/" } },
+      scriptRule("later", routeScript('return { model: "Provider/beta" };'))
+    ]), { scriptRuntime: runtime });
+    const result = await plugin.routeRequest(routingInput({ model: "Provider/alpha" }));
+    assert.equal(result.decision.model, "Provider/alpha");
+    const unmatched = await plugin.routeRequest(routingInput({ model: "lane/slot" }));
+    assert.equal(unmatched.decision.model, "Provider/beta");
+  } finally { await runtime.close(); }
+});
+
 function tokenProbeBody() {
   return { model: "Provider/alpha", messages: [{ role: "user", content: "token-estimate-probe " + "x ".repeat(100_000) }] };
 }
@@ -954,4 +998,42 @@ test("route script circuit breakers are versioned and can be bypassed for test r
   } finally {
     await runtime.close();
   }
+});
+
+
+test("#1928 a 60 MiB request stays within the route worker heap and retains lazy token semantics", { timeout: 30000 }, async () => {
+  const runtime = new RouteScriptRuntime({ workerCount: 1, workerFile });
+  const body = { model: "Provider/alpha", messages: [{ role: "user", content: "x ".repeat(30 * 1024 * 1024) }] };
+  const request = { body, headers: {}, method: "POST", url: "/v1/messages" };
+  const script = routeScript('return { truncated: input.body.__ccrBodyTruncated, model: input.body.model, count: input.tokenCount, messages: input.summary.messageCount, textLength: input.summary.lastUserText.length };', { timeoutMs: 5000 });
+  try {
+    const input = buildRouteScriptInput(request, { deferTokenCount: true });
+    const result = await runtime.execute("large-body", script, input);
+    assert.equal(result.status, "ok", result.error);
+    assert.equal(result.value.truncated, true);
+    assert.equal(result.value.model, "Provider/alpha");
+    assert.ok(result.value.count > 30 * 1024 * 1024);
+    assert.equal(result.value.messages, 1);
+    assert.equal(result.value.textLength, 16 * 1024);
+    const explicit = await runtime.execute("large-explicit-zero", script, buildRouteScriptInput(request, { deferTokenCount: true, tokenCount: 0 }));
+    assert.equal(explicit.status, "ok", explicit.error);
+    assert.equal(explicit.value.count, 0);
+  } finally { await runtime.close(); }
+});
+
+
+test("#1928 a large conversation still selects its script fallback chain", { timeout: 15000 }, async () => {
+  const runtime = new RouteScriptRuntime({ workerCount: 1, workerFile });
+  const script = routeScript(`return input.tokenCount > 0 ? {
+    model: "Provider/beta", fallback: { mode: "model-chain", models: ["Provider/fallback"], retryCount: 0 }
+  } : null;`, { timeoutMs: 5000 });
+  const plugin = new ClaudeCodeRouterPlugin(routingConfig([scriptRule("large-chain", script)]), { scriptRuntime: runtime });
+  const body = { model: "Provider/alpha", messages: [{ role: "user", content: "x".repeat(20 * 1024 * 1024) }] };
+  try {
+    const result = await plugin.routeRequest(routingInput(body));
+    assert.equal(result.decision.model, "Provider/beta");
+    assert.equal(result.decision.fallback.mode, "model-chain");
+    assert.deepEqual(result.decision.fallback.models, ["Provider/fallback"]);
+    assert.equal(body.messages[0].content.length, 20 * 1024 * 1024, "the forwarded request remains complete");
+  } finally { await runtime.close(); }
 });

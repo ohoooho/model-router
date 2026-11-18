@@ -1,3 +1,4 @@
+import { reconcileProfileModelSelections } from "@ccr/core/profiles/model-selection";
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -383,6 +384,28 @@ export async function saveAppConfig(config: AppConfig): Promise<AppConfig> {
   return enqueueAppConfigWrite(() => saveAppConfigNow(config));
 }
 
+/** Recovery changes only the selected takeover; unrelated invalid settings must not block it. */
+export async function disableGlobalAgentProfile(profileId: string): Promise<AppConfig> {
+  return enqueueAppConfigWrite(async () => {
+    await loadAppConfig();
+    await updatePersistedAppConfig((current) => {
+      if (!isObject(current) || !isObject(current.profile) || !Array.isArray(current.profile.profiles)) {
+        throw new Error("No saved agent profiles are available to restore.");
+      }
+      const profiles = current.profile.profiles as ProfileConfig[];
+      const target = profiles.find(profile => profile.id === profileId);
+      if (!target || !["claude-code", "codex"].includes(target.agent) || target.scope === "ccr" || target.scope === "custom") {
+        throw new Error("Select a system-default Claude Code or Codex profile to restore.");
+      }
+      return { ...current, profile: synchronizeLegacyProfileConfig({
+        ...current.profile as AppConfig["profile"],
+        profiles: profiles.map(profile => profile.id === profileId ? { ...profile, enabled: false } : profile)
+      }) };
+    });
+    return loadAppConfig();
+  });
+}
+
 export async function saveAppThemePreference(theme: unknown): Promise<AppConfig["theme"]> {
   const normalizedTheme = normalizeAppThemePreference(theme);
   return enqueueAppConfigWrite(async () => {
@@ -393,7 +416,7 @@ export async function saveAppThemePreference(theme: unknown): Promise<AppConfig[
 }
 
 async function saveAppConfigNow(config: AppConfig): Promise<AppConfig> {
-  const normalizedConfig = withSingleEnabledGlobalProfiles(config);
+  const normalizedConfig = reconcileProfileModelSelections(withSingleEnabledGlobalProfiles(config));
   assertProviderApiKeysAreSafe(normalizedConfig);
   const pluginMigration = migrateKnownGatewayPluginConfigs(normalizedConfig.plugins);
   // Credentials have their own save operation. A settings snapshot may predate
@@ -1453,6 +1476,8 @@ function parseProviders(value: unknown): GatewayProviderConfig[] | undefined {
         credentials: parseProviderCredentials(item.credentials ?? item.keys ?? item.apiKeys),
         extraBody: item.extraBody,
         extraHeaders: item.extraHeaders ?? item.extra_headers ?? item.headers,
+        forwardThinkingParameters: readBoolean(item.forwardThinkingParameters ?? item.forward_thinking_parameters),
+        supportsDeferredTools: readBoolean(item.supportsDeferredTools ?? item.supports_deferred_tools),
         icon: readString(item.icon),
         id: readString(item.id),
         enabled: item.enabled === false ? false : undefined,
@@ -1541,6 +1566,8 @@ function parseProviderModelMetadata(value: unknown): ProviderModelMetadata | und
   const maxOutputTokens = readPositiveInteger(value.maxOutputTokens ?? value.max_output_tokens ?? value.outputTokens ?? value.output_tokens);
   const openRouterDiscountRouting = parseOpenRouterDiscountRouting(value.openRouterDiscountRouting ?? value.open_router_discount_routing);
   const pricing = parseProviderModelPricing(value.pricing);
+  const reasoningEffortMap = parseStringRecord(value.reasoningEffortMap ?? value.reasoning_effort_map);
+  const reasoningRequired = value.reasoningRequired ?? value.reasoning_required;
   const metadata: ProviderModelMetadata = {
     ...(Array.isArray(value.additionalSpeedTiers) ? { additionalSpeedTiers: value.additionalSpeedTiers } : {}),
     ...(Array.isArray(value.additional_speed_tiers) ? { additionalSpeedTiers: value.additional_speed_tiers } : {}),
@@ -1558,6 +1585,8 @@ function parseProviderModelMetadata(value: unknown): ProviderModelMetadata | und
     ...(maxOutputTokens ? { maxOutputTokens } : {}),
     ...(openRouterDiscountRouting ? { openRouterDiscountRouting } : {}),
     ...(pricing ? { pricing } : {}),
+    ...(reasoningEffortMap ? { reasoningEffortMap } : {}),
+    ...(typeof reasoningRequired === "boolean" ? { reasoningRequired } : {}),
     ...(Array.isArray(value.serviceTiers) ? { serviceTiers: value.serviceTiers } : {}),
     ...(Array.isArray(value.service_tiers) ? { serviceTiers: value.service_tiers } : {}),
     ...(typeof value.supportsFastMode === "boolean" ? { supportsFastMode: value.supportsFastMode } : {}),
@@ -2482,7 +2511,7 @@ function parseMcpServers(value: unknown): GatewayMcpServerConfig[] | undefined {
       if (!command) {
         return undefined;
       }
-      const stdioMessageMode = readString(item.stdioMessageMode) === "newline-json" ? "newline-json" : "content-length";
+      const stdioMessageMode = readString(item.stdioMessageMode) === "content-length" ? "content-length" : "newline-json";
       return {
         args: parseStringList(item.args),
         command,

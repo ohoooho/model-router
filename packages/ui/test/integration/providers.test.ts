@@ -174,6 +174,7 @@ test("provider save keeps hand-written fields the dialog cannot edit", () => {
     billing: { currency: "USD" },
     extraBody: { default: { reasoning_effort: "high" } },
     extraHeaders: { "x-tenant": "acme" },
+    forwardThinkingParameters: true,
     models: ["model-a"],
     name: "example",
     provider: "openai",
@@ -185,6 +186,7 @@ test("provider save keeps hand-written fields the dialog cannot edit", () => {
   // section edits them, so they round-trip through the draft instead.
   assert.deepEqual(providerManualFieldsForSave(existing), {
     billing: existing.billing,
+    forwardThinkingParameters: true,
     provider: existing.provider,
     transformer: existing.transformer
   });
@@ -389,6 +391,18 @@ test("AddProviderForm renders auto model refresh in advanced settings", () => {
   assert.match(html, /data-ui-tooltip-trigger/);
   assert.match(html, /aria-label="Poll the provider models endpoint every 10 minutes and add newly discovered models automatically\."/);
   assert.match(html, /aria-checked="true"/);
+});
+
+test("#1912 deferred tool compatibility defaults on and remains editable after saving false", () => {
+  assert.equal(createProviderDraft([]).supportsDeferredTools, true);
+  const draft = createProviderDraftFromProvider({ name: "Legacy", models: ["tool-model"], supportsDeferredTools: false });
+  assert.equal(draft.supportsDeferredTools, false);
+  const html = renderToStaticMarkup(React.createElement(AddProviderForm, {
+    activeStep: "verify", draft, error: "", mode: "edit", onChange: () => undefined,
+    probeLoading: false, providers: []
+  }));
+  assert.match(html, /aria-label="Deferred tool loading"[^>]*aria-checked="false"|aria-checked="false"[^>]*aria-label="Deferred tool loading"/);
+  assert.match(html, /tool definitions are sent without defer_loading/);
 });
 
 test("edit provider dialog keeps advanced settings collapsed by default", () => {

@@ -108,6 +108,7 @@ const webClientBridge: CcrApi = {
   rpc: (method, ...args) => rpc(method, args),
   applyClaudeAppGateway: (config) => rpc("applyClaudeAppGateway", [config]) as ReturnType<CcrApi["applyClaudeAppGateway"]>,
   applyProfile: () => rpc("applyProfile") as ReturnType<CcrApi["applyProfile"]>,
+  recoverGlobalProfile: (profileId) => rpc("recoverGlobalProfile", [profileId]) as ReturnType<CcrApi["recoverGlobalProfile"]>,
   cancelBotGatewayQrLogin: (request) => rpc("cancelBotGatewayQrLogin", [request]) as ReturnType<CcrApi["cancelBotGatewayQrLogin"]>,
   checkProviderConnectivity: (request) => rpc("checkProviderConnectivity", [request]) as ReturnType<CcrApi["checkProviderConnectivity"]>,
   clearProxyNetworkCaptures: () => rpc("clearProxyNetworkCaptures") as ReturnType<CcrApi["clearProxyNetworkCaptures"]>,

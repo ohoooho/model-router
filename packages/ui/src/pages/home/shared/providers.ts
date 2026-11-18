@@ -193,7 +193,7 @@ export function routerRuleTypeLabel(type: RouterRuleType): string {
 
 export function formatRouterRuleCondition(rule: RouterRule): string {
   if (rule.type === "script") {
-    return `Node.js · ${rule.script?.timeoutMs ?? 2000}ms`;
+    return `${rule.condition ? `${rule.condition.left} ${rule.condition.operator} ${rule.condition.right} · ` : ""}Node.js · ${rule.script?.timeoutMs ?? 2000}ms`;
   }
   const condition = routerRuleConditionFromRule(rule);
   if (condition) {
@@ -339,7 +339,7 @@ export function createRoutingRuleDraftFromRule(rule: RouterRule, config?: AppCon
     pattern: rule.pattern ?? "",
     rewriteKey: firstRewrite.key,
     rewriteValue: firstRewrite.value,
-    rewrites: rule.type === "script" ? [] : rewrites.length ? rewrites : [firstRewrite],
+    rewrites: rule.type === "script" ? [] : rewrites,
     scriptFile: rule.script?.file ?? "",
     scriptTimeoutMs: String(rule.script?.timeoutMs ?? 2000),
     target: rule.target ?? "",
@@ -405,10 +405,10 @@ export function isRoutingRuleDraftSubmittable(draft: AddRoutingRuleDraft): boole
     return Boolean(draft.scriptFile.trim()) &&
       Number.isInteger(timeoutMs) &&
       timeoutMs >= 10 &&
-      timeoutMs <= ROUTER_SCRIPT_MAX_TIMEOUT_MS;
+      timeoutMs <= ROUTER_SCRIPT_MAX_TIMEOUT_MS &&
+      (!draft.conditionField.trim() || Boolean(draft.conditionOperator && draft.conditionRight.trim()));
   }
-  return draft.rewrites.length > 0 &&
-    draft.rewrites.every(isRoutingRewriteDraftRowValid) &&
+  return draft.rewrites.every(isRoutingRewriteDraftRowValid) &&
     Boolean(draft.conditionField.trim() && draft.conditionOperator && draft.conditionRight.trim());
 }
 
@@ -437,6 +437,11 @@ export function routingRuleFromDraft(
   return draft.type === "script"
     ? {
         ...commonRule,
+        ...(draft.conditionField.trim() ? { condition: {
+          left: buildRouterConditionPath(draft.conditionSource, draft.conditionField),
+          operator: draft.conditionOperator,
+          right: draft.conditionRight.trim()
+        } } : {}),
         script: {
           apiVersion: ROUTER_SCRIPT_API_VERSION,
           file: draft.scriptFile.trim(),
@@ -647,6 +652,7 @@ export function createProviderDraftFromDeepLinkPayload(
     credentials: [],
     extraBodyText: "",
     extraHeadersText: "",
+    supportsDeferredTools: true,
     icon: payload.icon?.trim() || "",
     modelDescriptions: modelDescriptionsForModels(payload.modelDescriptions, models),
     modelDisplayNames: modelDisplayNamesForModels(
@@ -747,6 +753,7 @@ export function createProviderDraft(providers: GatewayProviderConfig[]): AddProv
     credentials: [],
     extraBodyText: "",
     extraHeadersText: "",
+    supportsDeferredTools: true,
     icon: "",
     modelDescriptions: undefined,
     modelDisplayNames: undefined,
@@ -781,6 +788,7 @@ export function createProviderDraftFromProvider(provider: GatewayProviderConfig)
     credentials,
     extraBodyText: providerExtraJsonDraftText(provider.extraBody),
     extraHeadersText: providerExtraJsonDraftText(provider.extraHeaders),
+    supportsDeferredTools: provider.supportsDeferredTools !== false,
     icon: provider.icon ?? "",
     modelDescriptions: modelDescriptionsForModels(provider.modelDescriptions, provider.models),
     modelDisplayNames: modelDisplayNamesForModels(
@@ -2006,7 +2014,7 @@ export function providerCapabilitiesForSave(
 
 export type ProviderManualFields = Pick<
   GatewayProviderConfig,
-  "billing" | "provider" | "transformer"
+  "billing" | "forwardThinkingParameters" | "provider" | "transformer"
 >;
 
 /**
@@ -2033,6 +2041,7 @@ export function providerManualFieldsForSave(
   }
   const preserved: ProviderManualFields = {
     billing: existingProvider.billing,
+    forwardThinkingParameters: existingProvider.forwardThinkingParameters,
     provider: existingProvider.provider,
     transformer: existingProvider.transformer
   };
