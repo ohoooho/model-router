@@ -94,6 +94,22 @@ export class ModelRegistry {
       : undefined;
   }
 
+  /**
+   * Resolve a bare configured model id even when it is also exposed as a
+   * gateway alias. OMR hides provider prefixes in /v1/models, so the bare id
+   * would otherwise be classified as a gateway model and lose its provider
+   * metadata (context window, reasoning, etc.).
+   */
+  resolveBareProviderModel(value: string | undefined): { model: string; provider: GatewayProviderConfig } | undefined {
+    const normalized = normalizeRouteSelector(value);
+    if (!normalized || parseProviderModelSelector(normalized)) {
+      return undefined;
+    }
+    const match = this.disambiguateByProtocol(this.providerModelMatches(normalized, false), undefined) ??
+      this.disambiguateByProtocol(this.providerModelMatches(normalized, true), undefined);
+    return match ? { model: match.model, provider: match.provider } : undefined;
+  }
+
   resolveUniqueProviderModel(value: string | undefined): { model: string; provider: GatewayProviderConfig } | undefined {
     const normalized = normalizeRouteSelector(value);
     if (!normalized || parseProviderModelSelector(normalized)) {

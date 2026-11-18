@@ -481,6 +481,13 @@ function providerModelResolutionForSelector(config: AppConfig, selector: string)
     return direct;
   }
 
+  // OMR exposes bare model ids in /v1/models (no provider prefix). Resolve
+  // those against configured providers so discovery metadata is not lost.
+  const bare = registry.resolveBareProviderModel(selector);
+  if (bare) {
+    return bare;
+  }
+
   const attribution = resolveUsageModelAttribution(config, selector);
   if (!attribution.provider || !attribution.model) {
     return undefined;

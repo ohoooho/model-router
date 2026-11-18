@@ -725,8 +725,9 @@ test("OpenAI-compatible discovery advertises configured reasoning metadata", () 
     ]
   });
   const response = createGatewayModelsResponse(config, {});
-  const model = response.data.find((candidate) => candidate.id === "Reasoning/reasoning-model");
-  const plain = response.data.find((candidate) => candidate.id === "Plain/plain-model");
+  // OMR hides provider prefixes, so discovery exposes the bare model ids.
+  const model = response.data.find((candidate) => candidate.id === "reasoning-model");
+  const plain = response.data.find((candidate) => candidate.id === "plain-model");
 
   assert.ok(model);
   assert.ok(plain);

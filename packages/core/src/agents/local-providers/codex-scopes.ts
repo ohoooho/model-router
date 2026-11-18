@@ -2,7 +2,8 @@
 export function localCodexOauthConfig(plugin: Record<string, unknown>): Record<string, unknown> {
   const oauth = plugin.codexOauth as Record<string, unknown>;
   const key = typeof plugin.key === "string" ? plugin.key.toLowerCase() : "";
-  return key.startsWith("ccr-local-agent-") && key.includes("codex-oauth") && oauth.requiredScopes === undefined
+  const importedLocalAgent = key.startsWith("omr-local-agent-") || key.startsWith("ccr-local-agent-");
+  return importedLocalAgent && key.includes("codex-oauth") && oauth.requiredScopes === undefined
     ? { ...oauth, requiredScopes: [] }
     : oauth;
 }

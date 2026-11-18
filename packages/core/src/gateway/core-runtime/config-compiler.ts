@@ -762,7 +762,7 @@ function isLocalCodexOauthProviderPlugin(value: unknown): value is Record<string
     return false;
   }
   const key = stringValue(value.key)?.toLowerCase() ?? "";
-  return key.startsWith("omr-local-agent-") && key.includes("codex-oauth");
+  return (key.startsWith("omr-local-agent-") || key.startsWith("ccr-local-agent-")) && key.includes("codex-oauth");
 }
 
 
