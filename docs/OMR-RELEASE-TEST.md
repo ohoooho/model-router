@@ -292,6 +292,31 @@ chat, or logs. Check:
 - the change persists
 - request logs show the smoke requests
 
+### 6.6 Taoxian install onboarding state
+
+The Taoxian installer writes `onboardingFinishedAt` through the OMR install
+scripts (`install/write-config.js` and `install/migrate-runtime-config.js`), so
+a fresh Taoxian backend opens the normal Overview page instead of the
+"Connect agent" onboarding wizard. The write is idempotent and keeps an existing
+timestamp.
+
+Verify an installer-based install with:
+
+```bash
+sqlite3 -readonly "$HOME/.omr/config.sqlite" \
+  "SELECT value_json FROM app_config WHERE key='onboardingFinishedAt';"
+```
+
+Pass:
+
+- a non-empty timestamp is returned
+- opening the UI lands on Overview, not Onboarding
+- Agents/Profiles pages are still reachable and usable
+
+A direct npm install does not have this Taoxian-specific seed; it will show
+Onboarding until the user finishes it or `setOnboardingFinished` is called.
+This difference is expected.
+
 ## 7. Agent And Upgrade-Specific Checks
 
 ### 7.1 Claude Code
@@ -389,6 +414,7 @@ Packaged runtime:
   codex:
   docker:
   ui save/restart:
+  onboardingFinishedAt:
 
 New failures vs baseline:
 Evidence/log paths:
