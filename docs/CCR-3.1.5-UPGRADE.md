@@ -50,6 +50,10 @@ exists so Git can perform a three-way merge against the OMR patches.
 
 ## Verification
 
+Runtime acceptance procedure: [`docs/OMR-RELEASE-TEST.md`](OMR-RELEASE-TEST.md).
+It covers isolated installation, the gateway protocols, Agent Profiles, Docker
+loopback, baseline comparison, and the release decision checklist.
+
 Compared against the unmerged OMR baseline `d7ae246f` (same code as
 `origin/main` @ `c65007f5`):
 
