@@ -36,6 +36,7 @@
     "dev:electron": "node build/dev.mjs electron",
     "build": "node build/build.mjs && electron-builder",
     "build:assets": "node build/build.mjs",
+    "build:assets:refresh": "OMR_BUILD_REFRESH=1 node build/build.mjs",
     "build:docker": "node build/docker-build.mjs",
     "build:app:mac": "npm run build:app:mac:local",
     "build:app:mac:local": "npm run build:assets && electron-builder --config build/electron-builder.local.cjs --mac --publish never",
@@ -74,6 +75,7 @@
     "typecheck": "tsc --noEmit",
     "rebuild:sqlite3": "electron-rebuild -f -w better-sqlite3",
     "models:build": "node scripts/generate-models-json.mjs",
+    "claude-config:build": "node scripts/generate-claude-code-config-options.mjs",
     "version": "npm run models:build"
   },
   "dependencies": {

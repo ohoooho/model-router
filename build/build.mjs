@@ -1,6 +1,31 @@
-import "../scripts/generate-models-json.mjs";
-import "./../scripts/generate-claude-code-config-options.mjs";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { buildBrowserRenderer, buildMain, buildRenderer, buildRequestLogBodyWorker, buildStyles, buildTrayRenderer, buildWebClientBridge, cleanDist, copyAppAssets, copyBrowserRendererHtml, copyBundledClaudeRuntimePlugins, copyModelCatalog, copyRendererHtml, copyTrayRendererHtml, syncUiRendererToRuntimeDists } from "./esbuild.config.mjs";
+
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const generatedCatalogFiles = [
+  "packages/core/models.json",
+  "packages/ui/src/generated/claude-code-config-options.json"
+];
+
+// Release builds must be byte-reproducible. The generated catalogs are
+// checked in; only refresh them when a maintainer explicitly asks for a network
+// refresh. Otherwise two clean checkouts can produce different tarballs because
+// the upstream model/doc APIs changed between builds.
+if (process.env.OMR_BUILD_REFRESH === "1") {
+  await import("../scripts/generate-models-json.mjs");
+  await import("./../scripts/generate-claude-code-config-options.mjs");
+} else {
+  for (const relativePath of generatedCatalogFiles) {
+    const absolutePath = path.join(projectRoot, relativePath);
+    if (!existsSync(absolutePath)) {
+      throw new Error(
+        `Missing generated catalog: ${relativePath}. Run with OMR_BUILD_REFRESH=1 once, then commit the result.`
+      );
+    }
+  }
+}
 
 const mode = process.argv.includes("--dev") ? "development" : "production";
 

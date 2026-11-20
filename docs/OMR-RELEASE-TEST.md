@@ -14,7 +14,7 @@ and **not** a model-quality evaluation.
 
 | Item | Value |
 | --- | --- |
-| OMR package version | `0.2.0` (unchanged by the CCR upgrade) |
+| OMR package version | `0.2.2` |
 | CCR target | `3.1.5` |
 | Reference branch | `upgrade/ccr-3.1.5` |
 | Reference commit at first write | `94dfe813` |
@@ -22,8 +22,8 @@ and **not** a model-quality evaluation.
 | Last local runtime check | macOS, isolated HOME, alternate ports `13456/13457/13458` |
 | Runtime check coverage | health, UI, `/v1/models`, chat/completions, responses, messages with a local mock upstream |
 
-The package version stays `0.2.0`, so **do not use `omr --version` to identify
-the build**. Record the Git commit and the tarball SHA256 instead.
+Use the Git commit and the tarball SHA256 to identify the build. Do not rely on
+`omr --version` alone.
 
 ## 1. Record The Build Identity
 
@@ -75,11 +75,31 @@ Do not require a fully green suite. Require **no new failure names**.
 
 ## 3. Build And Pack
 
+Release builds are offline and byte-reproducible by default. `build:assets`
+uses the committed generated catalogs:
+
+- `packages/core/models.json`
+- `packages/ui/src/generated/claude-code-config-options.json`
+
+Do not refresh either catalog while preparing a release. The network refresh is
+only for an intentional catalog update:
+
+```bash
+OMR_BUILD_REFRESH=1 npm run build:assets
+git add packages/core/models.json \
+  packages/ui/src/generated/claude-code-config-options.json
+git commit -m "chore(models): refresh generated catalogs"
+```
+
+For the release artifact, use a clean checkout at the release commit and the
+same Node/npm versions as the signing machine:
+
 ```bash
 set -euo pipefail
 
 cd /path/to/model-router
-npm run build:assets
+npm ci
+git status --short  # must be empty
 
 PACKDIR=$(mktemp -d)
 npm pack --workspace @ohoooho/model-router --pack-destination "$PACKDIR"
@@ -89,13 +109,23 @@ printf 'tarball=%s\n' "$TARBALL"
 shasum -a 256 "$TARBALL"
 ```
 
-Build note: `npm run build:assets` regenerates `packages/core/models.json`.
-Do not commit that generated change unless the release intentionally includes a
-model-catalog refresh. Restore it if it is unrelated:
+Build note: `npm pack` runs `prepack` -> `build:assets`, which now uses the
+committed catalogs and does not fetch model or documentation APIs. Build from a
+clean tree and discard any generated `dist/` output before packing.
+
+To prove reproducibility, pack twice from the same commit and compare the bytes:
 
 ```bash
-git checkout -- packages/core/models.json
+A=$(mktemp -d)
+B=$(mktemp -d)
+npm pack --workspace @ohoooho/model-router --pack-destination "$A"
+npm pack --workspace @ohoooho/model-router --pack-destination "$B"
+cmp "$A"/*.tgz "$B"/*.tgz
+shasum -a 256 "$A"/*.tgz "$B"/*.tgz
 ```
+
+The two SHA256 values must match. If they do not, stop and investigate before
+assembling the release.
 
 ## 4. Install In Isolation
 

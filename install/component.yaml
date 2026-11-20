@@ -199,9 +199,9 @@ artifacts:
     kind: npm-tarball
     package: "@ohoooho/model-router"
     path: omr-0.2.2.tgz
-    sha256: 71be3d66673334889d9b38aed91c3412c4a293108c8feafc699c519ec3293ff5
-    size_bytes: 6874159
-    npm_integrity: sha512-B+HH6FyYGyza4rQ5zX1DcNnsyiNUCsGjMKXcCCg98FgYk7a5dFnXenG5yoDYYcEvCbzkTMCoTgxIwcx71Zkh8g==
+    sha256: dab0ba58346047e098854b5ec5e46cf346dc5c8f95526af90df71d9a0b2a7455
+    size_bytes: 6643620
+    npm_integrity: sha512-0syXRaFAkXyAavGXy7ZCWRgrZTXPrI1pXQVXZHEldzNU3xpxht22H4yiC5h3BWC+bgOBNwhgqx55PB0ojOy6cQ==
 
 # 用户目录、配置和系统权限边界。
 # 失职 243 闭环 (K-302 边界修正): OMR fork 仓是我的项目, 路径品牌化由我负责.
