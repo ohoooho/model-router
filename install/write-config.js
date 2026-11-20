@@ -138,7 +138,7 @@ const upsertConfig = db.prepare(`
 const OMR_CONFIG = {
   version: OMR_VERSION,
   fork_of: 'claude-code-router',
-  fork_base: 'v3.1.3',
+  fork_base: 'v3.1.5',
   patches_count: 6,
   patches: ['K-251', 'K-272', 'K-273', 'K-294', 'K-295'],
   // 双 baozi_key 引用 (实际 key 在 api_keys 表加密存)

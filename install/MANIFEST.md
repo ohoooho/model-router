@@ -17,7 +17,7 @@ omr-<MAJOR>.<MINOR>.<PATCH>.tgz
 ```
 
 - 可安装版本只使用纯 SemVer，不再把 `fork<上游版本>` 或 `+p<n>` 写进版本号和物料文件名。
-- 上游 fork base（当前 `claude-code-router v3.1.3`）和自家 patch 清单只作为
+- 上游 fork base（当前 `claude-code-router v3.1.5`）和自家 patch 清单只作为
   `install/write-config.js` 写入的配置元数据（`fork_base` / `patches`），不参与版本比较。
 - 历史版本 `0.1.0-fork3.1.3+p2` 仍可被识别；安装器按数字版本比较，`0.2.2` 会正常升级旧版本。
 
