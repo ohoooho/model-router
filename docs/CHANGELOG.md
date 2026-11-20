@@ -23,6 +23,17 @@
 
 ## Fork 后变更（OMR 专属）
 
+### OMR-RELEASE-0.2.2 — 2026-11-20
+- **类型**: chore
+- **标题**: 基于 CCR 3.1.5 升级分支重新发布离线包
+- **改动**:
+  - `packages/cli/package.json`、`package-lock.json`
+  - `install/component.yaml`、`install/component.context.json`
+  - `install/MANIFEST.md`、`install/README.md`
+- **原因**: 升级分支已合入 CCR 3.1.5；版本号高于已发布的 `0.2.1`，
+  避免 taoxian feed 的 `0.2.1` 反向覆盖内置离线包。
+- **兼容**: 离线包 `omr-0.2.2.tgz` 替换旧 `0.2.0` 物料。
+
 ### OMR-RELEASE-0.2.0 — 2026-11-13
 - **类型**: chore
 - **标题**: 可安装版本改为纯 SemVer `0.2.0`
