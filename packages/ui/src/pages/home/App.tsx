@@ -211,8 +211,8 @@ function WebAuthExpiredScreen({ language }: { language: ResolvedLanguage }) {
         {openAttempted ? (
           <p className="mt-3 text-xs leading-5 text-muted-foreground">
             {zh
-              ? "如果控制台没有自动打开，请从桌面 / 启动台打开“桃仙模型管理（OMR）控制台”。"
-              : "If the console did not open, launch “Taoxian Model Management (OMR) Console” from your desktop or Launchpad."}
+              ? "如果控制台没有自动打开，请从桌面 / 启动台打开“桃仙模型管理”。"
+              : "If the console did not open, launch “Taoxian Model Management” from your desktop or Launchpad."}
           </p>
         ) : null}
         <div className="mt-6 rounded-lg border border-border bg-muted/40 px-4 py-3">
