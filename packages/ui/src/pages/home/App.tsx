@@ -380,7 +380,7 @@ function App() {
 
     const handleWebAuthExpired = () => setWebAuthExpired(true);
     window.addEventListener("omr:web-auth-expired", handleWebAuthExpired);
-    void window.ccr.getAppInfo().then(setAppInfo);
+    void window.ccr.getAppInfo().then(setAppInfo).catch(() => undefined);
     void window.ccr.getProviderPresets()
       .then(setProviderPresets)
       .catch(() => setProviderPresets([]))
