@@ -193,16 +193,16 @@ function WebAuthExpiredScreen({ language }: { language: ResolvedLanguage }) {
           {zh ? "需要重新认证" : "Re-authentication required"}
         </div>
         <h1 className="mt-2 text-2xl font-semibold">
-          {zh ? "管理令牌已过期" : "Management token expired"}
+          {zh ? "模型管理控制台需要重新打开" : "Model management console needs to be reopened"}
         </h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
           {zh
-            ? "浏览器保存的 OMR 管理令牌已失效，通常是 OMR 服务重启后重新生成了令牌。"
-            : "The OMR management token saved in this browser is no longer valid. This usually happens after the OMR service restarts with a new token."}
+            ? "浏览器保存的管理令牌已过期，通常是 OMR 服务重启后重新生成了令牌。"
+            : "The management token saved in this browser has expired. This usually happens after the OMR service restarts with a new token."}
         </p>
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <Button onClick={openConsole} type="button">
-            {zh ? "重新打开 OMR 控制台" : "Open OMR console"}
+            {zh ? "打开模型管理控制台" : "Open model management console"}
           </Button>
           <span className="text-xs text-muted-foreground">
             {zh ? "会自动带上最新令牌" : "Uses the current token automatically"}
@@ -211,8 +211,8 @@ function WebAuthExpiredScreen({ language }: { language: ResolvedLanguage }) {
         {openAttempted ? (
           <p className="mt-3 text-xs leading-5 text-muted-foreground">
             {zh
-              ? "如果控制台没有自动打开，请从桌面 / 开始菜单启动“桃仙 OMR 控制台”。"
-              : "If the console did not open, launch “Taoxian OMR Console” from your desktop or Start Menu."}
+              ? "如果控制台没有自动打开，请从桌面 / 启动台打开“桃仙模型管理（OMR）控制台”。"
+              : "If the console did not open, launch “Taoxian Model Management (OMR) Console” from your desktop or Launchpad."}
           </p>
         ) : null}
         <div className="mt-6 rounded-lg border border-border bg-muted/40 px-4 py-3">
