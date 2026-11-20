@@ -179,6 +179,42 @@ function canInstallExtensionCandidate(candidate: PluginInstallCandidate): boolea
   return Boolean(candidate.id.trim() && (candidate.modulePath.trim() || (candidate.apps?.length ?? 0) > 0));
 }
 
+function WebAuthExpiredScreen({ language }: { language: ResolvedLanguage }) {
+  const zh = language === "zh";
+  return (
+    <div className="flex h-full min-h-screen items-center justify-center bg-background px-6 py-10 text-foreground">
+      <div className="w-full max-w-xl rounded-2xl border border-border bg-card p-8 shadow-sm" role="alert">
+        <div className="text-sm font-medium text-amber-600 dark:text-amber-400">
+          {zh ? "需要重新认证" : "Re-authentication required"}
+        </div>
+        <h1 className="mt-2 text-2xl font-semibold">
+          {zh ? "管理令牌已过期" : "Management token expired"}
+        </h1>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+          {zh
+            ? "浏览器保存的 OMR 管理令牌已失效，通常是 OMR 服务重启后重新生成了令牌。"
+            : "The OMR management token saved in this browser is no longer valid. This usually happens after the OMR service restarts with a new token."}
+        </p>
+        <p className="mt-5 text-sm font-medium">{zh ? "在终端运行：" : "Run this in your terminal:"}</p>
+        <div className="mt-2 space-y-2">
+          <code className="block rounded-lg bg-muted px-4 py-3 font-mono text-sm">omr ui</code>
+          <code className="block rounded-lg bg-muted px-4 py-3 font-mono text-sm">omr console --open</code>
+        </div>
+        <p className="mt-4 text-sm leading-6 text-muted-foreground">
+          {zh
+            ? "omr ui 会启动或复用 OMR 服务，并用最新令牌打开控制台；omr console 只打印或打开已运行服务的控制台链接。"
+            : "omr ui starts or reuses the OMR service and opens the console with the current token. omr console prints or opens the console URL for an already-running service."}
+        </p>
+        <p className="mt-4 text-xs leading-5 text-muted-foreground">
+          {zh
+            ? "如果反复出现，请让 OMR 服务使用固定的 OMR_WEB_AUTH_TOKEN（web-auth.env）。"
+            : "If this keeps happening, configure the OMR service with a fixed OMR_WEB_AUTH_TOKEN (web-auth.env)."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [activeView, setActiveView] = useState<ViewId>("onboarding");
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStepId>(() => getDefaultOnboardingStep(fallbackConfig));
@@ -204,6 +240,7 @@ function App() {
   const [configSaveError, setConfigSaveError] = useState("");
   const [autoSaveResumeRevision, setAutoSaveResumeRevision] = useState(0);
   const [runtimeDisconnected, setRuntimeDisconnected] = useState(false);
+  const [webAuthExpired, setWebAuthExpired] = useState(false);
   const [profileActionError, setProfileActionError] = useState("");
   const [profileAddOpen, setProfileAddOpen] = useState(false);
   const [profileAgentTab, setProfileAgentTab] = useState<ProfileConfig["agent"]>("claude-code");
@@ -341,6 +378,8 @@ function App() {
       return;
     }
 
+    const handleWebAuthExpired = () => setWebAuthExpired(true);
+    window.addEventListener("omr:web-auth-expired", handleWebAuthExpired);
     void window.ccr.getAppInfo().then(setAppInfo);
     void window.ccr.getProviderPresets()
       .then(setProviderPresets)
@@ -383,6 +422,7 @@ function App() {
     };
     const stopPolling = startVisiblePolling(refreshRuntimeStatus, 2000);
     return () => {
+      window.removeEventListener("omr:web-auth-expired", handleWebAuthExpired);
       stopPolling();
       unsubscribeOpenSettings();
       unsubscribeOpenUpdate();
@@ -3222,6 +3262,10 @@ function App() {
       state={configSaveState}
     />
   );
+
+  if (webAuthExpired) {
+    return <WebAuthExpiredScreen language={resolvedLanguage} />;
+  }
 
   return (
     <AppI18nContext.Provider value={copy}>

@@ -4,6 +4,7 @@ const rpcEndpoint = "/api/omr/rpc";
 const webAuthHeader = "x-omr-web-auth";
 const webAuthQueryParam = "omr_web_token";
 const webAuthStorageKey = "omr.webAuthToken";
+const webAuthExpiredEvent = "omr:web-auth-expired";
 const webAuthToken = readWebAuthToken();
 
 type RpcResponse =
@@ -26,6 +27,9 @@ async function rpc(method: string, args: unknown[] = []): Promise<unknown> {
     payload = undefined;
   }
   if (!response.ok || !payload?.ok) {
+    if (response.status === 401) {
+      window.dispatchEvent(new CustomEvent(webAuthExpiredEvent));
+    }
     const message = payload && !payload.ok
       ? payload.error.message
       : response.status === 404
