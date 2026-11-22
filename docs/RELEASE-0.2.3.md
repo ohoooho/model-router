@@ -1,6 +1,7 @@
-# OMR 0.2.3 Release Candidate
+# OMR 0.2.3 Release
 
 - Date: 2026-11-22
+- Status: published to npm; Taoxian feed signing/deploy pending
 - Branch: `release/omr-0.2.3`
 - Base: `upgrade/ccr-3.1.5` @ `dc39d7b` (CCR 3.1.5)
 - Package: `@ohoooho/model-router@0.2.3`
@@ -35,6 +36,16 @@ existing `virtualModelProfiles` JSON array.
 - `install/component.yaml` now records the artifact SHA256, size, and npm
   integrity above.
 
+## Registry Publication
+
+- `@ohoooho/model-router@0.2.3` is published under the `latest` dist-tag.
+- The registry tarball was downloaded and hashed after propagation:
+  `441ac72aa4247c5cf0793533e41eedb7b31c9fa336189e1039774dc1dca81077`
+  (`6653716` bytes), matching the tested artifact byte-for-byte.
+- Registry `dist.shasum` is `ea966aaa0fe1a2e15d169af0f2c83f98d4d36830`;
+  `dist.integrity` is
+  `sha512-0dvJcZBk1e3li8qBxpH6UJVOyPQiJUevxjEWfeZxiRylHyXxCeiI6tmZJDjLfLN0u78knqY5lTVbn87qnimArg==`.
+
 ## Verification
 
 Source gates:
@@ -67,17 +78,16 @@ Packaged runtime:
   - OpenCode model selector contains `DeepSeek V4.1 Flash 1017`.
   - `page_errors=0`.
 
-## Release Gates Still Pending
+## Remaining Release Gates
 
 Production signing and deployment must run on wuxian:
 
-1. Publish `@ohoooho/model-router@0.2.3` to npm.
-2. Rebuild the tarball from the final release commit and confirm SHA256/size.
-3. Regenerate the Taoxian catalog and `versions/stable.json` for OMR `0.2.3`,
+1. Rebuild/confirm the exact tarball from the final release commit.
+2. Regenerate the Taoxian catalog and `versions/stable.json` for OMR `0.2.3`,
    feed sequence `5`.
-4. Sign the catalog and feed with production keys.
-5. Assemble and verify the Taoxian installer release.
-6. Deploy `stable.json` and `stable.json.sig.json` together.
+3. Sign the catalog and feed with production keys.
+4. Assemble and verify the Taoxian installer release.
+5. Deploy `stable.json` and `stable.json.sig.json` together.
 
 Do not reuse the stale `versions/stable.json.sig.json` or the 0.2.2 OMR
 artifact for this release.
