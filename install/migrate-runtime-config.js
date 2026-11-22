@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Idempotently materialize Taoxian's runtime virtual-model profiles in an
 // existing OMR database. This intentionally touches only `app_config.default`:
-// provider visibility (Baozi on, tai hidden), the four alias profiles, and the
-// Baozi preferred/fallback route are updated; API keys and user-owned profile
-// fields stay untouched.
+// provider visibility (Baozi on, tai hidden), missing alias profiles, and the
+// Baozi preferred/fallback route are updated; API keys, user-owned profile
+// fields, and user-selected alias models stay untouched.
 
 const { DatabaseSync } = require('node:sqlite');
 const fs = require('node:fs');

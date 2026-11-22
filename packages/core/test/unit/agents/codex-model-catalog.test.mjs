@@ -604,6 +604,34 @@ test("codex catalog exposes model-entry aliases without the Fusion prefix", () =
   assert.equal(ids.includes("Fusion/baozi-code"), false);
 });
 
+test("codex catalog exposes built-in scene aliases without the Fusion prefix", () => {
+  const ids = buildCodexModelCatalogIds({
+    Providers: [
+      { name: "baozi", type: "openai_responses", models: ["coding-auto"] }
+    ],
+    virtualModelProfiles: [
+      {
+        baseModel: { fixedModel: "baozi/coding-auto", mode: "fixed" },
+        displayName: "Coding Auto (编程通用)",
+        enabled: true,
+        execution: {
+          clientToolsPolicy: "allow",
+          mode: "tool_loop",
+          streamMode: "optimistic"
+        },
+        id: "coding-auto",
+        key: "baozi-coding-auto",
+        match: { exactAliases: ["coding-auto"] },
+        materialization: { enabled: true, includeInGatewayModels: true },
+        tools: []
+      }
+    ]
+  }, "coding-auto");
+
+  assert.ok(ids.includes("coding-auto"));
+  assert.equal(ids.includes("Fusion/coding-auto"), false);
+});
+
 test("codex catalog keeps the Fusion prefix for legacy virtual models", () => {
   const ids = buildCodexModelCatalogIds({
     Providers: [

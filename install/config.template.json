@@ -54,6 +54,14 @@
       "strategy": "priority",
       "match": { "exactAliases": ["team-auto"] },
       "key_id": "baozi-team-auto"
+    },
+    {
+      "id": "trial-auto",
+      "displayName": "Trial Auto (体验配额)",
+      "enabled": true,
+      "strategy": "auto-balance",
+      "match": { "exactAliases": ["trial-auto"] },
+      "key_id": "baozi-assist-auto"
     }
   ]
 }

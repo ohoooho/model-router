@@ -111,8 +111,9 @@ verify.sh 输出 4 状态:
 | coding-auto (编程档) | `{{BAOZI_CODING_KEY}}` | `fake_coding_***` | baozi-coding-auto |
 | assist-auto (办公档) | `{{BAOZI_ASSIST_KEY}}` | `fake_assist_***` | baozi-assist-auto |
 | team-auto (团队档) | `{{BAOZI_TEAM_KEY}}` | `fake_team_***` | baozi-team-auto |
+| trial-auto (体验档) | `BAOZI_TRIAL_KEY`（可选，默认复用 assist key） | `fake_assist_***` | baozi-assist-auto |
 
-**原则**: 契约 component.yaml inputs 必须定义 4 个 baozi_key, 没真 key 时用 fake 占位 + 模板表达式预留. 验证场景独立测 (verify.sh 4 场景 for-loop), 不允许一个 dummy "***" 通杀.
+**原则**: 契约 component.yaml inputs 必须定义 4 个场景 baozi_key, 没真 key 时用 fake 占位 + 模板表达式预留. `trial-auto` 默认复用 assist key，可用 `BAOZI_TRIAL_KEY` 覆盖，因此不单独计入 4 个场景 key. 验证场景独立测 (verify.sh 5 场景 for-loop), 不允许一个 dummy "***" 通杀.
 
 **维度澄清**:
 - 场景维度 (chat/coding/assist/team): 使用场景, 4 个不同 key

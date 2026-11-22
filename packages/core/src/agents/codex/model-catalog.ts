@@ -118,7 +118,7 @@ export function buildCodexModelCatalogIds(
       }
     }
     for (const alias of virtualModelRawCatalogNames(profile)) {
-      pushUniqueModel(ids, isModelEntryCatalogProfile(profile) ? alias : fusionModelSelector(alias));
+      pushUniqueModel(ids, profileUsesBareAlias(profile) ? alias : fusionModelSelector(alias));
     }
   }
 
@@ -817,13 +817,26 @@ function virtualModelRawCatalogNames(profile: VirtualModelProfileConfig): string
   return [profile.key || profile.displayName].filter(Boolean);
 }
 
-function isModelEntryCatalogProfile(profile: VirtualModelProfileConfig): boolean {
+const builtinSceneAliases = new Set([
+  "coding-auto",
+  "assist-auto",
+  "chat-auto",
+  "team-auto",
+  "trial-auto"
+]);
+
+function profileUsesBareAlias(profile: VirtualModelProfileConfig): boolean {
   const metadata = profile.metadata;
-  return Boolean(
+  if (
     metadata &&
     typeof metadata === "object" &&
     !Array.isArray(metadata) &&
     (metadata as Record<string, unknown>).source === "model-entry"
+  ) {
+    return true;
+  }
+  return virtualModelRawCatalogNames(profile).some((alias) =>
+    builtinSceneAliases.has(alias.trim().toLowerCase())
   );
 }
 

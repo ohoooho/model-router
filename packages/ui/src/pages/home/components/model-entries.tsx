@@ -50,7 +50,8 @@ type ModelEntryMetadata = {
 };
 
 const modelEntrySource = "model-entry";
-const globalAliases = ["coding-auto", "chat-auto", "assist-auto", "team-auto"];
+const builtinSceneAliases = ["coding-auto", "assist-auto", "chat-auto", "team-auto", "trial-auto"];
+const globalAliases = builtinSceneAliases;
 
 const roleLabels: Record<ModelEntryRole, { en: string; zh: string }> = {
   code: { en: "Code", zh: "编程" },
@@ -92,8 +93,12 @@ function modelEntryMetadata(profile: VirtualModelProfileConfig): ModelEntryMetad
   return metadata as ModelEntryMetadata;
 }
 
-function isModelEntry(profile: VirtualModelProfileConfig): boolean {
-  return modelEntryMetadata(profile).source === modelEntrySource;
+export function isBuiltinSceneProfile(profile: VirtualModelProfileConfig): boolean {
+  return builtinSceneAliases.includes(entryAlias(profile).toLowerCase());
+}
+
+export function isModelEntry(profile: VirtualModelProfileConfig): boolean {
+  return modelEntryMetadata(profile).source === modelEntrySource || isBuiltinSceneProfile(profile);
 }
 
 function entryAlias(profile: VirtualModelProfileConfig): string {
@@ -102,7 +107,20 @@ function entryAlias(profile: VirtualModelProfileConfig): string {
 
 function entryRole(profile: VirtualModelProfileConfig): ModelEntryRole | undefined {
   const role = modelEntryMetadata(profile).role;
-  return role === "code" || role === "chat" || role === "office" ? role : undefined;
+  if (role === "code" || role === "chat" || role === "office") {
+    return role;
+  }
+  const alias = entryAlias(profile).toLowerCase();
+  if (alias.includes("coding") || alias.includes("code")) {
+    return "code";
+  }
+  if (alias.includes("assist") || alias.includes("office")) {
+    return "office";
+  }
+  if (alias.includes("chat")) {
+    return "chat";
+  }
+  return undefined;
 }
 
 function entryProviderName(profile: VirtualModelProfileConfig): string {
@@ -234,6 +252,10 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
       .filter(({ profile }) => isModelEntry(profile)),
     [config?.virtualModelProfiles]
   );
+  const editingProfile = editingKey
+    ? (config?.virtualModelProfiles ?? []).find((profile) => profile.key === editingKey)
+    : undefined;
+  const editingBuiltin = Boolean(editingProfile && isBuiltinSceneProfile(editingProfile));
   const selectedProvider = providers.find((provider) => provider.name === providerName);
   const providerIndex = providers.findIndex((provider) => provider.name === providerName);
 
@@ -381,19 +403,33 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
       return;
     }
     const normalizedAlias = alias.trim().toLowerCase();
-    if (reservedAliases.has(normalizedAlias)) {
+    if (!editingKey && reservedAliases.has(normalizedAlias)) {
       setError(zh ? `模型 ID “${normalizedAlias}” 已被占用，请换一个。` : `Model ID “${normalizedAlias}” is already in use. Choose another.`);
       return;
     }
-    const profile = buildModelEntryProfile(
-      selectedProvider,
-      role,
-      model,
-      normalizedAlias,
-      editingKey,
-      zh
-    );
+    if (editingKey && !editingProfile) {
+      setError(zh ? "这个入口已经不存在，请刷新后再试。" : "This entry no longer exists. Refresh and try again.");
+      return;
+    }
+    const fixedModel = `${selectedProvider.name}/${model}`;
     const currentProfiles = config?.virtualModelProfiles ?? [];
+    const profile = editingBuiltin && editingProfile
+      ? {
+          ...editingProfile,
+          baseModel: {
+            ...(editingProfile.baseModel ?? {}),
+            fixedModel,
+            mode: "fixed" as const
+          }
+        }
+      : buildModelEntryProfile(
+          selectedProvider,
+          role,
+          model,
+          normalizedAlias,
+          editingKey,
+          zh
+        );
     if (!editingKey) {
       profile.id = uniqueVirtualModelId(currentProfiles, profile.id);
     }
@@ -442,7 +478,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
     label: roleLabels[value][zh ? "zh" : "en"],
     value
   }));
-  const aliasConflict = Boolean(alias.trim()) && reservedAliases.has(alias.trim().toLowerCase());
+  const aliasConflict = !editingKey && Boolean(alias.trim()) && reservedAliases.has(alias.trim().toLowerCase());
   const validationError = dialog && !loading
     ? validateAlias(alias, zh) || (aliasConflict
       ? (zh ? `模型 ID “${alias.trim().toLowerCase()}” 已被占用，请换一个。` : `Model ID “${alias.trim().toLowerCase()}” is already in use. Choose another.`)
@@ -524,12 +560,18 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
                 {entries.map(({ profile }) => {
                   const entryId = entryAlias(profile);
                   const metadata = modelEntryMetadata(profile);
+                  const builtin = isBuiltinSceneProfile(profile);
                   return (
                     <div className="rounded-xl border border-border bg-card p-4 shadow-sm" key={profile.key}>
                       <div className="flex items-start gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex min-w-0 flex-wrap items-center gap-2">
                             <div className="truncate text-[14px] font-semibold text-foreground">{profile.displayName}</div>
+                            {builtin ? (
+                              <span className="rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:text-sky-300">
+                                {zh ? "内置场景" : "Built-in"}
+                              </span>
+                            ) : null}
                             <span className={cn(
                               "rounded-full border px-2 py-0.5 text-[10px] font-medium",
                               profile.enabled === false
@@ -563,16 +605,18 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
                           <Pencil className="h-3.5 w-3.5" />
                           {zh ? "编辑" : "Edit"}
                         </Button>
-                        <Button onClick={() => setDeleteTarget(profile)} size="sm" type="button" variant="ghost">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          {zh ? "删除" : "Delete"}
-                        </Button>
+                        {builtin ? null : (
+                          <Button onClick={() => setDeleteTarget(profile)} size="sm" type="button" variant="ghost">
+                            <Trash2 className="h-3.5 w-3.5" />
+                            {zh ? "删除" : "Delete"}
+                          </Button>
+                        )}
                       </div>
-                      {metadata.providerId ? null : (
+                      {metadata.source === modelEntrySource && !metadata.providerId ? (
                         <div className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
                           {zh ? "这个入口没有 Provider 元数据，可能是旧数据。" : "This entry has no provider metadata and may be legacy data."}
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   );
                 })}
@@ -630,7 +674,11 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
             <DialogHeader>
               <div className="min-w-0">
                 <DialogTitle>
-                  {dialog === "edit" ? (zh ? "编辑模型入口" : "Edit model entry") : (zh ? "新建模型入口" : "New model entry")}
+                  {editingBuiltin
+                    ? (zh ? "切换内置场景模型" : "Switch built-in model")
+                    : dialog === "edit"
+                      ? (zh ? "编辑模型入口" : "Edit model entry")
+                      : (zh ? "新建模型入口" : "New model entry")}
                 </DialogTitle>
               </div>
               <Button aria-label={zh ? "关闭" : "Close"} onClick={closeDialog} size="iconSm" type="button" variant="ghost">
@@ -642,9 +690,11 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
                 <Field label={zh ? "Provider" : "Provider"} requirement="required">
                   <SelectControl onChange={changeProvider} options={providerOptions} value={providerName} />
                 </Field>
-                <Field label={zh ? "使用角色" : "Role"} requirement="required">
-                  <SelectControl onChange={(value) => setRole(value as ModelEntryRole)} options={roleOptions} value={role} />
-                </Field>
+                {editingBuiltin ? null : (
+                  <Field label={zh ? "使用角色" : "Role"} requirement="required">
+                    <SelectControl onChange={(value) => setRole(value as ModelEntryRole)} options={roleOptions} value={role} />
+                  </Field>
+                )}
                 <Field label={zh ? "模型" : "Model"} requirement="required">
                   <SelectControl onChange={setModel} options={modelOptions} value={model} />
                 </Field>
@@ -680,7 +730,11 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
                   />
                 </Field>
                 <div className="rounded-lg border border-border bg-muted/25 px-3 py-2 text-[11px] leading-5 text-muted-foreground">
-                  {dialog === "edit" ? (
+                  {editingBuiltin ? (
+                    zh
+                      ? "内置场景的 ID 固定；可以在上面换 Provider / 模型。安装器重配会保留你选中的模型。"
+                      : "Built-in scene IDs are fixed. Pick a different provider or model above; reinstalling keeps your selected model."
+                  ) : dialog === "edit" ? (
                     zh
                       ? "已创建的模型 ID 不能改名。需要新名字时请新建一个入口；已有 ID 可以换背后的模型。"
                       : "An existing model ID cannot be renamed. Create a new entry for a new name; you can change the model behind an existing ID."
@@ -708,7 +762,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
               </Button>
               <Button disabled={!canSubmit || saving} onClick={() => void submitDialog()} type="button">
                 {saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : dialog === "edit" ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                {dialog === "edit" ? (zh ? "保存" : "Save") : (zh ? "创建并同步" : "Create and sync")}
+                {dialog === "edit" ? (zh ? "保存并同步" : "Save and sync") : (zh ? "创建并同步" : "Create and sync")}
               </Button>
             </DialogFooter>
           </DialogContent>
