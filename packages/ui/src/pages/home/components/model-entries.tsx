@@ -41,7 +41,7 @@ import {
   useState
 } from "../shared/index";
 
-type ModelEntryRole = "code" | "chat" | "office";
+type ModelEntryRole = string;
 type ModelEntryMetadata = {
   providerId?: string;
   providerName?: string;
@@ -52,12 +52,21 @@ type ModelEntryMetadata = {
 const modelEntrySource = "model-entry";
 const builtinSceneAliases = ["coding-auto", "assist-auto", "chat-auto", "team-auto", "trial-auto"];
 const globalAliases = builtinSceneAliases;
+const roleSuggestions = ["code", "chat", "office"];
 
-const roleLabels: Record<ModelEntryRole, { en: string; zh: string }> = {
+const roleLabels: Record<string, { en: string; zh: string }> = {
   code: { en: "Code", zh: "编程" },
   chat: { en: "Chat", zh: "对话" },
   office: { en: "Office", zh: "办公" }
 };
+
+function roleDisplayName(role: string, zh: boolean): string {
+  const normalized = role.trim();
+  if (!normalized) {
+    return zh ? "自定义" : "Custom";
+  }
+  return roleLabels[normalized.toLowerCase()]?.[zh ? "zh" : "en"] ?? normalized;
+}
 
 const clientLabels: Record<ProfileClientKind, string> = {
   "claude-code": "Claude Code",
@@ -107,8 +116,8 @@ function entryAlias(profile: VirtualModelProfileConfig): string {
 
 function entryRole(profile: VirtualModelProfileConfig): ModelEntryRole | undefined {
   const role = modelEntryMetadata(profile).role;
-  if (role === "code" || role === "chat" || role === "office") {
-    return role;
+  if (typeof role === "string" && role.trim()) {
+    return role.trim();
   }
   const alias = entryAlias(profile).toLowerCase();
   if (alias.includes("coding") || alias.includes("code")) {
@@ -185,10 +194,11 @@ function buildModelEntryProfile(
   zh: boolean
 ): VirtualModelProfileConfig {
   const fixedModel = `${provider.name}/${model}`;
+  const normalizedRole = role.trim();
   const metadata: ModelEntryMetadata = {
     providerId: provider.name,
     providerName: provider.name,
-    role,
+    role: normalizedRole || undefined,
     source: modelEntrySource
   };
   return {
@@ -197,7 +207,7 @@ function buildModelEntryProfile(
       mode: "fixed"
     },
     description: zh ? "由模型入口创建" : "Created from Model Entries",
-    displayName: `${provider.name} · ${roleLabels[role][zh ? "zh" : "en"]}`,
+    displayName: `${provider.name} · ${roleDisplayName(normalizedRole, zh)}`,
     enabled: true,
     execution: {
       clientToolsPolicy: "allow",
@@ -282,9 +292,10 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
   }, [config?.virtualModelProfiles, editingKey, providers]);
 
   const recommendedAlias = useMemo(() => {
+    const rolePart = slugify(role) || "custom";
     const base = bindProvider && selectedProvider
-      ? `${providerSlug(selectedProvider, providerIndex)}-${role}`
-      : role;
+      ? `${providerSlug(selectedProvider, providerIndex)}-${rolePart}`
+      : rolePart;
     return uniqueAlias(base, reservedAliases);
   }, [bindProvider, providerIndex, reservedAliases, role, selectedProvider]);
 
@@ -394,7 +405,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
 
   async function submitDialog(): Promise<void> {
     if (!selectedProvider || !model) {
-      setError(zh ? "请选择 Provider 和模型。" : "Select a provider and model.");
+      setError(zh ? "请选择供应商和模型。" : "Select a provider and model.");
       return;
     }
     const validation = validateAlias(alias, zh);
@@ -474,10 +485,6 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
     label: providerModelDisplayName(selectedProvider!, modelName),
     value: modelName
   }));
-  const roleOptions = (Object.keys(roleLabels) as ModelEntryRole[]).map((value) => ({
-    label: roleLabels[value][zh ? "zh" : "en"],
-    value
-  }));
   const aliasConflict = !editingKey && Boolean(alias.trim()) && reservedAliases.has(alias.trim().toLowerCase());
   const validationError = dialog && !loading
     ? validateAlias(alias, zh) || (aliasConflict
@@ -510,7 +517,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
               </div>
               <div className="mt-1 text-[12px] leading-5 text-muted-foreground">
                 {zh
-                  ? "以后换 Provider、换模型，只改这里的入口，Codex / OpenCode 不用再改配置。"
+                  ? "以后换供应商、换模型，只改这里的入口，Codex / OpenCode 不用再改配置。"
                   : "When you change providers or models later, update the entry here. Codex and OpenCode keep using the same model ID."}
               </div>
             </div>
@@ -528,15 +535,15 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
               <div className="rounded-xl border border-dashed border-border bg-muted/20 px-6 py-12 text-center">
                 <Boxes className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
                 <div className="text-[14px] font-semibold text-foreground">
-                  {zh ? "先添加一个 Provider" : "Add a provider first"}
+                  {zh ? "先添加一个供应商" : "Add a provider first"}
                 </div>
                 <div className="mx-auto mt-1 max-w-[460px] text-[12px] leading-5 text-muted-foreground">
                   {zh
-                    ? "模型入口需要基于 Provider 的模型创建。添加完 Provider 后，再回来给工具创建模型 ID。"
+                    ? "模型入口需要基于供应商的模型创建。添加完供应商后，再回来给工具创建模型 ID。"
                     : "Model entries use the models from a provider. Add a provider, then come back and create model IDs for your tools."}
                 </div>
                 <Button className="mt-4" onClick={onOpenProviders} type="button">
-                  {zh ? "去添加 Provider" : "Add a provider"}
+                  {zh ? "去添加供应商" : "Add a provider"}
                 </Button>
               </div>
             ) : entries.length === 0 ? (
@@ -614,7 +621,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
                       </div>
                       {metadata.source === modelEntrySource && !metadata.providerId ? (
                         <div className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
-                          {zh ? "这个入口没有 Provider 元数据，可能是旧数据。" : "This entry has no provider metadata and may be legacy data."}
+                          {zh ? "这个入口没有供应商元数据，可能是旧数据。" : "This entry has no provider metadata and may be legacy data."}
                         </div>
                       ) : null}
                     </div>
@@ -687,13 +694,28 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
             </DialogHeader>
             <DialogBody>
               <div className="space-y-4">
-                <Field label={zh ? "Provider" : "Provider"} requirement="required">
+                <Field label={zh ? "供应商" : "Provider"} requirement="required">
                   <SelectControl onChange={changeProvider} options={providerOptions} value={providerName} />
                 </Field>
                 {editingBuiltin ? null : (
-                  <Field label={zh ? "使用角色" : "Role"} requirement="required">
-                    <SelectControl onChange={(value) => setRole(value as ModelEntryRole)} options={roleOptions} value={role} />
-                  </Field>
+                  <>
+                    <Field label={zh ? "用途标签（可选）" : "Usage label (optional)"}>
+                      <Input
+                        list="model-entry-role-suggestions"
+                        onChange={(event) => setRole(event.target.value)}
+                        placeholder={zh ? "code / chat / office / 自定义" : "code / chat / office / custom"}
+                        value={role}
+                      />
+                    </Field>
+                    <datalist id="model-entry-role-suggestions">
+                      {roleSuggestions.map((value) => <option key={value} value={value} />)}
+                    </datalist>
+                    <div className="-mt-2 text-[11px] leading-4 text-muted-foreground">
+                      {zh
+                        ? "自由填写，不限制取值；推荐模型 ID 会根据它生成。"
+                        : "Free-form; the recommended model ID uses it."}
+                    </div>
+                  </>
                 )}
                 <Field label={zh ? "模型" : "Model"} requirement="required">
                   <SelectControl onChange={setModel} options={modelOptions} value={model} />
@@ -704,7 +726,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
                     <Checkbox checked={bindProvider} onCheckedChange={setBindProvider} />
                     <span className="min-w-0">
                       <span className="block text-[12px] font-medium text-foreground">
-                        {zh ? "在模型 ID 中绑定 Provider" : "Include the provider in the model ID"}
+                        {zh ? "在模型 ID 中绑定供应商" : "Include the provider in the model ID"}
                       </span>
                       <span className="mt-0.5 block text-[11px] leading-4 text-muted-foreground">
                         {zh
@@ -732,7 +754,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
                 <div className="rounded-lg border border-border bg-muted/25 px-3 py-2 text-[11px] leading-5 text-muted-foreground">
                   {editingBuiltin ? (
                     zh
-                      ? "内置场景的 ID 固定；可以在上面换 Provider / 模型。安装器重配会保留你选中的模型。"
+                      ? "内置场景的 ID 固定；可以在上面换供应商 / 模型。安装器重配会保留你选中的模型。"
                       : "Built-in scene IDs are fixed. Pick a different provider or model above; reinstalling keeps your selected model."
                   ) : dialog === "edit" ? (
                     zh
