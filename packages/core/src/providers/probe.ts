@@ -1665,7 +1665,16 @@ function readModelDisplayName(value: unknown): string | undefined {
   if (!isRecord(value)) {
     return undefined;
   }
-  return readString(value.display_name) || readString(value.displayName) || readString(value.label);
+  const explicit = readString(value.display_name) || readString(value.displayName) || readString(value.label);
+  if (explicit) {
+    return explicit;
+  }
+  // OpenCode and some OpenAI-compatible catalogues put the human-readable
+  // model name in `name` while `id` remains the API model ID. Do not treat
+  // `name` as a display name when it is the only identifier available.
+  const name = readString(value.name);
+  const id = readString(value.id) || readString(value.model);
+  return name && id && name !== id ? name : undefined;
 }
 
 function stripGeminiModelPrefix(value: string): string {

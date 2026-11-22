@@ -81,6 +81,7 @@ const sceneMeta: Record<SceneKey, {
   dot: string;
   labelEn: string;
   labelZh: string;
+  panel: string;
 }> = {
   code: {
     accent: "border-l-amber-500",
@@ -89,7 +90,8 @@ const sceneMeta: Record<SceneKey, {
     descZh: "写代码、调试、重构",
     dot: "bg-amber-500",
     labelEn: "Code",
-    labelZh: "编程"
+    labelZh: "编程",
+    panel: "border-amber-500/25 bg-amber-500/[0.06]"
   },
   chat: {
     accent: "border-l-sky-500",
@@ -98,7 +100,8 @@ const sceneMeta: Record<SceneKey, {
     descZh: "聊天、问答、写作",
     dot: "bg-sky-500",
     labelEn: "Chat",
-    labelZh: "对话"
+    labelZh: "对话",
+    panel: "border-sky-500/25 bg-sky-500/[0.06]"
   },
   office: {
     accent: "border-l-emerald-500",
@@ -107,7 +110,8 @@ const sceneMeta: Record<SceneKey, {
     descZh: "文档、表格、邮件",
     dot: "bg-emerald-500",
     labelEn: "Office",
-    labelZh: "办公"
+    labelZh: "办公",
+    panel: "border-emerald-500/25 bg-emerald-500/[0.06]"
   },
   team: {
     accent: "border-l-violet-500",
@@ -116,7 +120,8 @@ const sceneMeta: Record<SceneKey, {
     descZh: "团队协作、共享配额",
     dot: "bg-violet-500",
     labelEn: "Team",
-    labelZh: "团队"
+    labelZh: "团队",
+    panel: "border-violet-500/25 bg-violet-500/[0.06]"
   },
   trial: {
     accent: "border-l-rose-500",
@@ -125,7 +130,8 @@ const sceneMeta: Record<SceneKey, {
     descZh: "体验额度",
     dot: "bg-rose-500",
     labelEn: "Trial",
-    labelZh: "体验"
+    labelZh: "体验",
+    panel: "border-rose-500/25 bg-rose-500/[0.06]"
   },
   custom: {
     accent: "border-l-primary",
@@ -134,7 +140,8 @@ const sceneMeta: Record<SceneKey, {
     descZh: "你自己定义的用途",
     dot: "bg-primary",
     labelEn: "Custom",
-    labelZh: "自定义"
+    labelZh: "自定义",
+    panel: "border-primary/20 bg-primary/[0.04]"
   }
 };
 
@@ -229,6 +236,34 @@ function entryProviderName(profile: VirtualModelProfileConfig): string {
   return slash > 0 ? fixedModel.slice(0, slash) : "";
 }
 
+function entryDisplayName(profile: VirtualModelProfileConfig, zh: boolean): string {
+  const metadata = modelEntryMetadata(profile);
+  const provider = metadata.providerName?.trim() || metadata.providerId?.trim();
+  if (provider && metadata.role?.trim()) {
+    return `${provider} · ${roleDisplayName(metadata.role, zh)}`;
+  }
+  return profile.displayName;
+}
+
+function modelLabelForProfile(
+  profile: VirtualModelProfileConfig,
+  providers: GatewayProviderConfig[]
+): string {
+  const fixedModel = profile.baseModel?.fixedModel?.trim() || "";
+  if (!fixedModel) {
+    return "—";
+  }
+  const slash = fixedModel.indexOf("/");
+  if (slash <= 0) {
+    return fixedModel;
+  }
+  const providerName = fixedModel.slice(0, slash);
+  const modelName = fixedModel.slice(slash + 1);
+  const provider = providers.find((item) => item.name === providerName);
+  const displayName = provider ? providerModelDisplayName(provider, modelName) : modelName;
+  return displayName && displayName !== modelName ? `${providerName} · ${displayName}` : fixedModel;
+}
+
 function slugify(value: string | undefined): string {
   return (value ?? "")
     .trim()
@@ -317,13 +352,14 @@ function buildModelEntryProfile(
   };
 }
 
-function ModelEntryRow({
+function ModelEntryCard({
   copiedAlias,
   onCopy,
   onDelete,
   onEdit,
   onToggle,
   profile,
+  providers,
   zh
 }: {
   copiedAlias: string;
@@ -332,6 +368,7 @@ function ModelEntryRow({
   onEdit: (profile: VirtualModelProfileConfig) => void;
   onToggle: (profile: VirtualModelProfileConfig, enabled: boolean) => void;
   profile: VirtualModelProfileConfig;
+  providers: GatewayProviderConfig[];
   zh: boolean;
 }) {
   const alias = entryAlias(profile);
@@ -339,65 +376,68 @@ function ModelEntryRow({
   const scene = sceneMeta[sceneKeyForProfile(profile)];
   const enabled = profile.enabled !== false;
   return (
-    <div
-      className={cn(
-        "grid gap-3 border-l-4 px-4 py-3 transition-colors hover:bg-muted/20 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.8fr)_minmax(0,1fr)_auto] lg:items-center",
-        scene.accent,
-        !enabled && "opacity-60"
-      )}
-    >
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="truncate text-[13px] font-semibold text-foreground">{profile.displayName}</span>
-          <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", scene.badge)}>
-            {zh ? scene.labelZh : scene.labelEn}
+    <div className={cn("overflow-hidden rounded-xl border border-border bg-card shadow-sm", !enabled && "opacity-60")}>
+      <div className={cn("h-1 w-full", scene.dot)} />
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="truncate text-[14px] font-semibold text-foreground">{entryDisplayName(profile, zh)}</span>
+              <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", scene.badge)}>
+                {zh ? scene.labelZh : scene.labelEn}
+              </span>
+              {builtin ? (
+                <span className="rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  {zh ? "推荐场景" : "Recommended"}
+                </span>
+              ) : null}
+            </div>
+            <div className="mt-1 text-[11px] leading-4 text-muted-foreground">
+              {zh ? scene.descZh : scene.descEn}
+            </div>
+          </div>
+          <label className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+            <Checkbox
+              checked={enabled}
+              onCheckedChange={(checked) => onToggle(profile, checked)}
+            />
+            {enabled ? (zh ? "使用中" : "In use") : (zh ? "已停用" : "Disabled")}
+          </label>
+        </div>
+
+        <div className={cn("mt-3 rounded-lg border px-3 py-2", scene.panel)}>
+          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            {zh ? "调用 ID" : "Call ID"}
+          </div>
+          <div className="mt-0.5 break-all font-mono text-[13px] font-semibold text-foreground">{alias}</div>
+        </div>
+
+        <div className="mt-2 flex min-w-0 items-start justify-between gap-2 text-[11px]">
+          <span className="shrink-0 text-muted-foreground">{zh ? "当前指向" : "Current model"}</span>
+          <span
+            className="min-w-0 break-all text-right font-mono text-muted-foreground"
+            title={profile.baseModel?.fixedModel || undefined}
+          >
+            {modelLabelForProfile(profile, providers)}
           </span>
-          {builtin ? (
-            <span className="rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-              {zh ? "推荐场景" : "Recommended"}
-            </span>
-          ) : null}
         </div>
-        <div className="mt-0.5 text-[11px] leading-4 text-muted-foreground">
-          {zh ? scene.descZh : scene.descEn}
-        </div>
-        <label className="mt-1 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <Checkbox
-            checked={enabled}
-            onCheckedChange={(checked) => onToggle(profile, checked)}
-          />
-          {enabled ? (zh ? "使用中" : "In use") : (zh ? "已停用" : "Disabled")}
-        </label>
-      </div>
-      <div className="min-w-0">
-        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-          {zh ? "调用 ID" : "Call ID"}
-        </div>
-        <div className="mt-0.5 break-all font-mono text-[12px] font-semibold text-foreground">{alias}</div>
-      </div>
-      <div className="min-w-0">
-        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-          {zh ? "当前指向" : "Current model"}
-        </div>
-        <div className="mt-0.5 break-all font-mono text-[11px] leading-4 text-muted-foreground">
-          {profile.baseModel?.fixedModel || "—"}
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-        <Button onClick={() => onEdit(profile)} size="sm" type="button">
-          <Pencil className="h-3.5 w-3.5" />
-          {zh ? "选配模型" : "Choose model"}
-        </Button>
-        <Button onClick={() => onCopy(alias)} size="sm" type="button" variant="outline">
-          {copiedAlias === alias ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-          {copiedAlias === alias ? (zh ? "已复制" : "Copied") : (zh ? "复制调用 ID" : "Copy call ID")}
-        </Button>
-        {builtin ? null : (
-          <Button onClick={() => onDelete(profile)} size="sm" type="button" variant="ghost">
-            <Trash2 className="h-3.5 w-3.5" />
-            {zh ? "移除" : "Remove"}
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Button onClick={() => onEdit(profile)} size="sm" type="button">
+            <Pencil className="h-3.5 w-3.5" />
+            {zh ? "选配模型" : "Choose model"}
           </Button>
-        )}
+          <Button onClick={() => onCopy(alias)} size="sm" type="button" variant="outline">
+            {copiedAlias === alias ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            {copiedAlias === alias ? (zh ? "已复制" : "Copied") : (zh ? "复制调用 ID" : "Copy call ID")}
+          </Button>
+          {builtin ? null : (
+            <Button onClick={() => onDelete(profile)} size="sm" type="button" variant="ghost">
+              <Trash2 className="h-3.5 w-3.5" />
+              {zh ? "移除" : "Remove"}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -779,9 +819,9 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
                         {builtinEntries.length} {zh ? "个场景" : "scenes"}
                       </span>
                     </div>
-                    <div className="overflow-hidden rounded-xl border border-border bg-card">
+                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                       {builtinEntries.map(({ profile }) => (
-                        <ModelEntryRow
+                        <ModelEntryCard
                           copiedAlias={copiedAlias}
                           key={profile.key}
                           onCopy={(value) => void copyAlias(value)}
@@ -789,6 +829,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
                           onEdit={openEdit}
                           onToggle={(item, enabled) => void toggleEntry(item, enabled)}
                           profile={profile}
+                          providers={providers}
                           zh={zh}
                         />
                       ))}
@@ -811,9 +852,9 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
                     </span>
                   </div>
                   {customEntries.length > 0 ? (
-                    <div className="overflow-hidden rounded-xl border border-border bg-card">
+                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                       {customEntries.map(({ profile }) => (
-                        <ModelEntryRow
+                        <ModelEntryCard
                           copiedAlias={copiedAlias}
                           key={profile.key}
                           onCopy={(value) => void copyAlias(value)}
@@ -821,6 +862,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
                           onEdit={openEdit}
                           onToggle={(item, enabled) => void toggleEntry(item, enabled)}
                           profile={profile}
+                          providers={providers}
                           zh={zh}
                         />
                       ))}
@@ -920,19 +962,33 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
                   <>
                     <Field label={zh ? "用途标签（可选）" : "Usage label (optional)"}>
                       <Input
-                        list="model-entry-role-suggestions"
                         onChange={(event) => setRole(event.target.value)}
                         placeholder={zh ? "code / chat / office / 自定义" : "code / chat / office / custom"}
                         value={role}
                       />
                     </Field>
-                    <datalist id="model-entry-role-suggestions">
-                      {roleSuggestions.map((value) => <option key={value} value={value} />)}
-                    </datalist>
+                    <div className="flex flex-wrap gap-1.5">
+                      {roleSuggestions.map((value) => (
+                        <button
+                          className={cn(
+                            "rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors",
+                            role.trim().toLowerCase() === value
+                              ? "border-primary/30 bg-primary/10 text-primary"
+                              : "border-border bg-muted/40 text-muted-foreground hover:text-foreground"
+                          )}
+                          key={value}
+                          onClick={() => setRole(value)}
+                          type="button"
+                        >
+                          <span className="font-mono">{value}</span>
+                          <span className="ml-1">{roleDisplayName(value, zh)}</span>
+                        </button>
+                      ))}
+                    </div>
                     <div className="-mt-2 text-[11px] leading-4 text-muted-foreground">
                       {zh
-                        ? "自由填写，不限制取值；推荐调用 ID 会根据它生成。"
-                        : "Free-form; the recommended call ID uses it."}
+                        ? "点击常用标签，或直接输入任意文字；不限制取值，推荐调用 ID 会根据它生成。"
+                        : "Click a common label or type any text; values are not restricted. The recommended call ID uses it."}
                     </div>
                   </>
                 )}
