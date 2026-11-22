@@ -26,10 +26,10 @@ release:
   default_channel: stable
   # Must match packages/cli/package.json and the published npm package.
   # Fork/patch provenance belongs in _internal, not in the installable version.
-  default_version: 0.2.2
+  default_version: 0.2.3
   channels:
     stable:
-      version: 0.2.2
+      version: 0.2.3
     beta:
       version: 0.3.0                     # 下一版, 占位 (实际未发布)
 
@@ -194,11 +194,11 @@ scene_keys:
 # 实际安装物料。正式发布时必须有真实哈希和大小。
 artifacts:
   - id: omr-npm-package
-    version: 0.2.2
+    version: 0.2.3
     platform: any
     kind: npm-tarball
     package: "@ohoooho/model-router"
-    path: omr-0.2.2.tgz
+    path: omr-0.2.3.tgz
     sha256: e4066bb323c827a9098efa92cd07abf78ccc3f159cf8304f4cd549527e2ec8a5
     size_bytes: 6644839
     npm_integrity: sha512-9mpu5U/Llds1xpcyFcVFPYniKrcQN4HnAdilxN2FQSRjESKcGilP8uVhHxYcHG4UfYJbyOqbmMZUzcoBnzeoxw==

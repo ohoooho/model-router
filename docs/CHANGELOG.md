@@ -23,6 +23,25 @@
 
 ## Fork 后变更（OMR 专属）
 
+### OMR-RELEASE-0.2.3 — 2026-11-22
+- **类型**: feat
+- **标题**: 工具模型选配 + 稳定调用 ID + 供应商模型显示名
+- **改动**:
+  - 新增「工具模型选配」页面：卡片式管理 Codex / OpenCode / Claude Code
+    使用的模型调用 ID，支持新增、编辑、停用、删除、复制 ID 和同步提示。
+  - 5 个内置场景（`coding-auto` / `assist-auto` / `chat-auto` /
+    `team-auto` / `trial-auto`）作为推荐卡片出现在同一页面，可改指向模型，
+    不允许改名或删除。
+  - 供应商刷新会读取 `name` 作为模型显示名；OpenCode 的
+    `deepseek-v4.1-flash` 现在显示为 `DeepSeek V4.1 Flash 1017`。
+  - Codex 模型目录暴露裸调用 ID（如 `coding-auto`、`baozi-code`）；
+    旧 Fusion 配置继续保留 `Fusion/` 前缀。
+  - 安装器重跑时保留用户为场景选择的模型，只补缺失 profile / `baseModel`。
+  - 管理令牌过期时显示可操作的重新认证页面，保留命令行说明。
+  - 本地控制台使用 OHO 品牌、`噢吼模型管理` 名称和 `omr://open` 协议。
+- **兼容**: 无新增数据库表/列；继续使用现有 `virtualModelProfiles`。
+- **物料**: `omr-0.2.3.tgz`，替换 `0.2.2` 离线包。
+
 ### OMR-RELEASE-0.2.2 — 2026-11-20
 - **类型**: chore
 - **标题**: 基于 CCR 3.1.5 升级分支重新发布离线包
