@@ -20,6 +20,7 @@ import { RoutingView } from "./routing";
 import { VirtualModelsView } from "./virtual-models";
 
 export type MainNavigationItem = {
+  badge?: string;
   icon: LucideIcon;
   id: NavigationId;
 };
@@ -35,8 +36,8 @@ const sidebarNavigationGroupDefinitions: Array<{
   itemIds: NavigationId[];
   label: string;
 }> = [
-  { id: "workspace", itemIds: ["overview"], label: "Workspace" },
-  { id: "setup", itemIds: ["providers", "model-entries", "profile", "routing"], label: "Setup" },
+  { id: "workspace", itemIds: ["overview", "model-entries"], label: "Workspace" },
+  { id: "setup", itemIds: ["providers", "profile", "routing"], label: "Setup" },
   { id: "monitor", itemIds: ["logs", "observability"], label: "Monitor" },
   { id: "advanced", itemIds: ["virtual-models", "models", "api-keys", "extensions"], label: "Advanced" }
 ];
@@ -314,6 +315,8 @@ function SidebarNavigationButton({
   onClick: () => void;
   shouldReduceMotion: boolean | null;
 }) {
+  const t = useAppText();
+  const badge = item.badge ? t(item.badge) : "";
   return (
     <Button
       className={cn(
@@ -337,6 +340,11 @@ function SidebarNavigationButton({
         <item.icon className="h-3.5 w-3.5" />
       </motion.span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
+      {badge ? (
+        <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary max-[720px]:hidden">
+          {badge}
+        </span>
+      ) : null}
     </Button>
   );
 }

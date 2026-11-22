@@ -413,10 +413,10 @@ export const trayMascotIconUrls: Record<"cyan" | "orange" | "violet", string> = 
 
 export const mcpServerStartupTimeoutMs = 600000;
 
-export const navigation: Array<{ icon: LucideIcon; id: NavigationId }> = [
+export const navigation: Array<{ badge?: string; icon: LucideIcon; id: NavigationId }> = [
   { icon: Gauge, id: "overview" },
+  { badge: "Recommended", icon: Workflow, id: "model-entries" },
   { icon: Layers3, id: "providers" },
-  { icon: Workflow, id: "model-entries" },
   { icon: UserRound, id: "profile" },
   { icon: Route, id: "routing" },
   { icon: Boxes, id: "virtual-models" },

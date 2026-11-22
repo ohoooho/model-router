@@ -52,12 +52,15 @@ type ModelEntryMetadata = {
 const modelEntrySource = "model-entry";
 const builtinSceneAliases = ["coding-auto", "assist-auto", "chat-auto", "team-auto", "trial-auto"];
 const globalAliases = builtinSceneAliases;
-const roleSuggestions = ["code", "chat", "office"];
+const roleSuggestions = ["code", "chat", "office", "team", "trial"];
 
 const roleLabels: Record<string, { en: string; zh: string }> = {
   code: { en: "Code", zh: "编程" },
   chat: { en: "Chat", zh: "对话" },
-  office: { en: "Office", zh: "办公" }
+  office: { en: "Office", zh: "办公" },
+  team: { en: "Team", zh: "团队" },
+  trial: { en: "Trial", zh: "体验" },
+  custom: { en: "Custom", zh: "自定义" }
 };
 
 function roleDisplayName(role: string, zh: boolean): string {
@@ -66,6 +69,89 @@ function roleDisplayName(role: string, zh: boolean): string {
     return zh ? "自定义" : "Custom";
   }
   return roleLabels[normalized.toLowerCase()]?.[zh ? "zh" : "en"] ?? normalized;
+}
+
+type SceneKey = "code" | "chat" | "office" | "team" | "trial" | "custom";
+
+const sceneMeta: Record<SceneKey, {
+  accent: string;
+  badge: string;
+  descEn: string;
+  descZh: string;
+  dot: string;
+  labelEn: string;
+  labelZh: string;
+}> = {
+  code: {
+    accent: "border-l-amber-500",
+    badge: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    descEn: "Writing code, debugging, refactoring",
+    descZh: "写代码、调试、重构",
+    dot: "bg-amber-500",
+    labelEn: "Code",
+    labelZh: "编程"
+  },
+  chat: {
+    accent: "border-l-sky-500",
+    badge: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
+    descEn: "Chat, Q&A, writing",
+    descZh: "聊天、问答、写作",
+    dot: "bg-sky-500",
+    labelEn: "Chat",
+    labelZh: "对话"
+  },
+  office: {
+    accent: "border-l-emerald-500",
+    badge: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    descEn: "Documents, spreadsheets, email",
+    descZh: "文档、表格、邮件",
+    dot: "bg-emerald-500",
+    labelEn: "Office",
+    labelZh: "办公"
+  },
+  team: {
+    accent: "border-l-violet-500",
+    badge: "bg-violet-500/10 text-violet-700 dark:text-violet-300",
+    descEn: "Team collaboration and shared quota",
+    descZh: "团队协作、共享配额",
+    dot: "bg-violet-500",
+    labelEn: "Team",
+    labelZh: "团队"
+  },
+  trial: {
+    accent: "border-l-rose-500",
+    badge: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
+    descEn: "Trial quota",
+    descZh: "体验额度",
+    dot: "bg-rose-500",
+    labelEn: "Trial",
+    labelZh: "体验"
+  },
+  custom: {
+    accent: "border-l-primary",
+    badge: "bg-primary/10 text-primary",
+    descEn: "Your own use case",
+    descZh: "你自己定义的用途",
+    dot: "bg-primary",
+    labelEn: "Custom",
+    labelZh: "自定义"
+  }
+};
+
+function sceneKeyForProfile(profile: VirtualModelProfileConfig): SceneKey {
+  const alias = entryAlias(profile).toLowerCase();
+  if (alias.includes("trial")) return "trial";
+  if (alias.includes("team")) return "team";
+  if (alias.includes("coding") || alias.includes("code")) return "code";
+  if (alias.includes("assist") || alias.includes("office")) return "office";
+  if (alias.includes("chat")) return "chat";
+  const role = (entryRole(profile) ?? "").toLowerCase();
+  if (role.includes("code") || role.includes("coding")) return "code";
+  if (role.includes("chat")) return "chat";
+  if (role.includes("office") || role.includes("assist")) return "office";
+  if (role.includes("team")) return "team";
+  if (role.includes("trial")) return "trial";
+  return "custom";
 }
 
 const clientLabels: Record<ProfileClientKind, string> = {
@@ -172,15 +258,15 @@ function uniqueAlias(base: string, reserved: Set<string>): string {
 function validateAlias(value: string, zh: boolean): string {
   const alias = value.trim();
   if (!alias) {
-    return zh ? "请输入模型 ID。" : "Enter a model ID.";
+    return zh ? "请输入调用 ID。" : "Enter a call ID.";
   }
   if (!/^[a-z0-9][a-z0-9-]{0,47}$/.test(alias)) {
     return zh
-      ? "模型 ID 只能使用小写字母、数字和连字符，且必须以字母或数字开头，最多 48 个字符。"
-      : "Model IDs use lowercase letters, numbers, and hyphens only, start with a letter or number, and are at most 48 characters.";
+      ? "调用 ID 只能使用小写字母、数字和连字符，且必须以字母或数字开头，最多 48 个字符。"
+      : "Call IDs use lowercase letters, numbers, and hyphens only, start with a letter or number, and are at most 48 characters.";
   }
   if (alias.includes("--")) {
-    return zh ? "模型 ID 不能包含连续的连字符。" : "Model IDs cannot contain consecutive hyphens.";
+    return zh ? "调用 ID 不能包含连续的连字符。" : "Call IDs cannot contain consecutive hyphens.";
   }
   return "";
 }
@@ -229,6 +315,92 @@ function buildModelEntryProfile(
     metadata,
     tools: []
   };
+}
+
+function ModelEntryRow({
+  copiedAlias,
+  onCopy,
+  onDelete,
+  onEdit,
+  onToggle,
+  profile,
+  zh
+}: {
+  copiedAlias: string;
+  onCopy: (value: string) => void;
+  onDelete: (profile: VirtualModelProfileConfig) => void;
+  onEdit: (profile: VirtualModelProfileConfig) => void;
+  onToggle: (profile: VirtualModelProfileConfig, enabled: boolean) => void;
+  profile: VirtualModelProfileConfig;
+  zh: boolean;
+}) {
+  const alias = entryAlias(profile);
+  const builtin = isBuiltinSceneProfile(profile);
+  const scene = sceneMeta[sceneKeyForProfile(profile)];
+  const enabled = profile.enabled !== false;
+  return (
+    <div
+      className={cn(
+        "grid gap-3 border-l-4 px-4 py-3 transition-colors hover:bg-muted/20 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.8fr)_minmax(0,1fr)_auto] lg:items-center",
+        scene.accent,
+        !enabled && "opacity-60"
+      )}
+    >
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="truncate text-[13px] font-semibold text-foreground">{profile.displayName}</span>
+          <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", scene.badge)}>
+            {zh ? scene.labelZh : scene.labelEn}
+          </span>
+          {builtin ? (
+            <span className="rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              {zh ? "推荐场景" : "Recommended"}
+            </span>
+          ) : null}
+        </div>
+        <div className="mt-0.5 text-[11px] leading-4 text-muted-foreground">
+          {zh ? scene.descZh : scene.descEn}
+        </div>
+        <label className="mt-1 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <Checkbox
+            checked={enabled}
+            onCheckedChange={(checked) => onToggle(profile, checked)}
+          />
+          {enabled ? (zh ? "使用中" : "In use") : (zh ? "已停用" : "Disabled")}
+        </label>
+      </div>
+      <div className="min-w-0">
+        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          {zh ? "调用 ID" : "Call ID"}
+        </div>
+        <div className="mt-0.5 break-all font-mono text-[12px] font-semibold text-foreground">{alias}</div>
+      </div>
+      <div className="min-w-0">
+        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          {zh ? "当前指向" : "Current model"}
+        </div>
+        <div className="mt-0.5 break-all font-mono text-[11px] leading-4 text-muted-foreground">
+          {profile.baseModel?.fixedModel || "—"}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+        <Button onClick={() => onEdit(profile)} size="sm" type="button">
+          <Pencil className="h-3.5 w-3.5" />
+          {zh ? "选配模型" : "Choose model"}
+        </Button>
+        <Button onClick={() => onCopy(alias)} size="sm" type="button" variant="outline">
+          {copiedAlias === alias ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+          {copiedAlias === alias ? (zh ? "已复制" : "Copied") : (zh ? "复制调用 ID" : "Copy call ID")}
+        </Button>
+        {builtin ? null : (
+          <Button onClick={() => onDelete(profile)} size="sm" type="button" variant="ghost">
+            <Trash2 className="h-3.5 w-3.5" />
+            {zh ? "移除" : "Remove"}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => void }) {
@@ -415,7 +587,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
     }
     const normalizedAlias = alias.trim().toLowerCase();
     if (!editingKey && reservedAliases.has(normalizedAlias)) {
-      setError(zh ? `模型 ID “${normalizedAlias}” 已被占用，请换一个。` : `Model ID “${normalizedAlias}” is already in use. Choose another.`);
+      setError(zh ? `调用 ID “${normalizedAlias}” 已被占用，请换一个。` : `Call ID “${normalizedAlias}” is already in use. Choose another.`);
       return;
     }
     if (editingKey && !editingProfile) {
@@ -476,7 +648,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
       setCopiedAlias(value);
       window.setTimeout(() => setCopiedAlias((current) => current === value ? "" : current), 1600);
     } catch {
-      setError(zh ? "复制失败，请手动选择模型 ID。" : "Copy failed. Select the model ID manually.");
+      setError(zh ? "复制失败，请手动选择调用 ID。" : "Copy failed. Select the call ID manually.");
     }
   }
 
@@ -488,10 +660,12 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
   const aliasConflict = !editingKey && Boolean(alias.trim()) && reservedAliases.has(alias.trim().toLowerCase());
   const validationError = dialog && !loading
     ? validateAlias(alias, zh) || (aliasConflict
-      ? (zh ? `模型 ID “${alias.trim().toLowerCase()}” 已被占用，请换一个。` : `Model ID “${alias.trim().toLowerCase()}” is already in use. Choose another.`)
+      ? (zh ? `调用 ID “${alias.trim().toLowerCase()}” 已被占用，请换一个。` : `Call ID “${alias.trim().toLowerCase()}” is already in use. Choose another.`)
       : "")
     : "";
   const canSubmit = Boolean(selectedProvider && model && alias.trim() && !validationError && !saving);
+  const builtinEntries = entries.filter(({ profile }) => isBuiltinSceneProfile(profile));
+  const customEntries = entries.filter(({ profile }) => !isBuiltinSceneProfile(profile));
 
   return (
     <motion.div
@@ -502,23 +676,49 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
     >
       <Card className="flex h-full min-h-0 min-w-0 flex-col">
         <CardHeader className="flex-row items-center gap-2">
-          <CardTitle className="min-w-0 shrink-0 truncate">{zh ? "模型入口" : "Model Entries"}</CardTitle>
+          <div className="min-w-0">
+            <CardTitle className="min-w-0 truncate">{zh ? "工具模型选配" : "Tool Model Setup"}</CardTitle>
+            <div className="mt-0.5 text-[11px] text-muted-foreground">
+              {zh
+                ? "给 Codex / OpenCode / Claude Code 选模型，调用 ID 不变。"
+                : "Choose models for Codex, OpenCode, and Claude Code without changing call IDs."}
+            </div>
+          </div>
           <div className="min-w-0 flex-1" />
           <Button disabled={providers.length === 0} onClick={openCreate} type="button">
             <Plus className="h-4 w-4" />
-            {zh ? "新建模型入口" : "New model entry"}
+            {zh ? "新增工具模型" : "New tool model"}
           </Button>
         </CardHeader>
         <CardContent className="min-h-0 flex-1 overflow-auto p-4">
-          <div className="mx-auto flex w-full max-w-[980px] flex-col gap-4">
-            <div className="rounded-xl border border-border bg-muted/35 px-4 py-3">
-              <div className="text-[13px] font-semibold text-foreground">
-                {zh ? "模型 ID 只需要创建一次。" : "Create the model ID once."}
+          <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-4">
+            <div className="rounded-xl border border-primary/15 bg-primary/[0.04] px-4 py-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                  {zh ? "推荐" : "Recommended"}
+                </span>
+                <span className="text-[13px] font-semibold text-foreground">
+                  {zh ? "给工具选模型" : "Choose a model for your tools"}
+                </span>
               </div>
-              <div className="mt-1 text-[12px] leading-5 text-muted-foreground">
+              <div className="mt-1 max-w-[760px] text-[12px] leading-5 text-muted-foreground">
                 {zh
-                  ? "以后换供应商、换模型，只改这里的入口，Codex / OpenCode 不用再改配置。"
-                  : "When you change providers or models later, update the entry here. Codex and OpenCode keep using the same model ID."}
+                  ? "先选一个推荐场景，或者新建一个调用 ID；再选供应商和模型。工具里只认这个 ID，换模型不用改工具配置。"
+                  : "Start with a recommended scene or create a call ID, then choose a provider and model. Tools only need the call ID; changing the model does not require a tool config change."}
+              </div>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {[
+                  { n: "1", zh: "选场景", en: "Choose a scene" },
+                  { n: "2", zh: "选供应商和模型", en: "Pick a provider and model" },
+                  { n: "3", zh: "复制调用 ID 到工具", en: "Copy the call ID into your tool" }
+                ].map((step) => (
+                  <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-background/70 px-3 py-2" key={step.n}>
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                      {step.n}
+                    </span>
+                    <span className="text-[11px] text-foreground">{zh ? step.zh : step.en}</span>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -539,8 +739,8 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
                 </div>
                 <div className="mx-auto mt-1 max-w-[460px] text-[12px] leading-5 text-muted-foreground">
                   {zh
-                    ? "模型入口需要基于供应商的模型创建。添加完供应商后，再回来给工具创建模型 ID。"
-                    : "Model entries use the models from a provider. Add a provider, then come back and create model IDs for your tools."}
+                    ? "工具模型选配需要基于供应商的模型创建。添加完供应商后，再回来给工具创建调用 ID。"
+                    : "Tool model setup uses models from a provider. Add a provider, then come back and create call IDs for your tools."}
                 </div>
                 <Button className="mt-4" onClick={onOpenProviders} type="button">
                   {zh ? "去添加供应商" : "Add a provider"}
@@ -550,90 +750,102 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
               <div className="rounded-xl border border-dashed border-border bg-muted/20 px-6 py-12 text-center">
                 <Boxes className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
                 <div className="text-[14px] font-semibold text-foreground">
-                  {zh ? "还没有模型入口" : "No model entries yet"}
+                  {zh ? "还没有可用的模型" : "No models configured yet"}
                 </div>
                 <div className="mx-auto mt-1 max-w-[460px] text-[12px] leading-5 text-muted-foreground">
                   {zh
-                    ? "先创建一个 code / chat / office 入口，再把模型 ID 同步到工具。"
-                    : "Create a code, chat, or office entry, then sync the model ID to your tools."}
+                    ? "先创建一个模型选配，再把调用 ID 同步到工具。"
+                    : "Create a model setup, then sync the call ID to your tools."}
                 </div>
                 <Button className="mt-4" onClick={openCreate} type="button">
                   <Plus className="h-4 w-4" />
-                  {zh ? "新建模型入口" : "New model entry"}
+                  {zh ? "新增工具模型" : "New tool model"}
                 </Button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                {entries.map(({ profile }) => {
-                  const entryId = entryAlias(profile);
-                  const metadata = modelEntryMetadata(profile);
-                  const builtin = isBuiltinSceneProfile(profile);
-                  return (
-                    <div className="rounded-xl border border-border bg-card p-4 shadow-sm" key={profile.key}>
-                      <div className="flex items-start gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex min-w-0 flex-wrap items-center gap-2">
-                            <div className="truncate text-[14px] font-semibold text-foreground">{profile.displayName}</div>
-                            {builtin ? (
-                              <span className="rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:text-sky-300">
-                                {zh ? "内置场景" : "Built-in"}
-                              </span>
-                            ) : null}
-                            <span className={cn(
-                              "rounded-full border px-2 py-0.5 text-[10px] font-medium",
-                              profile.enabled === false
-                                ? "border-border bg-muted text-muted-foreground"
-                                : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                            )}>
-                              {profile.enabled === false ? (zh ? "已停用" : "Disabled") : (zh ? "已启用" : "Enabled")}
-                            </span>
-                          </div>
+              <div className="space-y-5">
+                {builtinEntries.length > 0 ? (
+                  <section className="space-y-2">
+                    <div className="flex flex-wrap items-end justify-between gap-2">
+                      <div>
+                        <div className="text-[13px] font-semibold text-foreground">{zh ? "推荐场景" : "Recommended scenes"}</div>
+                        <div className="mt-0.5 text-[11px] text-muted-foreground">
+                          {zh
+                            ? "安装器已经配好，点“选配模型”就能换底层模型。"
+                            : "Preconfigured. Click Choose model to change the model behind each ID."}
                         </div>
-                        <Checkbox
-                          checked={profile.enabled !== false}
-                          onCheckedChange={(checked) => void toggleEntry(profile, checked)}
-                        />
                       </div>
-                      <div className="mt-3 rounded-lg border border-border bg-muted/35 px-3 py-2">
-                        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                          {zh ? "工具里选择的名字" : "Name used by tools"}
-                        </div>
-                        <div className="mt-1 break-all font-mono text-[13px] font-semibold text-foreground">{entryId}</div>
-                      </div>
-                      <div className="mt-2 text-[11px] text-muted-foreground">
-                        {zh ? "当前模型" : "Current model"}: <span className="font-mono">{profile.baseModel?.fixedModel || "—"}</span>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <Button onClick={() => void copyAlias(entryId)} size="sm" type="button" variant="outline">
-                          {copiedAlias === entryId ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                          {copiedAlias === entryId ? (zh ? "已复制" : "Copied") : (zh ? "复制 ID" : "Copy ID")}
-                        </Button>
-                        <Button onClick={() => openEdit(profile)} size="sm" type="button" variant="outline">
-                          <Pencil className="h-3.5 w-3.5" />
-                          {zh ? "编辑" : "Edit"}
-                        </Button>
-                        {builtin ? null : (
-                          <Button onClick={() => setDeleteTarget(profile)} size="sm" type="button" variant="ghost">
-                            <Trash2 className="h-3.5 w-3.5" />
-                            {zh ? "删除" : "Delete"}
-                          </Button>
-                        )}
-                      </div>
-                      {metadata.source === modelEntrySource && !metadata.providerId ? (
-                        <div className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
-                          {zh ? "这个入口没有供应商元数据，可能是旧数据。" : "This entry has no provider metadata and may be legacy data."}
-                        </div>
-                      ) : null}
+                      <span className="text-[11px] text-muted-foreground">
+                        {builtinEntries.length} {zh ? "个场景" : "scenes"}
+                      </span>
                     </div>
-                  );
-                })}
+                    <div className="overflow-hidden rounded-xl border border-border bg-card">
+                      {builtinEntries.map(({ profile }) => (
+                        <ModelEntryRow
+                          copiedAlias={copiedAlias}
+                          key={profile.key}
+                          onCopy={(value) => void copyAlias(value)}
+                          onDelete={setDeleteTarget}
+                          onEdit={openEdit}
+                          onToggle={(item, enabled) => void toggleEntry(item, enabled)}
+                          profile={profile}
+                          zh={zh}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                <section className="space-y-2">
+                  <div className="flex flex-wrap items-end justify-between gap-2">
+                    <div>
+                      <div className="text-[13px] font-semibold text-foreground">{zh ? "我的模型" : "My models"}</div>
+                      <div className="mt-0.5 text-[11px] text-muted-foreground">
+                        {zh
+                          ? "为特定工具或用途创建的自定义调用 ID。"
+                          : "Custom call IDs for a specific tool or use case."}
+                      </div>
+                    </div>
+                    <span className="text-[11px] text-muted-foreground">
+                      {customEntries.length} {zh ? "个入口" : "entries"}
+                    </span>
+                  </div>
+                  {customEntries.length > 0 ? (
+                    <div className="overflow-hidden rounded-xl border border-border bg-card">
+                      {customEntries.map(({ profile }) => (
+                        <ModelEntryRow
+                          copiedAlias={copiedAlias}
+                          key={profile.key}
+                          onCopy={(value) => void copyAlias(value)}
+                          onDelete={setDeleteTarget}
+                          onEdit={openEdit}
+                          onToggle={(item, enabled) => void toggleEntry(item, enabled)}
+                          profile={profile}
+                          zh={zh}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-border bg-muted/15 px-4 py-4">
+                      <span className="text-[12px] text-muted-foreground">
+                        {zh
+                          ? "还没有自定义模型。推荐场景已经可以直接用；需要新的调用 ID 时再新增。"
+                          : "No custom models yet. The recommended scenes are ready to use; add a new call ID when you need one."}
+                      </span>
+                      <Button onClick={openCreate} size="sm" type="button" variant="outline">
+                        <Plus className="h-3.5 w-3.5" />
+                        {zh ? "新增" : "Add"}
+                      </Button>
+                    </div>
+                  )}
+                </section>
               </div>
             )}
 
             {savedAlias ? (
               <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3">
                 <div className="text-[13px] font-semibold text-foreground">
-                  {zh ? `已创建 ${savedAlias}` : `Created ${savedAlias}`}
+                  {zh ? `调用 ID 已创建：${savedAlias}` : `Call ID created: ${savedAlias}`}
                 </div>
                 <div className="mt-1 text-[12px] leading-5 text-muted-foreground">
                   {zh
@@ -643,7 +855,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
                 <div className="mt-2 flex flex-wrap gap-2">
                   <Button onClick={() => void copyAlias(savedAlias)} size="sm" type="button" variant="outline">
                     {copiedAlias === savedAlias ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                    {copiedAlias === savedAlias ? (zh ? "已复制" : "Copied") : (zh ? "复制模型 ID" : "Copy model ID")}
+                    {copiedAlias === savedAlias ? (zh ? "已复制" : "Copied") : (zh ? "复制调用 ID" : "Copy call ID")}
                   </Button>
                 </div>
               </div>
@@ -651,16 +863,18 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
 
             {syncResult ? (
               <div className="rounded-xl border border-border bg-card px-4 py-3">
-                <div className="text-[13px] font-semibold text-foreground">{zh ? "同步结果" : "Sync result"}</div>
+                <div className="text-[13px] font-semibold text-foreground">{zh ? "已同步到工具" : "Synced to tools"}</div>
                 <div className="mt-2 space-y-1.5">
                   {syncResult.clients.length === 0 ? (
-                    <div className="text-[12px] text-muted-foreground">{zh ? "没有启用的 Agent Profile。" : "No enabled agent profiles."}</div>
+                    <div className="text-[12px] text-muted-foreground">
+                      {zh ? "没有启用的 Agent 配置档案。" : "No enabled agent profiles."}
+                    </div>
                   ) : null}
                   {syncResult.clients.map((client) => (
                     <div className="flex flex-wrap items-center gap-2 text-[12px]" key={`${client.client}-${client.path}`}>
                       <span className={cn("h-1.5 w-1.5 rounded-full", client.ok ? "bg-emerald-500" : "bg-destructive")} />
                       <span className="font-medium text-foreground">{clientLabels[client.client] ?? client.client}</span>
-                      <span className="text-muted-foreground">{client.ok ? client.message : client.message}</span>
+                      <span className="text-muted-foreground">{client.message}</span>
                       {client.ok && clientRestartHints[client.client] ? (
                         <span className="rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[10px] text-muted-foreground">
                           {clientRestartHints[client.client]?.[zh ? "zh" : "en"]}
@@ -682,10 +896,10 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
               <div className="min-w-0">
                 <DialogTitle>
                   {editingBuiltin
-                    ? (zh ? "切换内置场景模型" : "Switch built-in model")
+                    ? (zh ? "调整推荐场景模型" : "Adjust recommended scene model")
                     : dialog === "edit"
-                      ? (zh ? "编辑模型入口" : "Edit model entry")
-                      : (zh ? "新建模型入口" : "New model entry")}
+                      ? (zh ? "调整工具模型" : "Adjust tool model")
+                      : (zh ? "新增工具模型" : "New tool model")}
                 </DialogTitle>
               </div>
               <Button aria-label={zh ? "关闭" : "Close"} onClick={closeDialog} size="iconSm" type="button" variant="ghost">
@@ -697,6 +911,11 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
                 <Field label={zh ? "供应商" : "Provider"} requirement="required">
                   <SelectControl onChange={changeProvider} options={providerOptions} value={providerName} />
                 </Field>
+                <div className="-mt-2 text-[11px] leading-4 text-muted-foreground">
+                  {zh
+                    ? "供应商是模型的来源（例如 tai、baozi）。Codex / OpenCode / Claude Code 是使用这个调用 ID 的工具。"
+                    : "The provider is where the model comes from (for example tai or baozi). Codex, OpenCode, and Claude Code are the tools that use the call ID."}
+                </div>
                 {editingBuiltin ? null : (
                   <>
                     <Field label={zh ? "用途标签（可选）" : "Usage label (optional)"}>
@@ -712,21 +931,38 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
                     </datalist>
                     <div className="-mt-2 text-[11px] leading-4 text-muted-foreground">
                       {zh
-                        ? "自由填写，不限制取值；推荐模型 ID 会根据它生成。"
-                        : "Free-form; the recommended model ID uses it."}
+                        ? "自由填写，不限制取值；推荐调用 ID 会根据它生成。"
+                        : "Free-form; the recommended call ID uses it."}
                     </div>
                   </>
                 )}
                 <Field label={zh ? "模型" : "Model"} requirement="required">
                   <SelectControl onChange={setModel} options={modelOptions} value={model} />
                 </Field>
+                <div className="-mt-2 space-y-1 text-[11px] leading-4 text-muted-foreground">
+                  <div>
+                    {zh
+                      ? "这里只显示所选供应商的模型。找不到时，先确认这个模型属于哪个供应商。"
+                      : "Only models from the selected provider are listed. If yours is missing, first check which provider owns it."}
+                  </div>
+                  <button
+                    className="text-left font-medium text-primary hover:underline"
+                    onClick={() => {
+                      closeDialog();
+                      onOpenProviders();
+                    }}
+                    type="button"
+                  >
+                    {zh ? "去供应商页面手动添加模型" : "Add a model on the Providers page"}
+                  </button>
+                </div>
 
                 {dialog === "create" ? (
                   <label className="flex items-start gap-2 rounded-lg border border-border bg-muted/25 px-3 py-2">
                     <Checkbox checked={bindProvider} onCheckedChange={setBindProvider} />
                     <span className="min-w-0">
                       <span className="block text-[12px] font-medium text-foreground">
-                        {zh ? "在模型 ID 中绑定供应商" : "Include the provider in the model ID"}
+                        {zh ? "在调用 ID 中绑定供应商（默认开启）" : "Include the provider in the call ID (on by default)"}
                       </span>
                       <span className="mt-0.5 block text-[11px] leading-4 text-muted-foreground">
                         {zh
@@ -738,7 +974,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
                 ) : null}
 
                 <Field
-                  label={zh ? "模型 ID（工具里选择的名字）" : "Model ID (name used by tools)"}
+                  label={zh ? "调用 ID（工具里选择的名字）" : "Call ID (name used by tools)"}
                   requirement="required"
                 >
                   <Input
@@ -754,16 +990,16 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
                 <div className="rounded-lg border border-border bg-muted/25 px-3 py-2 text-[11px] leading-5 text-muted-foreground">
                   {editingBuiltin ? (
                     zh
-                      ? "内置场景的 ID 固定；可以在上面换供应商 / 模型。安装器重配会保留你选中的模型。"
-                      : "Built-in scene IDs are fixed. Pick a different provider or model above; reinstalling keeps your selected model."
+                      ? "推荐场景的调用 ID 固定；可以在上面换供应商 / 模型。安装器重配会保留你选中的模型。"
+                      : "Recommended scene call IDs are fixed. Pick a different provider or model above; reinstalling keeps your selected model."
                   ) : dialog === "edit" ? (
                     zh
-                      ? "已创建的模型 ID 不能改名。需要新名字时请新建一个入口；已有 ID 可以换背后的模型。"
-                      : "An existing model ID cannot be renamed. Create a new entry for a new name; you can change the model behind an existing ID."
+                      ? "已创建的调用 ID 不能改名。需要新名字时请新建一个入口；已有 ID 可以换背后的模型。"
+                      : "An existing call ID cannot be renamed. Create a new entry for a new name; you can change the model behind an existing ID."
                   ) : (
                     zh
-                      ? `推荐：${recommendedAlias}。不要把模型版本或日期写进 ID；模型会换，ID 不要换。`
-                      : `Recommended: ${recommendedAlias}. Do not put model versions or dates in the ID; models change, IDs should not.`
+                      ? `推荐调用 ID：${recommendedAlias}。不要把模型版本或日期写进 ID；模型会换，ID 不要换。`
+                      : `Recommended call ID: ${recommendedAlias}. Do not put model versions or dates in the ID; models change, IDs should not.`
                   )}
                 </div>
                 {validationError && alias.trim() ? (

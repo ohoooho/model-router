@@ -3434,6 +3434,7 @@ function App() {
                 },
                 overview: {
                   onConfigureProviderAccounts: () => selectNavigationItem("providers"),
+                  onOpenModelEntries: () => selectNavigationItem("model-entries"),
                   usageFilters: {
                     modelFilter: usageModelFilter,
                     providerFilter: usageProviderFilter,
