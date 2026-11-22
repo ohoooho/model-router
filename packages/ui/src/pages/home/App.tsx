@@ -426,7 +426,11 @@ function App() {
     }
 
     const handleWebAuthExpired = () => setWebAuthExpired(true);
+    const refreshConfigFromExternalChange = () => {
+      void window.ccr?.getConfig().then(syncConfigState).catch(() => undefined);
+    };
     window.addEventListener("omr:web-auth-expired", handleWebAuthExpired);
+    window.addEventListener("omr:config-refresh", refreshConfigFromExternalChange);
     void window.ccr.getAppInfo().then(setAppInfo).catch(() => undefined);
     void window.ccr.getProviderPresets()
       .then(setProviderPresets)
@@ -470,6 +474,7 @@ function App() {
     const stopPolling = startVisiblePolling(refreshRuntimeStatus, 2000);
     return () => {
       window.removeEventListener("omr:web-auth-expired", handleWebAuthExpired);
+      window.removeEventListener("omr:config-refresh", refreshConfigFromExternalChange);
       stopPolling();
       unsubscribeOpenSettings();
       unsubscribeOpenUpdate();
@@ -3469,6 +3474,9 @@ function App() {
                   providers,
                   removeProvider: setProviderDeleteIndex,
                   setProviderEnabled
+                },
+                modelEntries: {
+                  onOpenProviders: () => selectNavigationItem("providers")
                 },
                 routing: {
                   addRule: openAddRoutingRuleDialog,

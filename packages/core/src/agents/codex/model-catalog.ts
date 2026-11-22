@@ -118,7 +118,7 @@ export function buildCodexModelCatalogIds(
       }
     }
     for (const alias of virtualModelRawCatalogNames(profile)) {
-      pushUniqueModel(ids, fusionModelSelector(alias));
+      pushUniqueModel(ids, isModelEntryCatalogProfile(profile) ? alias : fusionModelSelector(alias));
     }
   }
 
@@ -815,6 +815,16 @@ function virtualModelRawCatalogNames(profile: VirtualModelProfileConfig): string
     return exactAliases;
   }
   return [profile.key || profile.displayName].filter(Boolean);
+}
+
+function isModelEntryCatalogProfile(profile: VirtualModelProfileConfig): boolean {
+  const metadata = profile.metadata;
+  return Boolean(
+    metadata &&
+    typeof metadata === "object" &&
+    !Array.isArray(metadata) &&
+    (metadata as Record<string, unknown>).source === "model-entry"
+  );
 }
 
 function fusionModelSelector(model: string): string {

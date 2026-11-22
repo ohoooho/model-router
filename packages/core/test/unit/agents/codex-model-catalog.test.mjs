@@ -575,6 +575,63 @@ test("codex catalog keeps apply_patch bridge for non-GPT models with legacy glob
   assert.equal(model.apply_patch_tool_type, "freeform");
 });
 
+test("codex catalog exposes model-entry aliases without the Fusion prefix", () => {
+  const ids = buildCodexModelCatalogIds({
+    Providers: [
+      { name: "baozi", type: "openai_responses", models: ["MiniMax-M3"] }
+    ],
+    virtualModelProfiles: [
+      {
+        baseModel: { fixedModel: "baozi/MiniMax-M3", mode: "fixed" },
+        displayName: "baozi · Code",
+        enabled: true,
+        execution: {
+          clientToolsPolicy: "allow",
+          mode: "decorate_only",
+          streamMode: "optimistic"
+        },
+        id: "baozi-code",
+        key: "model-entry:baozi-code",
+        match: { exactAliases: ["baozi-code"], prefixes: [], suffixes: [] },
+        materialization: { enabled: true, includeInGatewayModels: true },
+        metadata: { source: "model-entry" },
+        tools: []
+      }
+    ]
+  }, "baozi-code");
+
+  assert.ok(ids.includes("baozi-code"));
+  assert.equal(ids.includes("Fusion/baozi-code"), false);
+});
+
+test("codex catalog keeps the Fusion prefix for legacy virtual models", () => {
+  const ids = buildCodexModelCatalogIds({
+    Providers: [
+      { name: "baozi", type: "openai_responses", models: ["MiniMax-M3"] }
+    ],
+    virtualModelProfiles: [
+      {
+        baseModel: { fixedModel: "baozi/MiniMax-M3", mode: "fixed" },
+        displayName: "Legacy Fusion",
+        enabled: true,
+        execution: {
+          clientToolsPolicy: "allow",
+          mode: "decorate_only",
+          streamMode: "optimistic"
+        },
+        id: "legacy-fusion",
+        key: "legacy-fusion",
+        match: { exactAliases: ["legacy-fusion"], prefixes: [], suffixes: [] },
+        materialization: { enabled: true, includeInGatewayModels: true },
+        tools: []
+      }
+    ]
+  }, "Fusion/legacy-fusion");
+
+  assert.ok(ids.includes("Fusion/legacy-fusion"));
+  assert.equal(ids.includes("legacy-fusion"), false);
+});
+
 test("codex catalog marks Fusion aliases with builtin web search as searchable", () => {
   const model = catalogModelFor({
     Providers: [],

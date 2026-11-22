@@ -15,6 +15,7 @@ import { LogsView, NetworkingView } from "./network-logs";
 import { OnboardingView } from "./onboarding";
 import { ProfileView } from "./profiles";
 import { ModelsView, ProvidersView } from "./providers";
+import { ModelEntriesView } from "./model-entries";
 import { RoutingView } from "./routing";
 import { VirtualModelsView } from "./virtual-models";
 
@@ -35,7 +36,7 @@ const sidebarNavigationGroupDefinitions: Array<{
   label: string;
 }> = [
   { id: "workspace", itemIds: ["overview"], label: "Workspace" },
-  { id: "setup", itemIds: ["providers", "profile", "routing"], label: "Setup" },
+  { id: "setup", itemIds: ["providers", "model-entries", "profile", "routing"], label: "Setup" },
   { id: "monitor", itemIds: ["logs", "observability"], label: "Monitor" },
   { id: "advanced", itemIds: ["virtual-models", "models", "api-keys", "extensions"], label: "Advanced" }
 ];
@@ -57,6 +58,7 @@ type MainViewProps = {
   apiKeys: ComponentProps<typeof ApiKeysView>;
   extensions: ComponentProps<typeof ExtensionsView>;
   logs: ComponentProps<typeof LogsView>;
+  modelEntries: ComponentProps<typeof ModelEntriesView>;
   models: ComponentProps<typeof ModelsView>;
   networking: ComponentProps<typeof NetworkingView>;
   observability: ComponentProps<typeof AgentAnalysisView>;
@@ -455,6 +457,7 @@ function MainViewSwitch({
         {activeView === "networking" && networkCaptureEnabled ? <NetworkingView {...viewProps.networking} /> : null}
         {activeView === "logs" ? <LogsView {...viewProps.logs} /> : null}
         {activeView === "providers" ? <ProvidersView {...viewProps.providers} /> : null}
+        {activeView === "model-entries" ? <ModelEntriesView {...viewProps.modelEntries} /> : null}
         {activeView === "models" ? <ModelsView {...viewProps.models} /> : null}
         {activeView === "routing" ? <RoutingView {...viewProps.routing} /> : null}
         {activeView === "virtual-models" ? <VirtualModelsView {...viewProps.virtualModels} /> : null}
