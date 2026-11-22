@@ -4,11 +4,11 @@
 // `default.virtualModelProfiles`, so every install (fresh or existing) needs
 // concrete profiles with a fixed base model.
 //
-// Taoxian deliberately routes the four public aliases through Baozi. The
-// upstream provider name must not be added by the default installer, and the
-// aliases stay configured even when Baozi has no usable key yet. User-added
-// providers (including tai) are preserved: this file only manages Baozi and
-// the four Taoxian aliases.
+// Taoxian seeds the five public aliases with Baozi defaults. The upstream
+// provider name must not be added by the default installer, and the aliases
+// stay configured even when Baozi has no usable key yet. User-added providers
+// (including tai) and user-selected alias models are preserved: this file only
+// fills missing Baozi scene profiles and missing base models.
 
 const MANAGED_PROVIDER = 'baozi';
 
@@ -24,7 +24,6 @@ const TAOXIAN_VIRTUAL_MODELS = {
     display_name: 'Assist Auto (通用助手)',
     strategy: 'auto-balance',
     defaultBaseModel: 'baozi/assist-auto',
-    allowedBaseModels: ['baozi/assist-auto', 'baozi/trial-auto'],
     match: { exactAliases: ['assist-auto'] },
     key_id: 'baozi-assist-auto',
   },
@@ -46,7 +45,6 @@ const TAOXIAN_VIRTUAL_MODELS = {
     display_name: 'Trial Auto (体验配额)',
     strategy: 'auto-balance',
     defaultBaseModel: 'baozi/trial-auto',
-    allowedBaseModels: ['baozi/trial-auto', 'baozi/assist-auto'],
     match: { exactAliases: ['trial-auto'] },
     key_id: 'baozi-assist-auto',
   },
@@ -123,10 +121,11 @@ function applyManagedProviderVisibility(providers) {
 }
 
 /**
- * Merge the four Taoxian scene profiles into `defaultConfig` without touching
- * user-owned fields. Existing profiles win, except that each managed alias
- * must keep its matching Baozi auto model (assist-auto may use trial-auto).
- * Returns a new profiles array and whether anything changed.
+ * Merge the five Taoxian scene profiles into `defaultConfig` without touching
+ * user-owned fields. Existing profiles win, including a user-selected fixed
+ * base model; only missing profiles and missing base models are filled with
+ * the Baozi scene defaults. Returns a new profiles array and whether anything
+ * changed.
  */
 function mergeVirtualModelProfiles(defaultConfig, virtualModels = TAOXIAN_VIRTUAL_MODELS) {
   const existingProfiles = Array.isArray(defaultConfig?.virtualModelProfiles)
@@ -162,11 +161,10 @@ function mergeVirtualModelProfiles(defaultConfig, virtualModels = TAOXIAN_VIRTUA
       const currentModel = existing.baseModel?.mode === 'fixed'
         ? String(existing.baseModel.fixedModel || '').trim()
         : '';
-      const allowedModels = [scene.defaultBaseModel, ...(scene.allowedBaseModels || [])];
-      if (!allowedModels.includes(currentModel)) {
-        // Taoxian owns the four public aliases. They must route to the matching
-        // Baozi auto model; assist-auto may also use the trial-auto model.
-        // User-owned providers and user-created virtual profiles are untouched.
+      if (!currentModel) {
+        // The user may have changed this alias to any provider/model through
+        // the Model Entries page. Preserve that choice; only seed the Baozi
+        // default when the profile has no fixed base model yet.
         existing.baseModel = { ...existing.baseModel, mode: 'fixed', fixedModel: scene.defaultBaseModel };
         changed = true;
       }

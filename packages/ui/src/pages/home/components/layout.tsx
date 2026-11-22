@@ -15,10 +15,12 @@ import { LogsView, NetworkingView } from "./network-logs";
 import { OnboardingView } from "./onboarding";
 import { ProfileView } from "./profiles";
 import { ModelsView, ProvidersView } from "./providers";
+import { ModelEntriesView } from "./model-entries";
 import { RoutingView } from "./routing";
 import { VirtualModelsView } from "./virtual-models";
 
 export type MainNavigationItem = {
+  badge?: string;
   icon: LucideIcon;
   id: NavigationId;
 };
@@ -34,7 +36,7 @@ const sidebarNavigationGroupDefinitions: Array<{
   itemIds: NavigationId[];
   label: string;
 }> = [
-  { id: "workspace", itemIds: ["overview"], label: "Workspace" },
+  { id: "workspace", itemIds: ["overview", "model-entries"], label: "Workspace" },
   { id: "setup", itemIds: ["providers", "profile", "routing"], label: "Setup" },
   { id: "monitor", itemIds: ["logs", "observability"], label: "Monitor" },
   { id: "advanced", itemIds: ["virtual-models", "models", "api-keys", "extensions"], label: "Advanced" }
@@ -57,6 +59,7 @@ type MainViewProps = {
   apiKeys: ComponentProps<typeof ApiKeysView>;
   extensions: ComponentProps<typeof ExtensionsView>;
   logs: ComponentProps<typeof LogsView>;
+  modelEntries: ComponentProps<typeof ModelEntriesView>;
   models: ComponentProps<typeof ModelsView>;
   networking: ComponentProps<typeof NetworkingView>;
   observability: ComponentProps<typeof AgentAnalysisView>;
@@ -312,6 +315,8 @@ function SidebarNavigationButton({
   onClick: () => void;
   shouldReduceMotion: boolean | null;
 }) {
+  const t = useAppText();
+  const badge = item.badge ? t(item.badge) : "";
   return (
     <Button
       className={cn(
@@ -335,6 +340,11 @@ function SidebarNavigationButton({
         <item.icon className="h-3.5 w-3.5" />
       </motion.span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
+      {badge ? (
+        <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary max-[720px]:hidden">
+          {badge}
+        </span>
+      ) : null}
     </Button>
   );
 }
@@ -455,6 +465,7 @@ function MainViewSwitch({
         {activeView === "networking" && networkCaptureEnabled ? <NetworkingView {...viewProps.networking} /> : null}
         {activeView === "logs" ? <LogsView {...viewProps.logs} /> : null}
         {activeView === "providers" ? <ProvidersView {...viewProps.providers} /> : null}
+        {activeView === "model-entries" ? <ModelEntriesView {...viewProps.modelEntries} /> : null}
         {activeView === "models" ? <ModelsView {...viewProps.models} /> : null}
         {activeView === "routing" ? <RoutingView {...viewProps.routing} /> : null}
         {activeView === "virtual-models" ? <VirtualModelsView {...viewProps.virtualModels} /> : null}

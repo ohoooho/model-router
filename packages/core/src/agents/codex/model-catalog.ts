@@ -118,7 +118,7 @@ export function buildCodexModelCatalogIds(
       }
     }
     for (const alias of virtualModelRawCatalogNames(profile)) {
-      pushUniqueModel(ids, fusionModelSelector(alias));
+      pushUniqueModel(ids, profileUsesBareAlias(profile) ? alias : fusionModelSelector(alias));
     }
   }
 
@@ -815,6 +815,29 @@ function virtualModelRawCatalogNames(profile: VirtualModelProfileConfig): string
     return exactAliases;
   }
   return [profile.key || profile.displayName].filter(Boolean);
+}
+
+const builtinSceneAliases = new Set([
+  "coding-auto",
+  "assist-auto",
+  "chat-auto",
+  "team-auto",
+  "trial-auto"
+]);
+
+function profileUsesBareAlias(profile: VirtualModelProfileConfig): boolean {
+  const metadata = profile.metadata;
+  if (
+    metadata &&
+    typeof metadata === "object" &&
+    !Array.isArray(metadata) &&
+    (metadata as Record<string, unknown>).source === "model-entry"
+  ) {
+    return true;
+  }
+  return virtualModelRawCatalogNames(profile).some((alias) =>
+    builtinSceneAliases.has(alias.trim().toLowerCase())
+  );
 }
 
 function fusionModelSelector(model: string): string {

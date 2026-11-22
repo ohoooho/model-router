@@ -1,7 +1,7 @@
 import {
   AddApiKeyDraft, AddProfileDraft, AddProviderDraft, AddRoutingRuleDraft, AgentAnalysisSessionSelection, AgentAnalysisSnapshot, AgentFilterValue,
   ApiKeyConfig, AppConfig, appCopy, AppI18nContext, AppInfo, AppSaveConfigOptions, AppUpdateStatus,
-  AppLanguagePreference, applyProviderProbeResult, AppToast, BotGatewaySavedConfig, buildExtensionList, claudeDesignRoutingConfigFromDraft,
+  AppLanguagePreference, applyProviderProbeResult, AppToast, BotGatewaySavedConfig, buildExtensionList, Button, claudeDesignRoutingConfigFromDraft,
   ClaudeDesignRoutingDraft, ClaudeDesignRoutingRuleDraft, cloneConfig, createApiKeyDraft, createApiKeyEditDraft,
   createApiKeyList, createClaudeDesignRoutingDraft, createClaudeDesignRoutingRuleDraft, createCursorProxyRoutingDraft, createCursorProxyRoutingRuleDraft, createEmptyAgentAnalysis,
   copyTextToClipboard, createEmptyRequestLogPage, createEmptyUsageStats, createExtensionInstallDraft, createGeneratedApiKey, createPluginSettingsDraft, createProfileDraft,
@@ -181,34 +181,81 @@ function canInstallExtensionCandidate(candidate: PluginInstallCandidate): boolea
 
 function WebAuthExpiredScreen({ language }: { language: ResolvedLanguage }) {
   const zh = language === "zh";
+  const [openAttempted, setOpenAttempted] = useState(false);
+  const host = window.location.hostname.toLowerCase();
+  const isLocalConsole =
+    host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]";
+  const openConsole = () => {
+    setOpenAttempted(true);
+    window.location.href = "omr://open";
+  };
   return (
     <div className="flex h-full min-h-screen items-center justify-center bg-background px-6 py-10 text-foreground">
       <div className="w-full max-w-xl rounded-2xl border border-border bg-card p-8 shadow-sm" role="alert">
         <div className="text-sm font-medium text-amber-600 dark:text-amber-400">
-          {zh ? "需要重新认证" : "Re-authentication required"}
+          {zh ? "噢吼模型管理" : "OHO Model Management"}
         </div>
         <h1 className="mt-2 text-2xl font-semibold">
-          {zh ? "管理令牌已过期" : "Management token expired"}
+          {isLocalConsole
+            ? (zh ? "控制台需要重新打开" : "Console needs to be reopened")
+            : (zh ? "控制台登录已过期" : "Console login expired")}
         </h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          {zh
-            ? "浏览器保存的 OMR 管理令牌已失效，通常是 OMR 服务重启后重新生成了令牌。"
-            : "The OMR management token saved in this browser is no longer valid. This usually happens after the OMR service restarts with a new token."}
+          {isLocalConsole
+            ? (zh
+              ? "浏览器里的控制台登录信息已过期。这通常发生在 OMR 服务重启之后。"
+              : "The console login saved in this browser has expired. This usually happens after the OMR service restarts.")
+            : (zh
+              ? "当前连接的是远程 OMR 服务。请联系管理员重新获取访问链接。"
+              : "This is a remote OMR service. Ask the administrator for a new access link.")}
         </p>
-        <p className="mt-5 text-sm font-medium">{zh ? "在终端运行：" : "Run this in your terminal:"}</p>
-        <div className="mt-2 space-y-2">
-          <code className="block rounded-lg bg-muted px-4 py-3 font-mono text-sm">omr ui</code>
-          <code className="block rounded-lg bg-muted px-4 py-3 font-mono text-sm">omr console --open</code>
+        {isLocalConsole ? (
+          <>
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <Button onClick={openConsole} type="button">
+                {zh ? "重新打开控制台" : "Reopen console"}
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {zh ? "自动使用最新登录信息" : "Uses the latest login automatically"}
+              </span>
+            </div>
+            {openAttempted ? (
+              <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                {zh
+                  ? "如果按钮没有反应，请从启动台打开“噢吼模型管理”。"
+                  : "If the button does nothing, launch “OHO Model Management” from Launchpad."}
+              </p>
+            ) : null}
+          </>
+        ) : null}
+        <div className="mt-6 rounded-lg border border-border bg-muted/40 px-4 py-3">
+          <p className="text-sm font-medium">
+            {isLocalConsole
+              ? (zh ? "高级：命令行方式" : "Advanced: command line")
+              : (zh ? "服务器管理员：命令行方式" : "Server administrator: command line")}
+          </p>
+          <div className="mt-2 space-y-2">
+            <code className="block rounded-lg bg-muted px-4 py-3 font-mono text-sm">omr ui</code>
+            <code className="block rounded-lg bg-muted px-4 py-3 font-mono text-sm">omr console --open</code>
+          </div>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+            {isLocalConsole
+              ? (zh
+                ? "omr ui 会启动或复用 OMR 服务，并打开带最新登录信息的控制台；omr console 只打印或打开已运行服务的控制台链接。"
+                : "omr ui starts or reuses the OMR service and opens the console with the latest login. omr console prints or opens the console URL for an already-running service.")
+              : (zh
+                ? "管理员可在 OMR 服务器上运行 omr console --open，重新获取带有效登录信息的控制台链接。"
+                : "An administrator can run omr console --open on the OMR server to get a console link with a valid login.")}
+          </p>
         </div>
-        <p className="mt-4 text-sm leading-6 text-muted-foreground">
-          {zh
-            ? "omr ui 会启动或复用 OMR 服务，并用最新令牌打开控制台；omr console 只打印或打开已运行服务的控制台链接。"
-            : "omr ui starts or reuses the OMR service and opens the console with the current token. omr console prints or opens the console URL for an already-running service."}
-        </p>
         <p className="mt-4 text-xs leading-5 text-muted-foreground">
-          {zh
-            ? "如果反复出现，请让 OMR 服务使用固定的 OMR_WEB_AUTH_TOKEN（web-auth.env）。"
-            : "If this keeps happening, configure the OMR service with a fixed OMR_WEB_AUTH_TOKEN (web-auth.env)."}
+          {isLocalConsole
+            ? (zh
+              ? "如果反复出现，请检查 OMR 服务的固定管理令牌配置（web-auth.env）。"
+              : "If this keeps happening, check the OMR service's fixed management token configuration (web-auth.env).")
+            : (zh
+              ? "普通用户不需要在本机安装或运行 OMR。"
+              : "Regular users do not need to install or run OMR on this machine.")}
         </p>
       </div>
     </div>
@@ -379,7 +426,11 @@ function App() {
     }
 
     const handleWebAuthExpired = () => setWebAuthExpired(true);
+    const refreshConfigFromExternalChange = () => {
+      void window.ccr?.getConfig().then(syncConfigState).catch(() => undefined);
+    };
     window.addEventListener("omr:web-auth-expired", handleWebAuthExpired);
+    window.addEventListener("omr:config-refresh", refreshConfigFromExternalChange);
     void window.ccr.getAppInfo().then(setAppInfo).catch(() => undefined);
     void window.ccr.getProviderPresets()
       .then(setProviderPresets)
@@ -423,6 +474,7 @@ function App() {
     const stopPolling = startVisiblePolling(refreshRuntimeStatus, 2000);
     return () => {
       window.removeEventListener("omr:web-auth-expired", handleWebAuthExpired);
+      window.removeEventListener("omr:config-refresh", refreshConfigFromExternalChange);
       stopPolling();
       unsubscribeOpenSettings();
       unsubscribeOpenUpdate();
@@ -3382,6 +3434,7 @@ function App() {
                 },
                 overview: {
                   onConfigureProviderAccounts: () => selectNavigationItem("providers"),
+                  onOpenModelEntries: () => selectNavigationItem("model-entries"),
                   usageFilters: {
                     modelFilter: usageModelFilter,
                     providerFilter: usageProviderFilter,
@@ -3422,6 +3475,9 @@ function App() {
                   providers,
                   removeProvider: setProviderDeleteIndex,
                   setProviderEnabled
+                },
+                modelEntries: {
+                  onOpenProviders: () => selectNavigationItem("providers")
                 },
                 routing: {
                   addRule: openAddRoutingRuleDialog,

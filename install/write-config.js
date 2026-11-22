@@ -225,9 +225,10 @@ const fallbackModels = Array.isArray(fallback.models)
   : [];
 
 // Runtime virtual models are read from default.virtualModelProfiles, not from
-// the legacy app_config.virtual_models metadata. Build profiles for the four
+// the legacy app_config.virtual_models metadata. Build profiles for the five
 // Taoxian scenes and give each a concrete fixed Baozi base model. Existing
-// profiles win; we only fill missing ids/baseModel and repair non-Baozi routes.
+// profiles win, including user-selected models; we only fill missing profiles
+// and missing base models.
 const { profiles: existingProfiles } = mergeVirtualModelProfiles({
   ...defaultConfig,
   Providers: managedProviders,

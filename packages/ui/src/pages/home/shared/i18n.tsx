@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo } from "react";
 import { translateErrorMessage } from "@ccr/core/contracts/i18n";
 
-type NavigationId = "onboarding" | "overview" | "observability" | "api-keys" | "server" | "profile" | "networking" | "logs" | "providers" | "models" | "routing" | "virtual-models" | "extensions";
+type NavigationId = "onboarding" | "overview" | "observability" | "api-keys" | "server" | "profile" | "networking" | "logs" | "providers" | "model-entries" | "models" | "routing" | "virtual-models" | "extensions";
 type ResolvedLanguage = "en" | "zh";
 
 export type AppCopy = {
@@ -115,6 +115,7 @@ export const appCopy: Record<ResolvedLanguage, AppCopy> = {
       networking: "Networking",
       observability: "Observability",
       overview: "Overview",
+      "model-entries": "Tool Model Setup",
       profile: "Agent Profiles",
       providers: "Providers",
       models: "Models",
@@ -217,6 +218,7 @@ export const appCopy: Record<ResolvedLanguage, AppCopy> = {
       primaryNavigation: "Primary navigation"
     },
     text: {
+      "Recommended": "Recommended",
       "上一页": "Previous page",
       "下一页": "Next page",
       "全部状态": "All statuses",
@@ -749,6 +751,7 @@ export const appCopy: Record<ResolvedLanguage, AppCopy> = {
       networking: "网络",
       observability: "观测",
       overview: "概览",
+      "model-entries": "工具模型选配",
       profile: "Agent 配置档案",
       providers: "供应商",
       models: "模型",
@@ -851,6 +854,7 @@ export const appCopy: Record<ResolvedLanguage, AppCopy> = {
       primaryNavigation: "主导航"
     },
     text: {
+      "Recommended": "推荐",
       "Changes have not been saved.": "更改尚未保存，当前操作还未生效。",
       "Connection lost. Status may be out of date.": "连接已断开，显示的运行状态可能已过期。",
       "Saving changes…": "正在保存更改…",
@@ -2185,10 +2189,10 @@ export const appCopy: Record<ResolvedLanguage, AppCopy> = {
       "Marketplace": "市场",
       "Added": "已添加",
       "Added models": "已添加模型",
-      "Add custom model": "添加自定义模型",
-      "Cancel custom model": "取消自定义模型",
+      "Add custom model": "添加模型 ID",
+      "Cancel custom model": "取消手动添加",
       "Click a model to edit settings": "点击模型编辑设置",
-      "Custom model": "自定义模型",
+      "Custom model": "手动添加模型 ID",
       "Model already added": "模型已添加",
       "Model name": "模型名称",
       "Models are required. Ask the provider to include models=... in the link.": "需要模型列表。请让供应商在链接中加入 models=...。",
@@ -2229,7 +2233,7 @@ export const appCopy: Record<ResolvedLanguage, AppCopy> = {
       "No available models": "没有可用模型",
       "No models added": "未添加模型",
       "No provider models": "没有供应商模型",
-      "This provider did not return a model list. Add model IDs with Custom model.": "该供应商未返回模型列表，请使用“自定义模型”手动添加模型 ID。",
+      "This provider did not return a model list. Add model IDs with Custom model.": "该供应商未返回模型列表，请使用“手动添加模型 ID”。",
       "No protocol detection yet": "尚未检测协议",
       "No response fields": "没有响应字段",
       "No unavailable models": "没有不可用模型",

@@ -19,7 +19,7 @@ import {
   SelectControl, SortableContext, sortableKeyboardCoordinates, systemStatusPointTooltip,
   Tabs, TabsList, TabsTrigger, Tooltip, translateOptions, Trash2, UsageComparisonRow, usageRangeOptions,
   GatewayProviderConfig, UsageSeriesPoint, UsageStatsRange, UsageStatsSnapshot, usageStatusTone, UsageTotals, useAppText,
-  useEffect, useMemo, useRef, useSensor, useSensors, useSortable,
+  useResolvedAppLanguage, useEffect, useMemo, useRef, useSensor, useSensors, useSortable,
   useState, X, XAxis, YAxis
 } from "../shared/index";
 import { buildTokenActivity, type TokenActivityCell } from "@/lib/usage-activity";
@@ -47,6 +47,7 @@ function chartTooltipPortal(): HTMLElement | null {
 
 export function OverviewView({
   onConfigureProviderAccounts,
+  onOpenModelEntries,
   onWidgetsChange,
   overviewWidgets,
   providerAccounts,
@@ -59,6 +60,7 @@ export function OverviewView({
   usageStats
 }: {
   onConfigureProviderAccounts?: () => void;
+  onOpenModelEntries?: () => void;
   onWidgetsChange: (widgets: OverviewWidgetConfig[]) => void;
   overviewWidgets: OverviewWidgetConfig[];
   providerAccounts: ProviderAccountSnapshot[];
@@ -71,6 +73,7 @@ export function OverviewView({
   usageStats: UsageStatsSnapshot;
 }) {
   const t = useAppText();
+  const zh = useResolvedAppLanguage() === "zh";
   const viewRef = useRef<HTMLDivElement>(null);
   const [activeWidgetId, setActiveWidgetId] = useState<string>();
   const [selectedWidgetId, setSelectedWidgetId] = useState<string>();
@@ -467,6 +470,29 @@ export function OverviewView({
           </Button>
         </div>
       </div>
+
+      {onOpenModelEntries && !editing ? (
+        <div className="flex flex-col gap-3 rounded-xl border border-primary/20 bg-primary/[0.04] px-4 py-3 sm:flex-row sm:items-center">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                {zh ? "推荐" : "Recommended"}
+              </span>
+              <span className="text-[13px] font-semibold text-foreground">
+                {zh ? "给工具选模型" : "Choose a model for your tools"}
+              </span>
+            </div>
+            <div className="mt-1 text-[12px] leading-5 text-muted-foreground">
+              {zh
+                ? "Codex / OpenCode / Claude Code 共用一个调用 ID；换模型只改这里，不用改工具配置。"
+                : "Codex, OpenCode, and Claude Code can share one call ID. Change the model here without touching tool configs."}
+            </div>
+          </div>
+          <Button onClick={onOpenModelEntries} size="sm" type="button">
+            {zh ? "开始选配" : "Set up models"}
+          </Button>
+        </div>
+      ) : null}
 
       {editing ? (
         <div className="grid min-h-0 grid-cols-1 gap-4 xl:grid-cols-[220px_minmax(0,1fr)_260px]">

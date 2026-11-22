@@ -328,6 +328,44 @@ test("model discovery carries Authorization fallback for protocol-specific API k
   );
 });
 
+test("model discovery uses a provider name field as a display name when it differs from the model ID", async (t) => {
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/models")) {
+      return new Response(JSON.stringify({
+        data: [
+          {
+            id: "deepseek-v4.1-flash",
+            name: "DeepSeek V4.1 Flash 1017",
+            object: "model"
+          }
+        ]
+      }), {
+        headers: { "content-type": "application/json" },
+        status: 200
+      });
+    }
+    return new Response(JSON.stringify({ data: [] }), {
+      headers: { "content-type": "application/json" },
+      status: 200
+    });
+  };
+  t.after(() => {
+    globalThis.fetch = previousFetch;
+  });
+
+  const probe = await probeGatewayProvider({
+    baseUrl: "http://127.0.0.1:49124/v1",
+    forceRefresh: true,
+    mode: "models",
+    protocols: ["openai_chat_completions"]
+  });
+
+  assert.ok(probe.models.includes("deepseek-v4.1-flash"));
+  assert.equal(probe.modelDisplayNames?.["deepseek-v4.1-flash"], "DeepSeek V4.1 Flash 1017");
+});
+
 test("connectivity probe applies provider plugin auth for local agent imports", async (t) => {
   const previousFetch = globalThis.fetch;
   let called = false;

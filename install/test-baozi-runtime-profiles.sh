@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Regression: existing OMR configs must move the four public aliases to Baozi
-# and enable Baozi, while preserving user-added providers (including tai) and
-# user-selected preferred/fallback routes. Migration must stay idempotent even
-# when Baozi has no real key.
+# Regression: existing OMR configs must keep user-selected alias models, add
+# missing managed aliases with Baozi defaults, and enable Baozi, while
+# preserving user-added providers (including tai) and user-selected
+# preferred/fallback routes. Migration must stay idempotent even when Baozi has
+# no real key.
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -71,8 +72,10 @@ if (JSON.stringify(config.Router.fallback.models) !== JSON.stringify(['tai/glm-5
   throw new Error(`user fallback was changed to ${JSON.stringify(config.Router.fallback.models)}`);
 }
 const aliases = {
-  'coding-auto': 'baozi/coding-auto',
-  'chat-auto': 'baozi/chat-auto',
+  // User-selected models win; migration must not pull them back to Baozi.
+  'coding-auto': 'tai/deepseek-v4.1-flash-1017',
+  'chat-auto': 'tai/glm-5.3-flash',
+  // Missing managed aliases are seeded with their Baozi scene defaults.
   'assist-auto': 'baozi/assist-auto',
   'team-auto': 'baozi/team-auto',
   'trial-auto': 'baozi/trial-auto',
@@ -99,4 +102,4 @@ after="$(sha_file "${DATA_DIR}/config.sqlite")"
   exit 1
 }
 
-echo "PASS: aliases use Baozi; user-added tai and user routes are preserved"
+echo "PASS: user-selected alias models, user-added tai, and user routes are preserved"
