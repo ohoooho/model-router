@@ -12,4 +12,4 @@ for sidecar in "${db}-wal" "${db}-shm"; do
   [[ -f "$sidecar" ]] && cp -p "$sidecar" "${destination}${sidecar#"$db"}"
 done
 chmod 600 "$destination"*
-echo "✅ OMR SQLite 备份到 $destination（含存在的 WAL sidecar）"
+echo "✅ OMR SQLite 备份到 ${destination}（含存在的 WAL sidecar）"

@@ -18,4 +18,4 @@ for suffix in -wal -shm; do
   [[ -f "$side_source" ]] && cp -p "$side_source" "${db}${suffix}"
 done
 chmod 600 "$db"
-echo "✅ OMR 配置已回滚到 $label；请重新运行 install/verify.sh。"
+echo "✅ OMR 配置已回滚到 ${label}；请重新运行 install/verify.sh。"
