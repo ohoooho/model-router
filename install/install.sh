@@ -169,7 +169,10 @@ ARTIFACT_INTEGRITY=""
 ARTIFACT_SIZE=""
 ARTIFACT_TMP_DIR=""
 cleanup_artifact_tmp() {
-    [ -n "${ARTIFACT_TMP_DIR}" ] && rm -rf "${ARTIFACT_TMP_DIR}"
+    if [ -n "${ARTIFACT_TMP_DIR}" ]; then
+        rm -rf "${ARTIFACT_TMP_DIR}"
+    fi
+    return 0
 }
 trap cleanup_artifact_tmp EXIT
 
