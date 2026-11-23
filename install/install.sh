@@ -72,6 +72,48 @@ sha256_file() {
     fi
 }
 
+sha512_integrity_file() {
+    node -e 'const fs=require("fs");const crypto=require("crypto");const b=fs.readFileSync(process.argv[1]);process.stdout.write("sha512-"+crypto.createHash("sha512").update(b).digest("base64"))' "$1"
+}
+
+file_size() {
+    wc -c < "$1" | tr -d '[:space:]'
+}
+
+# Feed metadata is optional when the component is invoked standalone, but when
+# present it must match the exact tarball that is about to be installed.
+verify_feed_artifact() {
+    local file="$1"
+    local actual_sha actual_size actual_integrity
+
+    actual_sha="$(sha256_file "${file}")"
+    actual_size="$(file_size "${file}")"
+    actual_integrity="$(sha512_integrity_file "${file}")"
+
+    if [ -n "${OMR_ARTIFACT_SHA256:-}" ] && [ "${OMR_ARTIFACT_SHA256}" != "${actual_sha}" ]; then
+        echo "ERR: feed artifact_sha256 不匹配" >&2
+        echo "    expected: ${OMR_ARTIFACT_SHA256}" >&2
+        echo "    actual:   ${actual_sha}" >&2
+        exit 3
+    fi
+    if [ -n "${OMR_ARTIFACT_SIZE:-}" ] && [ "${OMR_ARTIFACT_SIZE}" != "${actual_size}" ]; then
+        echo "ERR: feed artifact_size 不匹配" >&2
+        echo "    expected: ${OMR_ARTIFACT_SIZE}" >&2
+        echo "    actual:   ${actual_size}" >&2
+        exit 3
+    fi
+    if [ -n "${OMR_ARTIFACT_INTEGRITY:-}" ] && [ "${OMR_ARTIFACT_INTEGRITY}" != "${actual_integrity}" ]; then
+        echo "ERR: feed artifact_integrity 不匹配" >&2
+        echo "    expected: ${OMR_ARTIFACT_INTEGRITY}" >&2
+        echo "    actual:   ${actual_integrity}" >&2
+        exit 3
+    fi
+
+    ARTIFACT_SHA256="${actual_sha}"
+    ARTIFACT_SIZE="${actual_size}"
+    ARTIFACT_INTEGRITY="${OMR_ARTIFACT_INTEGRITY:-${actual_integrity}}"
+}
+
 # A component script must also be safe when called without the Taoxian
 # detector. Never replace an existing package unless the caller explicitly
 # requests an upgrade.
@@ -123,6 +165,14 @@ fi
 
 # ===== 3. 装包 (online/offline) =====
 ARTIFACT_SHA256=""
+ARTIFACT_INTEGRITY=""
+ARTIFACT_SIZE=""
+ARTIFACT_TMP_DIR=""
+cleanup_artifact_tmp() {
+    [ -n "${ARTIFACT_TMP_DIR}" ] && rm -rf "${ARTIFACT_TMP_DIR}"
+}
+trap cleanup_artifact_tmp EXIT
+
 if [ "${SKIPPED_EXISTING}" -eq 0 ] && [ "${OMR_INSTALL_MODE}" = "online" ]; then
     echo "==> 1) online: npm install -g @ohoooho/model-router@${OMR_VERSION} (契约 §3.1: 必须 @version)"
     # Let npm use its configured registry/proxy. A separate curl probe can
@@ -130,11 +180,26 @@ if [ "${SKIPPED_EXISTING}" -eq 0 ] && [ "${OMR_INSTALL_MODE}" = "online" ]; then
     if ! npm view "@ohoooho/model-router@${OMR_VERSION}" version --fetch-timeout=5000 --fetch-retries=0 >/dev/null 2>&1; then
         echo "WARN: npm registry 中找不到目标版本, 自动转 offline 模式"
         OMR_INSTALL_MODE="offline"
+    elif [ -n "${OMR_ARTIFACT_SHA256:-}" ] || [ -n "${OMR_ARTIFACT_SIZE:-}" ] || [ -n "${OMR_ARTIFACT_INTEGRITY:-}" ]; then
+        echo "==> 1a) online: 下载 npm tarball 并校验 feed 物料"
+        ARTIFACT_TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/omr-artifact.XXXXXX")"
+        if ! npm pack "@ohoooho/model-router@${OMR_VERSION}" --pack-destination "${ARTIFACT_TMP_DIR}" --silent >/dev/null; then
+            echo "ERR: npm pack 下载 tarball 失败" >&2
+            exit 8
+        fi
+        ARTIFACT_FILE="$(find "${ARTIFACT_TMP_DIR}" -maxdepth 1 -type f -name '*.tgz' | head -1)"
+        if [ -z "${ARTIFACT_FILE}" ] || [ ! -f "${ARTIFACT_FILE}" ]; then
+            echo "ERR: npm pack 未生成 tarball" >&2
+            exit 8
+        fi
+        verify_feed_artifact "${ARTIFACT_FILE}"
+        # Install the exact bytes we just verified; do not let npm re-resolve
+        # a different registry tarball after the check.
+        npm install -g "${ARTIFACT_FILE}" --no-audit --no-fund
     else
-        # 关键修复: 必须 @版本 (失职 217 立刻修)
+        echo "WARN: feed 未提供 OMR artifact sha256/integrity；仅依赖 npm registry 校验"
         npm install -g "@ohoooho/model-router@${OMR_VERSION}" --silent
-        # 算 sha256 (从 npm pack)
-        ARTIFACT_SHA256=$(npm view "@ohoooho/model-router@${OMR_VERSION}" dist.integrity 2>/dev/null | tr -d '\n' || echo "")
+        ARTIFACT_INTEGRITY="$(npm view "@ohoooho/model-router@${OMR_VERSION}" dist.integrity 2>/dev/null | tr -d '\n' || true)"
     fi
 fi
 
@@ -145,20 +210,19 @@ if [ "${SKIPPED_EXISTING}" -eq 0 ] && [ "${OMR_INSTALL_MODE}" = "offline" ]; the
         echo "    把 omr-${OMR_VERSION}.tgz 放到 ${OMR_OFFLINE_TARBALL_DIR}，或设置 OMR_TARBALL"
         exit 2
     fi
-    # sha256 校验 (契约 §9.2: 物料签名/sha256 必须校验)
+    # 组件清单校验：tarball 必须与 component.yaml 记录的 sha256 一致。
     EXPECTED_SHA=$(awk '
         /^[[:space:]]*- id: omr-npm-package/ { found = 1; next }
         found && /^[[:space:]]*sha256:/ { print $2; exit }
     ' "${COMPONENT_YAML}" 2>/dev/null | tr -d '<>"' || true)
-    ACTUAL_SHA=$(sha256_file "${OMR_TARBALL}")
+    verify_feed_artifact "${OMR_TARBALL}"
     if [ -n "${EXPECTED_SHA}" ] && [ "${EXPECTED_SHA}" != "generated-sha256-by-build" ]; then
-        if [ "${EXPECTED_SHA}" != "${ACTUAL_SHA}" ]; then
-            echo "ERR: tarball sha256 不匹配"
+        if [ "${EXPECTED_SHA}" != "${ARTIFACT_SHA256}" ]; then
+            echo "ERR: tarball sha256 与 component.yaml 不匹配"
             echo "    expected: ${EXPECTED_SHA}"
-            echo "    actual:   ${ACTUAL_SHA}"
+            echo "    actual:   ${ARTIFACT_SHA256}"
             exit 3
         fi
-        ARTIFACT_SHA256="${ACTUAL_SHA}"
     fi
     # 包体固定为本地 tarball；依赖默认从 registry 解析。
     # 完全断网需要预热 npm cache，并设置 OMR_STRICT_OFFLINE=1。
@@ -309,6 +373,8 @@ cat <<EOF
   "resolved_version": "${OMR_VERSION}",
   "installed_version": "${INSTALLED_VERSION}",
   "artifact_sha256": "${ARTIFACT_SHA256}",
+  "artifact_integrity": "${ARTIFACT_INTEGRITY}",
+  "artifact_size": "${ARTIFACT_SIZE}",
   "platform": "$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)",
   "verification": "installed+configured_pending_doctor"
 }
