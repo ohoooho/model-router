@@ -431,7 +431,7 @@ function normalizeCoreGatewayVirtualModelProfile(profile: unknown, config: AppCo
   const baseModel = isRecord(profile.baseModel) ? profile.baseModel : undefined;
   const fixedModel = stringValue(baseModel?.fixedModel);
   const rewrittenFixedModel = fixedModel
-    ? rewriteModelSelectorForCoreGatewayProfile(fixedModel, config, "anthropic_messages")
+    ? rewriteModelSelectorForCoreGatewayProfile(fixedModel, config, "anthropic_messages", { preferResponses: true })
     : undefined;
   if (baseModel && rewrittenFixedModel && rewrittenFixedModel !== fixedModel) {
     nextProfile = {
@@ -503,7 +503,8 @@ function normalizeCoreGatewayVirtualModelProfile(profile: unknown, config: AppCo
 function rewriteModelSelectorForCoreGatewayProfile(
   model: string,
   config: AppConfig,
-  clientProtocol: GatewayProviderProtocol
+  clientProtocol: GatewayProviderProtocol,
+  options: { preferResponses?: boolean } = {}
 ): string | undefined {
   const normalized = normalizeRouteSelector(model);
   if (!normalized) {
@@ -518,16 +519,26 @@ function rewriteModelSelectorForCoreGatewayProfile(
     return publicModel;
   }
 
-  const providerName = coreGatewayProviderSelectorName(selector.provider, clientProtocol);
+  const providerName = coreGatewayProviderSelectorName(selector.provider, clientProtocol, options);
   return providerName ? `${providerName}/${selector.model}` : publicModel;
 }
 
 
 function coreGatewayProviderSelectorName(
   provider: GatewayProviderConfig,
-  clientProtocol: GatewayProviderProtocol
+  clientProtocol: GatewayProviderProtocol,
+  options: { preferResponses?: boolean } = {}
 ): string | undefined {
-  const capability = providerCapabilityForClientProtocol(provider, clientProtocol);
+  // A virtual model serves every client protocol. When the provider has a
+  // native Responses capability, compile the fixed target to it: Codex sends
+  // /v1/responses, and Claude Code traffic can be adapted to the same target.
+  // Providers without Responses keep the existing Anthropic-first preference.
+  const responsesCapability = options.preferResponses
+    ? providerCapabilityForClientProtocol(provider, "openai_responses")
+    : undefined;
+  const capability = responsesCapability?.type === "openai_responses"
+    ? responsesCapability
+    : providerCapabilityForClientProtocol(provider, clientProtocol);
   const explicitCapabilities = normalizedProviderCapabilities(provider);
   const protocol = capability?.type ?? (explicitCapabilities.length === 0 ? providerProtocolForClientProtocol(provider, clientProtocol) : undefined);
   if (!protocol) {

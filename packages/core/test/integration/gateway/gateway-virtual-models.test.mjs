@@ -94,6 +94,66 @@ test("gateway config rewrites Fusion fixed base and vision models to core provid
   assert.equal(profiles[0].execution.maxTurns, 6);
 });
 
+test("virtual models prefer a native Responses capability when the provider exposes one", () => {
+  const credential = [{ apiKey: "test-key", id: "test-1" }];
+  const capability = (type, baseUrl) => ({ baseUrl, type });
+  const config = {
+    Providers: [
+      {
+        api_base_url: "https://multi.test/v1",
+        capabilities: [
+          capability("openai_chat_completions", "https://multi.test/v1"),
+          capability("openai_responses", "https://multi.test/v1"),
+          capability("anthropic_messages", "https://multi.test/anthropic")
+        ],
+        credentials: credential,
+        models: ["shared-model"],
+        name: "Multi Protocol",
+        type: "openai_chat_completions"
+      },
+      {
+        api_base_url: "https://chat.test/v1",
+        capabilities: [capability("openai_chat_completions", "https://chat.test/v1")],
+        credentials: credential,
+        models: ["shared-model"],
+        name: "Chat Only",
+        type: "openai_chat_completions"
+      },
+      {
+        api_base_url: "https://anthropic.test",
+        capabilities: [capability("anthropic_messages", "https://anthropic.test")],
+        credentials: credential,
+        models: ["shared-model"],
+        name: "Anthropic Only",
+        type: "anthropic_messages"
+      }
+    ],
+    Router: { fallback: { mode: "off", models: [], retryCount: 0 } },
+    gateway: {}
+  };
+  const profile = (id, providerName) => ({
+    baseModel: { fixedModel: `${providerName}/shared-model`, mode: "fixed" },
+    displayName: id,
+    enabled: true,
+    execution: { clientToolsPolicy: "allow", mode: "decorate_only", streamMode: "optimistic" },
+    id,
+    key: id,
+    match: { exactAliases: [id], prefixes: [], suffixes: [] },
+    materialization: { enabled: true, includeInGatewayModels: true },
+    tools: []
+  });
+  const normalized = normalizeCoreGatewayVirtualModelProfiles([
+    profile("multi", "Multi Protocol"),
+    profile("chat", "Chat Only"),
+    profile("anthropic", "Anthropic Only")
+  ], config);
+  const fixedModelById = Object.fromEntries(normalized.map((item) => [item.id, item.baseModel.fixedModel]));
+
+  assert.match(fixedModelById.multi, /::openai_responses::cred:test-1\/shared-model$/);
+  assert.match(fixedModelById.chat, /::openai_chat_completions::cred:test-1\/shared-model$/);
+  assert.match(fixedModelById.anthropic, /::anthropic_messages::cred:test-1\/shared-model$/);
+});
+
 test("issue 1480 Fusion vision config injects core auth token into MCP gateway runtime", async () => {
   const providerName = "Zhipu AI (China) - Coding Plan";
   const config = {
