@@ -87,8 +87,12 @@ for (const [id, expected] of Object.entries(aliases)) {
   if (fixed !== expected) throw new Error(`${id} is ${fixed}, expected ${expected}`);
 }
 if (!baozi.models.includes('trial-auto')) throw new Error('baozi trial-auto model was not added');
-if (config.virtualModelProfiles.find((item) => item.id === 'trial-auto').key !== 'baozi-assist-auto') {
-  throw new Error('trial-auto must share the assist scene key');
+if (config.virtualModelProfiles.find((item) => item.id === 'trial-auto').key !== 'baozi-trial-auto') {
+  throw new Error('trial-auto must have its own profile key');
+}
+const profileKeys = config.virtualModelProfiles.map((item) => item.key);
+if (new Set(profileKeys).size !== profileKeys.length) {
+  throw new Error(`duplicate virtual-model profile keys: ${JSON.stringify(profileKeys)}`);
 }
 const coding = config.virtualModelProfiles.find((item) => item.id === 'coding-auto');
 if (coding.custom !== 1) throw new Error('user-owned profile field was lost');
@@ -102,4 +106,61 @@ after="$(sha_file "${DATA_DIR}/config.sqlite")"
   exit 1
 }
 
-echo "PASS: user-selected alias models, user-added tai, and user routes are preserved"
+# Regression: older installs keyed profiles by key_id, so assist-auto and
+# trial-auto both used `baozi-assist-auto`. The new Model Entries page edits by
+# profile key; saving one scene must never overwrite the other. The same UI bug
+# could also leave two assist-auto rows and no trial-auto row.
+LEGACY_DATA_DIR="${TMP_DIR}/legacy-data"
+mkdir -p "${LEGACY_DATA_DIR}"
+export OMR_DATA_DIR="${LEGACY_DATA_DIR}"
+node - "${LEGACY_DATA_DIR}/config.sqlite" <<'NODE'
+const { DatabaseSync } = require('node:sqlite');
+const db = new DatabaseSync(process.argv[2]);
+db.exec('CREATE TABLE app_config (key TEXT PRIMARY KEY, value_json TEXT NOT NULL, updated_at TEXT)');
+const config = {
+  Providers: [
+    { name: 'baozi', enabled: true, baseUrl: 'https://llm.ohoooho.com/v1', apiKey: 'fake_baozi_***', models: ['assist-auto', 'trial-auto'] },
+    { name: 'tai', enabled: true, baseUrl: 'https://tai.example/v1', apiKey: 'fake_tai_***', models: ['glm-5.3-flash', 'qwen3.8-max'] },
+  ],
+  preferredProvider: 'tai',
+  virtualModelProfiles: [
+    { id: 'coding-auto', key: 'baozi-coding-auto', displayName: 'Coding', enabled: true, baseModel: { mode: 'fixed', fixedModel: 'tai/glm-5.3-flash' }, match: { exactAliases: ['coding-auto'] }, execution: {}, tools: [], materialization: {} },
+    { id: 'assist-auto', key: 'baozi-assist-auto', displayName: 'Assist', enabled: true, baseModel: { mode: 'fixed', fixedModel: 'tai/glm-5.3-flash' }, match: { exactAliases: ['assist-auto'] }, execution: {}, tools: [], materialization: {} },
+    { id: 'assist-auto', key: 'baozi-assist-auto', displayName: 'Assist duplicate', enabled: true, baseModel: { mode: 'fixed', fixedModel: 'tai/glm-5.3-flash' }, match: { exactAliases: ['assist-auto'] }, execution: {}, tools: [], materialization: {} },
+    { id: 'trial-auto', key: 'baozi-assist-auto', displayName: 'Trial', enabled: true, baseModel: { mode: 'fixed', fixedModel: 'tai/qwen3.8-max' }, match: { exactAliases: ['trial-auto'] }, execution: {}, tools: [], materialization: {} },
+  ],
+};
+db.prepare("INSERT INTO app_config (key, value_json, updated_at) VALUES ('default', ?, datetime('now'))")
+  .run(JSON.stringify(config));
+db.close();
+NODE
+node "${SCRIPT_DIR}/migrate-runtime-config.js" >/dev/null
+node - "${LEGACY_DATA_DIR}/config.sqlite" <<'NODE'
+const { DatabaseSync } = require('node:sqlite');
+const db = new DatabaseSync(process.argv[2], { readOnly: true });
+const config = JSON.parse(db.prepare("SELECT value_json FROM app_config WHERE key='default'").get().value_json);
+db.close();
+const profiles = config.virtualModelProfiles;
+const ids = profiles.map((item) => item.id);
+if (ids.filter((id) => id === 'assist-auto').length !== 1) {
+  throw new Error(`expected one assist-auto profile, got ${JSON.stringify(ids)}`);
+}
+const assist = profiles.find((item) => item.id === 'assist-auto');
+const trial = profiles.find((item) => item.id === 'trial-auto');
+if (!trial) throw new Error('trial-auto profile was lost');
+if (assist.key !== 'baozi-assist-auto') throw new Error(`assist-auto key is ${assist.key}`);
+if (trial.key !== 'baozi-trial-auto') throw new Error(`trial-auto key is ${trial.key}`);
+if (assist.baseModel.fixedModel !== 'tai/glm-5.3-flash') throw new Error('assist-auto model was overwritten');
+if (trial.baseModel.fixedModel !== 'tai/qwen3.8-max') throw new Error('trial-auto model was overwritten');
+const keys = profiles.map((item) => item.key);
+if (new Set(keys).size !== keys.length) throw new Error(`duplicate profile keys: ${JSON.stringify(keys)}`);
+NODE
+legacy_before="$(sha_file "${LEGACY_DATA_DIR}/config.sqlite")"
+node "${SCRIPT_DIR}/migrate-runtime-config.js" >/dev/null
+legacy_after="$(sha_file "${LEGACY_DATA_DIR}/config.sqlite")"
+[ "${legacy_before}" = "${legacy_after}" ] || {
+  echo "FAIL: legacy duplicate-key repair was not idempotent" >&2
+  exit 1
+}
+
+echo "PASS: user-selected alias models, user-added tai, user routes, and legacy duplicate profile keys are preserved or repaired"

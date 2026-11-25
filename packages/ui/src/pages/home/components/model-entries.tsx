@@ -452,7 +452,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [dialog, setDialog] = useState<"create" | "edit" | undefined>();
-  const [editingKey, setEditingKey] = useState<string>();
+  const [editingId, setEditingId] = useState<string>();
   const [providerName, setProviderName] = useState("");
   const [role, setRole] = useState<ModelEntryRole>("code");
   const [model, setModel] = useState("");
@@ -474,8 +474,8 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
       .filter(({ profile }) => isModelEntry(profile)),
     [config?.virtualModelProfiles]
   );
-  const editingProfile = editingKey
-    ? (config?.virtualModelProfiles ?? []).find((profile) => profile.key === editingKey)
+  const editingProfile = editingId
+    ? (config?.virtualModelProfiles ?? []).find((profile) => profile.id === editingId)
     : undefined;
   const editingBuiltin = Boolean(editingProfile && isBuiltinSceneProfile(editingProfile));
   const selectedProvider = providers.find((provider) => provider.name === providerName);
@@ -484,7 +484,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
   const reservedAliases = useMemo(() => {
     const reserved = new Set(globalAliases);
     for (const profile of config?.virtualModelProfiles ?? []) {
-      if (editingKey && profile.key === editingKey) {
+      if (editingId && profile.id === editingId) {
         continue;
       }
       for (const aliasValue of profile.match?.exactAliases ?? []) {
@@ -501,7 +501,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
       }
     }
     return reserved;
-  }, [config?.virtualModelProfiles, editingKey, providers]);
+  }, [config?.virtualModelProfiles, editingId, providers]);
 
   const recommendedAlias = useMemo(() => {
     const rolePart = slugify(role) || "custom";
@@ -541,7 +541,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
   function openCreate(): void {
     const provider = providers[0];
     setDialog("create");
-    setEditingKey(undefined);
+    setEditingId(undefined);
     setProviderName(provider?.name ?? "");
     setRole("code");
     setModel(provider?.models[0] ?? "");
@@ -559,7 +559,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
     const selectedModel = slash >= 0 ? fixedModel.slice(slash + 1) : fixedModel;
     const selectedRole = entryRole(profile) ?? "code";
     setDialog("edit");
-    setEditingKey(profile.key);
+    setEditingId(profile.id);
     setProviderName(provider);
     setRole(selectedRole);
     setModel(selectedModel);
@@ -574,7 +574,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
       return;
     }
     setDialog(undefined);
-    setEditingKey(undefined);
+    setEditingId(undefined);
     setError("");
   }
 
@@ -626,11 +626,11 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
       return;
     }
     const normalizedAlias = alias.trim().toLowerCase();
-    if (!editingKey && reservedAliases.has(normalizedAlias)) {
+    if (!editingId && reservedAliases.has(normalizedAlias)) {
       setError(zh ? `调用 ID “${normalizedAlias}” 已被占用，请换一个。` : `Call ID “${normalizedAlias}” is already in use. Choose another.`);
       return;
     }
-    if (editingKey && !editingProfile) {
+    if (editingId && !editingProfile) {
       setError(zh ? "这个入口已经不存在，请刷新后再试。" : "This entry no longer exists. Refresh and try again.");
       return;
     }
@@ -650,18 +650,18 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
           role,
           model,
           normalizedAlias,
-          editingKey,
+          editingProfile?.key,
           zh
         );
-    if (!editingKey) {
+    if (!editingId) {
       profile.id = uniqueVirtualModelId(currentProfiles, profile.id);
     }
-    const nextProfiles = editingKey
-      ? currentProfiles.map((item) => item.key === editingKey ? profile : item)
+    const nextProfiles = editingId
+      ? currentProfiles.map((item) => item.id === editingId ? profile : item)
       : [...currentProfiles, profile];
-    if (await persistProfiles(nextProfiles, editingKey ? undefined : normalizedAlias)) {
+    if (await persistProfiles(nextProfiles, editingId ? undefined : normalizedAlias)) {
       setDialog(undefined);
-      setEditingKey(undefined);
+      setEditingId(undefined);
     }
   }
 
@@ -669,7 +669,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
     if (!deleteTarget) {
       return;
     }
-    const nextProfiles = (config?.virtualModelProfiles ?? []).filter((profile) => profile.key !== deleteTarget.key);
+    const nextProfiles = (config?.virtualModelProfiles ?? []).filter((profile) => profile.id !== deleteTarget.id);
     if (await persistProfiles(nextProfiles)) {
       setDeleteTarget(undefined);
     }
@@ -677,7 +677,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
 
   async function toggleEntry(profile: VirtualModelProfileConfig, enabled: boolean): Promise<void> {
     const nextProfiles = (config?.virtualModelProfiles ?? []).map((item) =>
-      item.key === profile.key ? { ...item, enabled } : item
+      item.id === profile.id ? { ...item, enabled } : item
     );
     await persistProfiles(nextProfiles);
   }
@@ -697,7 +697,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
     label: providerModelDisplayName(selectedProvider!, modelName),
     value: modelName
   }));
-  const aliasConflict = !editingKey && Boolean(alias.trim()) && reservedAliases.has(alias.trim().toLowerCase());
+  const aliasConflict = !editingId && Boolean(alias.trim()) && reservedAliases.has(alias.trim().toLowerCase());
   const validationError = dialog && !loading
     ? validateAlias(alias, zh) || (aliasConflict
       ? (zh ? `调用 ID “${alias.trim().toLowerCase()}” 已被占用，请换一个。` : `Call ID “${alias.trim().toLowerCase()}” is already in use. Choose another.`)
@@ -823,7 +823,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
                       {builtinEntries.map(({ profile }) => (
                         <ModelEntryCard
                           copiedAlias={copiedAlias}
-                          key={profile.key}
+                          key={profile.id}
                           onCopy={(value) => void copyAlias(value)}
                           onDelete={setDeleteTarget}
                           onEdit={openEdit}
@@ -856,7 +856,7 @@ export function ModelEntriesView({ onOpenProviders }: { onOpenProviders: () => v
                       {customEntries.map(({ profile }) => (
                         <ModelEntryCard
                           copiedAlias={copiedAlias}
-                          key={profile.key}
+                          key={profile.id}
                           onCopy={(value) => void copyAlias(value)}
                           onDelete={setDeleteTarget}
                           onEdit={openEdit}

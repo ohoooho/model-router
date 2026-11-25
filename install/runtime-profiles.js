@@ -19,6 +19,7 @@ const TAOXIAN_VIRTUAL_MODELS = {
     defaultBaseModel: 'baozi/coding-auto',
     match: { exactAliases: ['coding-auto'] },
     key_id: 'baozi-coding-auto',
+    profileKey: 'baozi-coding-auto',
   },
   'assist-auto': {
     display_name: 'Assist Auto (通用助手)',
@@ -26,6 +27,7 @@ const TAOXIAN_VIRTUAL_MODELS = {
     defaultBaseModel: 'baozi/assist-auto',
     match: { exactAliases: ['assist-auto'] },
     key_id: 'baozi-assist-auto',
+    profileKey: 'baozi-assist-auto',
   },
   'chat-auto': {
     display_name: 'Chat Auto (日常聊天)',
@@ -33,6 +35,7 @@ const TAOXIAN_VIRTUAL_MODELS = {
     defaultBaseModel: 'baozi/chat-auto',
     match: { exactAliases: ['chat-auto'] },
     key_id: 'baozi-chat-auto',
+    profileKey: 'baozi-chat-auto',
   },
   'team-auto': {
     display_name: 'Team Auto (团队协作)',
@@ -40,13 +43,18 @@ const TAOXIAN_VIRTUAL_MODELS = {
     defaultBaseModel: 'baozi/team-auto',
     match: { exactAliases: ['team-auto'] },
     key_id: 'baozi-team-auto',
+    profileKey: 'baozi-team-auto',
   },
   'trial-auto': {
     display_name: 'Trial Auto (体验配额)',
     strategy: 'auto-balance',
     defaultBaseModel: 'baozi/trial-auto',
     match: { exactAliases: ['trial-auto'] },
+    // trial-auto intentionally shares assist's upstream API key. The profile
+    // key is the UI/runtime identity and must not be shared: editing one
+    // scene by key would otherwise overwrite the other.
     key_id: 'baozi-assist-auto',
+    profileKey: 'baozi-trial-auto',
   },
 };
 
@@ -120,25 +128,65 @@ function applyManagedProviderVisibility(providers) {
   });
 }
 
+function profileKeyForScene(scene, id) {
+  return String(scene.profileKey || scene.key_id || `baozi-${id}`).trim();
+}
+
+function uniqueProfileKey(base, usedKeys) {
+  const normalized = String(base || 'profile').trim() || 'profile';
+  if (!usedKeys.has(normalized)) {
+    return normalized;
+  }
+  for (let index = 2; index < 1000; index += 1) {
+    const candidate = `${normalized}-${index}`;
+    if (!usedKeys.has(candidate)) {
+      return candidate;
+    }
+  }
+  return `${normalized}-${Date.now()}`;
+}
+
 /**
  * Merge the five Taoxian scene profiles into `defaultConfig` without touching
  * user-owned fields. Existing profiles win, including a user-selected fixed
  * base model; only missing profiles and missing base models are filled with
  * the Baozi scene defaults. Returns a new profiles array and whether anything
  * changed.
+ *
+ * `key` is the profile identity used by the UI and runtime; it must be unique.
+ * `key_id` only selects the upstream API key and may be shared (trial-auto
+ * intentionally reuses assist-auto's key).
  */
 function mergeVirtualModelProfiles(defaultConfig, virtualModels = TAOXIAN_VIRTUAL_MODELS) {
-  const existingProfiles = Array.isArray(defaultConfig?.virtualModelProfiles)
+  const sourceProfiles = Array.isArray(defaultConfig?.virtualModelProfiles)
     ? [...defaultConfig.virtualModelProfiles]
     : [];
-  const profileById = new Map(
-    existingProfiles
-      .filter((profile) => profile && typeof profile === 'object' && profile.id)
-      .map((profile) => [profile.id, profile]),
-  );
+  const existingProfiles = [];
+  const profileById = new Map();
   let changed = false;
 
+  // Repair configs written by older installers that keyed profiles by
+  // `key_id`, which created duplicate keys for assist-auto and trial-auto.
+  // Keep the first profile for a duplicated id and drop later copies so
+  // editing one entry can never overwrite another.
+  for (const profile of sourceProfiles) {
+    if (!profile || typeof profile !== 'object' || Array.isArray(profile)) {
+      existingProfiles.push(profile);
+      continue;
+    }
+    const id = typeof profile.id === 'string' ? profile.id.trim() : '';
+    if (id) {
+      if (profileById.has(id)) {
+        changed = true;
+        continue;
+      }
+      profileById.set(id, profile);
+    }
+    existingProfiles.push(profile);
+  }
+
   for (const [id, scene] of Object.entries(virtualModels)) {
+    const desiredKey = profileKeyForScene(scene, id);
     const generated = {
       id,
       name: scene.display_name,
@@ -146,7 +194,7 @@ function mergeVirtualModelProfiles(defaultConfig, virtualModels = TAOXIAN_VIRTUA
       enabled: true,
       baseModel: { mode: 'fixed', fixedModel: scene.defaultBaseModel },
       strategy: scene.strategy,
-      key: scene.key_id,
+      key: desiredKey,
       match: scene.match,
       tools: [],
       execution: { mode: 'tool_loop', clientToolsPolicy: 'allow', streamMode: 'optimistic' },
@@ -168,7 +216,44 @@ function mergeVirtualModelProfiles(defaultConfig, virtualModels = TAOXIAN_VIRTUA
         existing.baseModel = { ...existing.baseModel, mode: 'fixed', fixedModel: scene.defaultBaseModel };
         changed = true;
       }
+      if (existing.key !== desiredKey) {
+        existing.key = desiredKey;
+        changed = true;
+      }
     }
+  }
+
+  // Reserve managed scene keys first, then repair any other duplicate keys.
+  // This keeps assist-auto and trial-auto distinct even on an old config.
+  const managedIds = new Set(Object.keys(virtualModels));
+  const usedKeys = new Set();
+  const normalizeKey = (profile, index) => {
+    if (!profile || typeof profile !== 'object' || Array.isArray(profile)) {
+      return;
+    }
+    const currentKey = typeof profile.key === 'string' ? profile.key.trim() : '';
+    const base = currentKey
+      || (typeof profile.id === 'string' && profile.id.trim())
+      || `profile-${index + 1}`;
+    const nextKey = uniqueProfileKey(base, usedKeys);
+    if (nextKey !== profile.key) {
+      profile.key = nextKey;
+      changed = true;
+    }
+    usedKeys.add(nextKey);
+  };
+  for (const id of managedIds) {
+    const profile = profileById.get(id);
+    if (profile) {
+      normalizeKey(profile, existingProfiles.indexOf(profile));
+    }
+  }
+  for (let index = 0; index < existingProfiles.length; index += 1) {
+    const profile = existingProfiles[index];
+    if (profile && typeof profile === 'object' && !Array.isArray(profile) && managedIds.has(profile.id)) {
+      continue;
+    }
+    normalizeKey(profile, index);
   }
 
   return { profiles: existingProfiles, changed };
