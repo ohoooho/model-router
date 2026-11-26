@@ -14,7 +14,7 @@ and **not** a model-quality evaluation.
 
 | Item | Value |
 | --- | --- |
-| OMR package version | `0.2.3` |
+| OMR package version | `0.2.4` |
 | CCR target | `3.1.5` |
 | Reference branch | `upgrade/ccr-3.1.5` |
 | Reference commit at first write | `94dfe813` |

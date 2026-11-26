@@ -23,6 +23,24 @@
 
 ## Fork 后变更（OMR 专属）
 
+### OMR-RELEASE-0.2.4 — 2026-11-26
+- **类型**: bug-fix
+- **标题**: Codex Responses 历史兼容 + 虚拟模型稳定切换 + 模型条目键修复
+- **改动**:
+  - Codex Responses 请求在 OMR 转发层做 item id 兼容：`function_call.id`
+    的 `call_*` 规范为 `fc_*`，`function_call_output.id` 规范为 `fco_*`，
+    `call_id` 保持原值。
+  - `store:false` 时移除历史 reasoning item 的 `rs_*` id，保留 reasoning
+    内容；避免上游报 `Item with id ... not found`。
+  - 当虚拟模型固定目标支持 Responses 时优先使用 Responses 协议；
+    `/v1/chat/completions`、`/v1/responses`、`/v1/messages` 切换同一虚拟 ID
+    时不再回落到其他模型。
+  - 修复模型条目 profile key 冲突：迁移时去重/修复，UI 按唯一 model id 编辑，
+    `assist-auto` / `trial-auto` 不再互相覆盖。
+- **兼容**: 无新增数据库表/列；不改变 `*-auto` 别名，不改变全局 fallback；
+  OpenCode 未配置的模型仍返回明确 400，不静默替换。
+- **物料**: `omr-0.2.4.tgz`，替换 `0.2.3` 离线包。
+
 ### OMR-RELEASE-0.2.3 — 2026-11-22
 - **类型**: feat
 - **标题**: 工具模型选配 + 稳定调用 ID + 供应商模型显示名

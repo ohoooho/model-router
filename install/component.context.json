@@ -8,8 +8,8 @@
 
   "component": {
     "id": "omr",
-    "default_version": "0.2.3",
-    "resolved_version": "0.2.3",
+    "default_version": "0.2.4",
+    "resolved_version": "0.2.4",
     "version_policy": "default"
   },
 
