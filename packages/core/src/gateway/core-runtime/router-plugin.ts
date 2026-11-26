@@ -63,6 +63,10 @@ import {
   prepareCodexMultiAgentBridgeRequest,
   transformCodexMultiAgentBridgeResponseValue
 } from "@ccr/core/gateway/features/codex-multi-agent-bridge";
+import {
+  codexResponsesIdCompatHeader,
+  normalizeCodexResponsesInputIds
+} from "@ccr/core/gateway/features/codex-responses-id-compat";
 import { requestLogRequestedModel } from "@ccr/core/observability/request-log-model";
 import { createStreamExperienceMeter, LiveTokenRateTracker } from "@ccr/core/observability/stream-experience";
 import {
@@ -463,6 +467,33 @@ export async function createGatewayPlugin(input: GatewayPluginFactoryInput = {})
       stage: "beforeUpstream",
       transform: (requestInput: GatewayRequestTransformInput) =>
         applyCodexBridgeRequestTransform(config, requestInput)
+    }, {
+      key: "ccr-codex-responses-id-compat",
+      stage: "beforeUpstream",
+      transform: (requestInput: GatewayRequestTransformInput) => {
+        const path = requestPath(
+          requestInput.route?.url ?? requestInput.request?.url ?? "/"
+        );
+        if (requestProtocolForPath(path) !== "openai_responses") {
+          return undefined;
+        }
+        const targetProtocol =
+          normalizeProviderProtocol(requestInput.targetProviderConfig?.type) ??
+          normalizeProviderProtocol(requestInput.targetProviderConfig?.provider);
+        if (targetProtocol !== "openai_responses" || !isRecord(requestInput.requestBody)) {
+          return undefined;
+        }
+        const normalized = normalizeCodexResponsesInputIds(requestInput.requestBody);
+        if (!normalized) {
+          return undefined;
+        }
+        return {
+          headers: {
+            [codexResponsesIdCompatHeader]: String(normalized.changed)
+          },
+          requestBody: normalized.body
+        };
+      }
     }],
     responseHooks: [{
       key: ccrAnthropicReasoningResponseHookKey,
