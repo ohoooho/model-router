@@ -1,10 +1,11 @@
 /**
- * Codex stores a function_call's call id in both `id` and `call_id` in its
- * session history. The OpenAI Responses API requires the item `id` to use the
- * `fc_` prefix (function calls) or `fco_` prefix (function call outputs), while
- * `call_id` remains the Chat-Completions-style `call_*` value.
+ * Codex stores function-call ids and reasoning item ids from earlier turns in
+ * its session history. The OpenAI Responses API accepts `call_*` as
+ * `call_id`, but function-call item ids must use `fc_` / `fco_`. When
+ * `store:false`, previously generated reasoning items are not persisted and
+ * their `rs_*` ids cannot be referenced again.
  *
- * Normalize only Codex-style call ids; leave already-valid item ids alone.
+ * Normalize only Codex-style ids; leave already-valid item ids alone.
  */
 import { isRecord, stringValue } from "@ccr/core/gateway/internal/value";
 
@@ -16,6 +17,7 @@ export function normalizeCodexResponsesInputIds(
   if (!Array.isArray(body.input)) {
     return undefined;
   }
+  const stripReasoningIds = body.store !== true;
   let changed = 0;
   const input = body.input.map((item) => {
     if (!isRecord(item)) {
@@ -25,6 +27,11 @@ export function normalizeCodexResponsesInputIds(
     const id = stringValue(item.id);
     if (!id) {
       return item;
+    }
+    if (type === "reasoning" && stripReasoningIds) {
+      changed += 1;
+      const { id: _id, ...rest } = item;
+      return rest;
     }
     if (type === "function_call" && id.startsWith("call_")) {
       changed += 1;
